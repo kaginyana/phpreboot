@@ -1,0 +1,18 @@
+c2 = select id, value
+     from collections
+     where value == 5;
+     
+     
+// ArrayList c2 = new ArrayList()
+// for(c in Collections) {
+//   if (c.value == 5) {
+//     c2.add(new Anonymous() {{
+//       foo= c.id;
+//       bar= c.value
+//     }});
+//   }
+// }
+
+// SQL:
+// select id, value
+// where value == 5

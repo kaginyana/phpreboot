@@ -1,0 +1,19 @@
+x = 2
+x = 3 // error
+
+z = map c in [1..4]
+  to c + 1
+// z = [2, 3, 4, 5]
+
+min = map z in array
+   fold min_value => min(z, min_value)
+   
+max = map z in array
+   fold max_value => max(z, max_value)
+   
+count = map z in array
+   fold count => 1 + count
+   
+
+   
+     

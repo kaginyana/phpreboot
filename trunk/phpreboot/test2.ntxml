@@ -1,0 +1,12 @@
+
+  echo <foo></foo> ;
+  
+  <bar x="3" y='4'>
+    <foobar/>
+  </bar>
+  
+  <html>
+    <title>hello</title>
+  </html>
+  
+  <a x=$(2+3) y=$(3+4)></a> 

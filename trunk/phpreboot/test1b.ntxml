@@ -1,0 +1,9 @@
+  a = <html>
+   <title>hello PHP.reboot</title>
+   <body>
+    <h1>
+    </h1>
+   </body>
+  </html>;
+  
+  echo a;

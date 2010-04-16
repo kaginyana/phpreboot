@@ -1,0 +1,238 @@
+directives:
+  autoalias
+
+priorities:
+  eq   = 0 left
+  bool = 1 left
+  plus = 2 left
+  mult = 3 left
+  unary = 4 left
+  xml = 5 left
+  ifelse = 6 right
+
+tokens:
+  let = 'let'
+  _if = 'if'
+  _else = 'else'     [ifelse]
+  elseif = 'elseif'  [ifelse]
+  _while = 'while'
+  _do = 'do'
+  _for = 'for'
+  foreach = 'foreach'
+  function = 'function' 
+  as = 'as' 
+  _switch = 'switch'
+  _case = 'case'
+  _default = 'default'
+  echo = 'echo'
+  dot = '\.'
+  comma = ','
+  colon = ':'
+  assign = '='
+  plus = '\+'   [plus]
+  minus = '-'   [plus]
+  mult = '\*'   [mult]
+  div = '\/'    [mult]
+  eq = '=='     [eq]
+  ne = '!='     [eq]
+  lt = '<'  [eq]
+  le = '<=' [eq]
+  gt = '>'  [eq]
+  ge = '>=' [eq]
+  or = 'or'     [bool]
+  and = 'and'   [bool]
+  not = '!'     [unary]
+  lcurl = '\{'
+  rcurl = '\}'
+  lpar = '\('
+  rpar = '\)'
+  lopt = '\['
+  ropt = '\]'
+  semi = ';'
+  
+  lbrack_slash = '<[( \t\r\n]*\/'
+  slash_rbrack = '\/[( \t\r\n]*>'
+  dollar = '\$'
+  
+  _any = 'any'
+  _boolean = 'boolean'
+  _int = 'int'
+  _double = 'double'
+  
+  null_literal = 'null'
+  bool_literal = 'true|false'
+  value_literal = '([0-9]+(\.([0-9])+)?)|(0[xX][0-9a-fA-F]+)'
+  string_literal = '(\u0022([^\u0022])*\u0022)|(\u0027([^\u0027])*\u0027)'
+  id = '[A-Za-z_][A-Za-z0-9_]*'
+  text = '[^ \t\r\n<${]+'      [xml]
+  
+blanks:
+  space = '( |\t|\r|\n)+'
+  
+comments:
+  oneline_comment = "\/\/([^\r\n])*(\r)?\n" 
+  multiline_comment = "\/\*([^*]|[(\r)?\n]|(\*+([^*/]|((\r)?\n))))*\*+\/"
+  
+types:
+  'id': String
+  'null_literal': void
+  'bool_literal': boolean
+  'value_literal': Object  
+  'string_literal': String
+  'lcurl': void
+  'rcurl': void
+  'if': void
+  'do': void
+  'while': void
+  'text': String
+  
+attributes:
+  symbol: com.googlecode.phpreboot.model.Symbol
+  type: com.googlecode.phpreboot.compiler.Type  
+  
+starts:
+  script  
+  
+productions:           
+  type = 'any'      { type_any }
+       | 'boolean'  { type_boolean }
+       | 'int'      { type_int }
+       | 'double'   { type_double }
+       ;
+
+  script = script member     { script_script_member }
+         | member            { script_member }
+         ; 
+         
+  member = fun      { member_fun } 
+         | instr    { member_instr }
+         ;
+         
+  fun = 'function' signature block        { fun }
+      ; 
+      
+  signature =  type? 'id' '(' parameter* ')'       { signature }
+            ;
+ 
+  parameter = type 'id'  { parameter_typed }
+            | 'id'       { parameter_any }
+            ;    
+         
+  block = '{' instr* '}'            { block }
+        ;
+              
+  instr = assignment ';'                            { instr_assign }
+        | declaration ';'                           { instr_decl }
+        | funcall ';'                               { instr_funcall }
+        | 'echo' expr ';'                           { instr_echo }
+        | 'if' '(' expr ')' instr else_if           { instr_if }
+        | label? labeled_instr                      { instr_labeled }
+        | block                                     { instr_block }
+        | xmls                                      { instr_xmls }
+        ;
+        
+  assignment = 'id' '=' expr                  { assignment_id }
+             | 'id' '.' 'id' '=' expr         { assignment_field } 
+             | primary '.' 'id' '=' expr      { assignment_primary_field }
+             | 'id' '[' expr ']' '=' expr     { assignment_array } 
+             | primary '[' expr ']' '=' expr  { assignment_primary_array }
+             ; 
+             
+  declaration = type 'id'              { declaration_type_empty }
+              | type 'id' '=' expr     { declaration_type_init }
+              | 'let' 'id' '=' expr    { declaration_let }
+              ;           
+     
+  funcall = 'id' '(' expr/'comma'* ')'   { funcall }
+          ;
+        
+  label = 'id' ':'   { loop_label }
+        ;       
+        
+  labeled_instr = 'while' '(' expr ')' instr                             { labeled_instr_while }
+                | 'do' instr 'while' '(' expr ')' ';'                    { labeled_instr_do_while }
+                | 'for' '(' for_init? ';' expr? ';' for_step? ')' instr  { labeled_instr_for }
+                | 'foreach' '(' expr 'as' 'id' ')' instr                 { labeled_instr_foreach }
+                | 'foreach' '(' expr 'as' 'id' ':' 'id' ')' instr        { labeled_instr_foreach_entry }
+                | 'switch' '(' expr ')' '{' inner_switch* '}'            { labeled_instr_switch }
+                ;
+       
+  for_init = declaration        { for_init_declaration }
+           | assignment         { for_init_assignment }
+           | funcall            { for_init_funcall }
+           ;
+           
+  for_step = assignment         { for_step_assignment }
+           | funcall            { for_step_funcall }
+           ;
+              
+  inner_switch = 'case' literal ':'   { inner_switch_case }
+               | instr                { inner_switch_instr }
+               | 'default' ':'        { inner_switch_default }
+               ;
+        
+  else_if = 'elseif' '(' expr ')' instr else_if              { else_if_else_if }
+          | 'else' instr                                     { else_if_else }
+          |                                        [ifelse]  { else_if_empty }
+          ;
+  
+  literal = single_literal                     { literal_single }
+          | '[' array_value/'comma'* ']'       { literal_array }
+          ; 
+          
+  single_literal = 'null_literal'      { literal_null }
+                 | 'bool_literal'      { literal_bool }
+                 | 'value_literal'     { literal_value }
+                 | 'string_literal'    { literal_string }
+                 ;
+          
+  array_value = literal                 { array_value_single }
+              | literal ':' literal     { array_value_entry }
+              ;
+  
+  primary = literal                 { primary_literal }
+          | 'id' '[' expr ']'       { primary_array_access }     
+          | primary '[' expr ']'    { primary_primary_array_access }                          
+          | 'id' '.' 'id'           { primary_field_access }
+          | primary '.' 'id'        { primary_primary_field_access }                  
+          | '(' expr ')'            { primary_parens }
+          | funcall                 { primary_funcall }
+          ;
+  
+  expr = 'id'                       { expr_id }
+       | primary                    { expr_primary }
+       | '+' expr        [unary]    { expr_unary_plus }
+       | '-' expr        [unary]    { expr_unary_minus }
+       | '!' expr        [unary]    { expr_unary_not }
+       | expr '+' expr   [plus]     { expr_plus }
+       | expr '-' expr   [plus]     { expr_minus }
+       | expr '*' expr   [mult]     { expr_mult }
+       | expr '/' expr   [mult]     { expr_div }
+       | expr '==' expr  [eq]       { expr_eq }
+       | expr '!=' expr  [eq]       { expr_ne }
+       | expr '<' expr   [eq]       { expr_lt }
+       | expr '<=' expr  [eq]       { expr_le }
+       | expr '>' expr   [eq]       { expr_gt }
+       | expr '>=' expr  [eq]       { expr_ge }
+       | expr 'or' expr  [bool]     { expr_or }
+       | expr 'and' expr [bool]     { expr_and }
+       | xmls                       { expr_xmls }
+       ;
+       
+   xmls = '<' 'id' attrs '>' content 'lbrack_slash' 'id' '>'     { xmls_start_end_tag }
+        | '<' 'id' attrs 'slash_rbrack'                          { xmls_empty_tag }
+        ;
+       
+   content = content xmls                                       { content_xmls }
+           | content 'text'                                     { content_text }
+           | content block                                      { content_block }
+           | content '$' 'id'                                   { content_dollar_id }
+           | content '$' '(' expr ')'                           { content_dollar_expr }
+           |                                                    { content_empty }
+           ;
+           
+   attrs = attrs 'id' '=' '$' 'id'             { attrs_dollar_id }
+         | attrs 'id' '=' '$' '(' expr ')'     { attrs_dollar_expr }
+         | attrs 'id' '=' 'string_literal'     { attrs_string_literal }
+         |                                          { attrs_empty }
+         ;

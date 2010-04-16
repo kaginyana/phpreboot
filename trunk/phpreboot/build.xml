@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<project name="phpreboot" default="all" basedir=".">
+	
+  <property name="tatoo-build.dir" location="build-lib"/>
+  <property name="tatoo.jar" location="${tatoo-build.dir}/tatoo.jar"/>
+  <property name="tatoo-runtime.dir" location="lib"/>
+  <property name="tatoo-runtime.jar" location="${tatoo-runtime.dir}/tatoo-runtime.jar"/>
+	
+  <property name="src" value="src"/>
+  <property name="classes" value="classes"/>
+  <property name="gen-src" value="gen-src"/>
+  <property name="ebnf.file" value="${ant.project.name}.ebnf"/>
+  
+  <target name="tasks">
+    <taskdef name="ebnf" classname="fr.umlv.tatoo.cc.ebnf.main.EBNFTask" classpath="${tatoo.jar}"/>
+  </target>
+  	
+  <target name="ebnf" depends="tasks">
+  	<delete dir="${gen-src}"/>
+	<ebnf destination="${gen-src}" ebnfFile="${ebnf.file}" parserType="lalr"
+		  generateast="true"
+		  logfile="log.html" loglevel="ALL">
+		
+		<package lexer="com.googlecode.${ant.project.name}.lexer"/>
+		<package parser="com.googlecode.${ant.project.name}.parser"/>
+		<package tools="com.googlecode.${ant.project.name}.tools"/>
+		<package ast="com.googlecode.${ant.project.name}.ast"/>
+	</ebnf>
+  </target>
+	
+  <target name="all" depends="ebnf">
+  </target>
+	
+	<target name="compile">
+	  <mkdir dir="${classes}"/>
+
+	  <javac srcdir="${src}:${gen-src}" destdir="${classes}">
+		  <classpath path="${tatoo-runtime.jar}"/>
+		  <compilerarg value="-Xlint:deprecation"/>
+	  </javac>
+	</target>
+	
+  <target name="run" depends="compile">
+  	<java fork="true"
+  	      classname="fr.umlv.compil.${ant.project.name}.Main">
+  	  <classpath>
+  	    <pathelement location="${classes}"/>
+  	  	<pathelement location="${tatoo-runtime.jar}"/>
+  	  </classpath>
+  	</java>
+  </target>
+	
+	<target name="clean">
+		<delete dir="${classes}"/>
+		<delete dir="${gen-src}"/>
+		<!-- not to break eclipse source folders -->
+		<mkdir dir="${gen-src}"/>
+	</target>
+
+</project>

@@ -1,0 +1,10 @@
+  <html>
+   <title>hello PHP.reboot</title>
+   <body>
+    <h1>
+    {
+      echo "hello world !";
+    }
+    </h1>
+   </body>
+  </html>

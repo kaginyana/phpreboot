@@ -29,6 +29,9 @@ import com.googlecode.phpreboot.ast.ElseIf;
 import com.googlecode.phpreboot.ast.ElseIfElse;
 import com.googlecode.phpreboot.ast.ElseIfElseIf;
 import com.googlecode.phpreboot.ast.ElseIfEmpty;
+import com.googlecode.phpreboot.ast.Eoi;
+import com.googlecode.phpreboot.ast.EoiEoln;
+import com.googlecode.phpreboot.ast.EoiSemi;
 import com.googlecode.phpreboot.ast.Expr;
 import com.googlecode.phpreboot.ast.ExprId;
 import com.googlecode.phpreboot.ast.ExprPrimary;
@@ -193,8 +196,8 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
   // --- instructions
   
   @Override
-  public Instr instr_echo(Expr expr) {
-    Instr instr_echo = super.instr_echo(expr);
+  public Instr instr_echo(Expr expr, Eoi eoi) {
+    Instr instr_echo = super.instr_echo(expr, eoi);
     if (interpreter != 0) {
       return instr_echo;
     }
@@ -213,8 +216,8 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
   }
   
   @Override
-  public Instr instr_decl(Declaration declaration) {
-    Instr instr_decl = super.instr_decl(declaration);
+  public Instr instr_decl(Declaration declaration, Eoi eoi) {
+    Instr instr_decl = super.instr_decl(declaration, eoi);
     if (interpreter != 0) {
       return instr_decl;
     }
@@ -223,8 +226,8 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
   }
   
   @Override
-  public Instr instr_assign(Assignment assignment) {
-    Instr instr_assign = super.instr_assign(assignment);
+  public Instr instr_assign(Assignment assignment, Eoi eoi) {
+    Instr instr_assign = super.instr_assign(assignment, eoi);
     if (interpreter != 0) {
       return instr_assign;
     }
@@ -233,8 +236,8 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
   }
   
   @Override
-  public Instr instr_funcall(Funcall funcall) {
-    Instr instr_funcall = super.instr_funcall(funcall);
+  public Instr instr_funcall(Funcall funcall, Eoi eoi) {
+    Instr instr_funcall = super.instr_funcall(funcall, eoi);
     if (interpreter != 0) {
       return instr_funcall;
     }
@@ -353,6 +356,15 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
       for(Node node: instr.nodeList()) {
         eval(node, scope);
       }
+      return null;
+    }
+    
+    @Override
+    public Object visit(EoiEoln eoi__eoln, Scope scope) {
+      return null;
+    }
+    @Override
+    public Object visit(EoiSemi eoi__semi, Scope scope) {
       return null;
     }
     
@@ -814,7 +826,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     @Override
     public Object visit(ContentText content_text, Scope scope) {
       Array array = (Array)eval(content_text.getContent(), scope);
-      array.__add__(content_text.getText().getValue()+' '); // FIXME should not add a space here ?
+      array.__add__(content_text.getText().getValue());
       return array;
     }
     @Override

@@ -64,10 +64,11 @@ tokens:
   value_literal = '([0-9]+(\.([0-9])+)?)|(0[xX][0-9a-fA-F]+)'
   string_literal = '(\u0022([^\u0022])*\u0022)|(\u0027([^\u0027])*\u0027)'
   id = '[A-Za-z_][A-Za-z0-9_]*'
-  text = '[^ \t\r\n<${]+'      [xml]
+  text = '[^<${]+'          [xml]
+  eoln = '(\r)?\n'
   
 blanks:
-  space = '( |\t|\r|\n)+'
+  space = '( |\t|\r|\n)'
   
 comments:
   oneline_comment = "\/\/([^\r\n])*(\r)?\n" 
@@ -120,11 +121,15 @@ productions:
          
   block = '{' instr* '}'            { block }
         ;
+             
+  eoi = 'eoln'
+      | ';'
+      ;           
               
-  instr = assignment ';'                            { instr_assign }
-        | declaration ';'                           { instr_decl }
-        | funcall ';'                               { instr_funcall }
-        | 'echo' expr ';'                           { instr_echo }
+  instr = assignment eoi                            { instr_assign }
+        | declaration eoi                           { instr_decl }
+        | funcall eoi                               { instr_funcall }
+        | 'echo' expr eoi                           { instr_echo }
         | 'if' '(' expr ')' instr else_if           { instr_if }
         | label? labeled_instr                      { instr_labeled }
         | block                                     { instr_block }
@@ -150,7 +155,7 @@ productions:
         ;       
         
   labeled_instr = 'while' '(' expr ')' instr                             { labeled_instr_while }
-                | 'do' instr 'while' '(' expr ')' ';'                    { labeled_instr_do_while }
+                | 'do' instr 'while' '(' expr ')' eoi                    { labeled_instr_do_while }
                 | 'for' '(' for_init? ';' expr? ';' for_step? ')' instr  { labeled_instr_for }
                 | 'foreach' '(' expr 'as' 'id' ')' instr                 { labeled_instr_foreach }
                 | 'foreach' '(' expr 'as' 'id' ':' 'id' ')' instr        { labeled_instr_foreach_entry }

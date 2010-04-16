@@ -1,0 +1,10 @@
+
+  <foo>bar</foo>
+  <foo>
+   {
+     echo 7;
+   }
+  </foo>
+  <foo>$a</foo>
+  <foo>$(2+3)</foo>
+  

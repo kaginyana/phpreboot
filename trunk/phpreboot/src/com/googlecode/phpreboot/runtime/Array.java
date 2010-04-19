@@ -1,7 +1,6 @@
 package com.googlecode.phpreboot.runtime;
 
-
-public class Array implements Sequenceable {  
+public class Array implements Sequenceable, ArrayAccess {  
   public static class Entry implements Sequence {
     /*final*/ Object key;
     Object value;
@@ -54,14 +53,15 @@ public class Array implements Sequenceable {
     header.before = header.after = header;
   }
 
-  private static int hashIndex(Object key, int length) {
-    return key.hashCode() & (length-1);
-  }
-
   public int __size__() {
     return size;
   }
 
+  private static int hashIndex(Object key, int length) {
+    return key.hashCode() & (length-1);
+  }
+  
+  @Override
   public Object __get__(Object key) {
     Entry[] table = this.table;
     for (Entry e = table[hashIndex(key, table.length)];
@@ -74,6 +74,7 @@ public class Array implements Sequenceable {
     return null;
   }
 
+  @Override
   public Object __get__(int key) {
     return __get__((Integer)key);
   }

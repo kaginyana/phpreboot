@@ -17,9 +17,14 @@
   	
   <target name="ebnf" depends="tasks">
   	<delete dir="${gen-src}"/>
-	<ebnf destination="${gen-src}" ebnfFile="${ebnf.file}" parserType="lalr"
+	<ebnf destination="${gen-src}" parserType="lalr"
 		  generateast="true"
 		  logfile="log.html" loglevel="ALL">
+		
+		<inputfiles>
+			<inputfile unit="ebnf" file="${ebnf.file}"/>
+			<inputfile unit="ebnf" file="sql.ebnf"/>
+	    </inputfiles>
 		
 		<package lexer="com.googlecode.${ant.project.name}.lexer"/>
 		<package parser="com.googlecode.${ant.project.name}.parser"/>

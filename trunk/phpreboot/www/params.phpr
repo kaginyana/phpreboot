@@ -1,10 +1,6 @@
   <html>
    <title>hello PHP.reboot</title>
    <body>
-    <h1>
-    {
-      echo "Hello World !";
-    }
-    </h1>
+    <h1> Hello $(_GET["name"])</h1>
    </body>
   </html>

@@ -1,6 +1,7 @@
 package com.googlecode.phpreboot.compiler;
 
 import com.googlecode.phpreboot.runtime.RT;
+import com.googlecode.phpreboot.runtime.Sequence;
 
 public enum PrimitiveType implements Type {
   ANY(Object.class) {

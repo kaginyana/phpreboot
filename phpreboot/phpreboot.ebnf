@@ -41,7 +41,7 @@ tokens:
   ge = '>=' [eq]
   or = 'or'     [bool]
   and = 'and'   [bool]
-  not = '!'     [unary]
+  bang = '!'    [unary]
   lcurl = '\{'
   rcurl = '\}'
   lpar = '\('
@@ -53,6 +53,38 @@ tokens:
   lbrack_slash = '<[( \t\r\n]*\/'
   slash_rbrack = '\/[( \t\r\n]*>'
   dollar = '\$'
+  
+  //SQL tokens, removed when using branching
+  select = 'select'
+  distinct = 'distinct'
+  all = 'all'
+  from = 'from'
+  where = 'where'
+  is = 'is'
+  not = 'not'
+  group = 'group'
+  order = 'order'
+  by = 'by'
+  like = 'like'
+  ordering = 'asc|desc|ascent|descent'
+  spaceship = '<>'
+  create = 'create'
+  _table = 'table'
+  unique = 'unique'
+  _primary = 'primary'
+  key = 'key'
+  _char = 'char'
+  varchar = 'varchar'
+  number = 'number'
+  smallint = 'smallint'
+  integer = 'integer'
+  _float = 'float'
+  date = 'date'
+  time = 'time'
+  timestamp = 'timestamp'
+  insert = 'insert'
+  into = 'into'
+  values = 'values'
   
   _any = 'any'
   _boolean = 'boolean'
@@ -82,9 +114,6 @@ types:
   'string_literal': String
   'lcurl': void
   'rcurl': void
-  'if': void
-  'do': void
-  'while': void
   'text': String
   
 attributes:
@@ -122,6 +151,9 @@ productions:
   block = '{' instr* '}'            { block }
         ;
              
+  action =      { action }
+         ;           
+             
   eoi = 'eoln'
       | ';'
       ;           
@@ -130,10 +162,10 @@ productions:
         | declaration eoi                           { instr_decl }
         | funcall eoi                               { instr_funcall }
         | 'echo' expr eoi                           { instr_echo }
-        | 'if' '(' expr ')' instr else_if           { instr_if }
-        | label? labeled_instr                      { instr_labeled }
+        | action 'if' '(' expr ')' instr else_if    { instr_if }
+        | label labeled_instr                       { instr_labeled }
         | block                                     { instr_block }
-        | xmls                                      { instr_xmls }
+        | action xmls                               { instr_xmls }
         ;
         
   assignment = 'id' '=' expr                  { assignment_id }
@@ -151,7 +183,8 @@ productions:
   funcall = 'id' '(' expr/'comma'* ')'   { funcall }
           ;
         
-  label = 'id' ':'   { loop_label }
+  label = 'id' ':'          { label_id }
+        |                   { label_empty }
         ;       
         
   labeled_instr = 'while' '(' expr ')' instr                             { labeled_instr_while }
@@ -224,20 +257,22 @@ productions:
        | xmls                       { expr_xmls }
        ;
        
+   dollar_access = '$' 'id'                { dollar_access_id }
+                 | '$' '(' expr ')'        { dollar_access_expr }
+                 ;    
+       
    xmls = '<' 'id' attrs '>' content 'lbrack_slash' 'id' '>'     { xmls_start_end_tag }
         | '<' 'id' attrs 'slash_rbrack'                          { xmls_empty_tag }
         ;
        
-   content = content xmls                                       { content_xmls }
-           | content 'text'                                     { content_text }
-           | content block                                      { content_block }
-           | content '$' 'id'                                   { content_dollar_id }
-           | content '$' '(' expr ')'                           { content_dollar_expr }
-           |                                                    { content_empty }
+   content = content xmls                     { content_xmls }
+           | content 'text'                   { content_text }
+           | content block                    { content_block }
+           | content dollar_access            { content_dollar_access }
+           |                                  { content_empty }
            ;
            
-   attrs = attrs 'id' '=' '$' 'id'             { attrs_dollar_id }
-         | attrs 'id' '=' '$' '(' expr ')'     { attrs_dollar_expr }
+   attrs = attrs 'id' '=' dollar_access        { attrs_dollar_access }
          | attrs 'id' '=' 'string_literal'     { attrs_string_literal }
-         |                                          { attrs_empty }
+         |                                     { attrs_empty }
          ;

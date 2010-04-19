@@ -1,0 +1,5 @@
+a = select * from foo
+foreach(a as key: value) {
+  echo key
+  echo value
+}

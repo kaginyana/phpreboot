@@ -1,5 +1,5 @@
-a = select * from foo
+n = 3
+a = select name from foo where id < $n
 foreach(a as key: value) {
-  echo key
-  echo value
+  echo "row: " + key + " name: " + value.name
 }

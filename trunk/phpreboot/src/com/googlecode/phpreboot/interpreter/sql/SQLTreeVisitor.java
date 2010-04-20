@@ -1,13 +1,20 @@
 package com.googlecode.phpreboot.interpreter.sql;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Collection;
+import java.util.List;
 
 import com.googlecode.phpreboot.ast.ColumnConstraintNotNull;
 import com.googlecode.phpreboot.ast.ColumnDefinition;
 import com.googlecode.phpreboot.ast.ColumnNameOptColumnname;
+import com.googlecode.phpreboot.ast.ConditionValueDollarAccess;
+import com.googlecode.phpreboot.ast.ConditionValueId;
+import com.googlecode.phpreboot.ast.ConditionValueLiteral;
+import com.googlecode.phpreboot.ast.ConditionValueTableId;
 import com.googlecode.phpreboot.ast.Expr;
 import com.googlecode.phpreboot.ast.FromClause;
 import com.googlecode.phpreboot.ast.GroupbyClause;
@@ -18,6 +25,7 @@ import com.googlecode.phpreboot.ast.NumberPrecisionDouble;
 import com.googlecode.phpreboot.ast.NumberPrecisionInteger;
 import com.googlecode.phpreboot.ast.OrderbyClause;
 import com.googlecode.phpreboot.ast.Query;
+import com.googlecode.phpreboot.ast.SearchCondition;
 import com.googlecode.phpreboot.ast.SelectStar;
 import com.googlecode.phpreboot.ast.SelectSublistId;
 import com.googlecode.phpreboot.ast.SelectSublistTableId;
@@ -52,6 +60,7 @@ import com.googlecode.phpreboot.interpreter.Evaluator;
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.ScriptVar;
 import com.googlecode.phpreboot.model.Symbol;
+import com.googlecode.phpreboot.parser.ProductionEnum;
 import com.googlecode.phpreboot.runtime.RT;
 import com.googlecode.phpreboot.runtime.SQLCursor;
 
@@ -111,25 +120,44 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException>{
   @Override
   public Void visit(SqlQuery sql_query, SQLEnv env) {
     String name = sql_query.getId().getValue();
-    Scope scope = env.getScope();
-    Symbol symbol = scope.lookup(name);
-    if (symbol != null) {
-      throw RT.error("variable %s already defined", name);
-    }
-    
     tree(sql_query.getQuery(), env);
     String sqlQuery = env.getBuilder().toString();
     
-    SQLCursor cursor;
+    ResultSet resultSet;
+    List<Object> parameters = env.getParameters();
+    Connection connection = env.getConnection();
     try {
-      Statement statement = env.getConnection().createStatement();
-      cursor = new SQLCursor(statement.executeQuery(sqlQuery));
+      Statement statement;
+      if (parameters.isEmpty()) {
+        statement = connection.createStatement();
+        resultSet = statement.executeQuery(sqlQuery);
+        
+      } else {
+        PreparedStatement prepareStatement = connection.prepareStatement(sqlQuery);
+        int index = 1;
+        for(Object value: parameters) {
+          prepareStatement.setObject(index++, value);
+        }
+        resultSet = prepareStatement.executeQuery();
+      }
+      
     } catch (SQLException e) {
       throw (RuntimeException)new RuntimeException(sqlQuery).initCause(e);
     }
+    SQLCursor cursor = new SQLCursor(resultSet);
     
-    ScriptVar scriptVar = new ScriptVar(name, PrimitiveType.ANY, cursor);
-    scope.register(scriptVar);
+    Scope scope = env.getScope();
+    Symbol symbol = scope.lookup(name);
+    if (symbol == null) {
+      ScriptVar scriptVar = new ScriptVar(name, PrimitiveType.ANY, cursor);
+      scope.register(scriptVar);
+    } else {
+      if (!(symbol instanceof ScriptVar)) {
+        throw RT.error("%s is not a variable", name);
+      }
+      ScriptVar scriptVar = (ScriptVar)symbol;
+      scriptVar.setValue(cursor);
+    }
     return null;
   }
   
@@ -380,4 +408,102 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException>{
   }
 
   
+  @Override
+  public Void visit(WhereClause where_clause, SQLEnv env) {
+    env.append(" WHERE ");
+    tree(where_clause.getSearchCondition(), env);
+    return null;
+  }
+  
+  @Override
+  protected Void visit(SearchCondition search_condition, SQLEnv env) {
+    ProductionEnum kind = search_condition.getKind();
+    List<Node> nodeList = search_condition.nodeList();
+    
+    // unary
+    switch(kind) {
+    case search_condition_not:
+      env.append("NOT ");
+      tree(nodeList.get(0), env);
+      return null;
+    case search_condition_parens:
+      env.append("(");
+      tree(nodeList.get(0), env);
+      env.append(")");
+      return null;
+    }
+    
+    // binary
+    tree(nodeList.get(0), env);
+    
+    switch(kind) {
+    case search_condition_like:
+      env.append(" LIKE ");
+      break;
+    case search_condition_and:
+      env.append(" AND ");
+      break;
+    case search_condition_or:
+      env.append(" OR ");
+      break;
+    case search_condition_assign:
+      env.append(" = ");
+      break;
+    case search_condition_is:
+      env.append(" IS ");
+      break;
+    case search_condition_spaceship:
+      env.append(" <> ");
+      break;
+    case search_condition_is_not:
+      env.append(" IS NOT ");
+      break;
+    case search_condition_lt:
+      env.append(" < ");
+      break;
+    case search_condition_le:
+      env.append(" <= ");
+      break;
+    case search_condition_gt:
+      env.append(" > ");
+      break;
+    case search_condition_ge:
+      env.append(" >= ");
+      break;
+    }
+    
+    tree(nodeList.get(1), env);
+    return null;
+  }
+  
+  @Override
+  public Void visit(ConditionValueLiteral condition_value_literal, SQLEnv env) {
+    Object value = evaluator.eval(condition_value_literal.getSingleLiteral(), new EvalEnv(env.getScope(), null));
+    String text;
+    if (value instanceof String) {
+      text = "'"+value.toString()+"'";
+    } else {
+      text = String.valueOf(value);
+    }
+    env.append(text);
+    return null;
+  }
+  @Override
+  public Void visit(ConditionValueId condition_value_id, SQLEnv env) {
+    env.append(condition_value_id.getId().getValue());
+    return null;
+  }
+  @Override
+  public Void visit(ConditionValueTableId condition_value_table_id, SQLEnv env) {
+    env.append(condition_value_table_id.getId().getValue()+'.'+
+        condition_value_table_id.getId2().getValue());
+    return null;
+  }
+  @Override
+  public Void visit(ConditionValueDollarAccess condition_value_dollar_access,SQLEnv env) {
+    Object value = evaluator.eval(condition_value_dollar_access.getDollarAccess(), new EvalEnv(env.getScope(), null));
+    env.append("?");
+    env.getParameters().add(value);
+    return null;
+  }
 }

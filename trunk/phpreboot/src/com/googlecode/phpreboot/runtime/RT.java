@@ -64,6 +64,9 @@ public class RT {
       if (right instanceof Double) {
         return plus(l, (double)(Double)right);
       }
+      if (right instanceof String) {
+        return l + (String)right;
+      }
       throw error("invalid value for operation + "+right);
     }
     if (left instanceof Double) {
@@ -74,9 +77,19 @@ public class RT {
       if (right instanceof Double) {
         return plus(l, (double)(Double)right);
       }
+      if (right instanceof String) {
+        return l + (String)right;
+      }
       throw error("invalid value for operation + "+right);
     }
-    throw error("invalid value for operation + "+left);
+    if (left instanceof String) {
+      return ((String)left) + right;
+    }
+    if (right instanceof String) {
+      return left + (String)right;
+    }
+    
+    throw error("invalid value for operation + "+left+" "+right);
   }
   public static int plus(int left, int right) {
     return left + right;

@@ -1,7 +1,9 @@
 package com.googlecode.phpreboot.webserver;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.Reader;
@@ -12,6 +14,7 @@ import com.googlecode.phpreboot.compiler.PrimitiveType;
 import com.googlecode.phpreboot.interpreter.Evaluator;
 import com.googlecode.phpreboot.interpreter.Interpreter;
 import com.googlecode.phpreboot.interpreter.Scope;
+import com.googlecode.phpreboot.interpreter.sql.GenericSQLConnection;
 import com.googlecode.phpreboot.model.ScriptVar;
 import com.googlecode.phpreboot.runtime.Array;
 import com.googlecode.phpreboot.tools.Analyzers;
@@ -21,45 +24,70 @@ import com.sun.grizzly.tcp.http11.GrizzlyResponse;
 
 public class WebScriptDispatcher extends GrizzlyAdapter {
   private final Path rootPath;
+  private final String jdbcURL;
+  private final Evaluator evaluator;
   
-  public WebScriptDispatcher(Path rootPath) {
+  public WebScriptDispatcher(Path rootPath, Evaluator evaluator, String jdbcURL) {
     this.rootPath = rootPath;
     addRootFolder(rootPath.toAbsolutePath().toString());
+    this.evaluator = evaluator;
+    this.jdbcURL = jdbcURL;
   }
   
   @Override
   public void service(GrizzlyRequest request, @SuppressWarnings("rawtypes") GrizzlyResponse response) {
     String uri = request.getDecodedRequestURI();
+    if (uri.length() == 1) {  // if '/'
+      uri = "/index.phpr";
+    }
     Path path = rootPath.resolve(uri.substring(1));
     String name = path.getName().toString();
     
     try {
-      if (name.endsWith(".phpr")) {
-        try {
-          handleScript(path, request, response);
-        } catch (IOException e) {
-          dumpException(response, e);
-        }
-        return;
-      }
-
+      InputStream input = path.newInputStream();
       try {
-        service(uri, request.getRequest(), response.getResponse());
-      } catch (Exception e) {
-        dumpException(response, e);
+        OutputStream output = response.getOutputStream();
+        try {
+
+          if (name.endsWith(".phpr")) {
+            handleScript(input, output, request);
+          } else {
+            copy(input, output);
+          }
+          
+        } finally {
+          output.close();
+        }
+      } finally {
+        input.close();
       }
-    } catch(IOException e) {
-      e.printStackTrace();
+    } catch(Exception e) {
+      
+      try {
+        dumpException(response, e);
+      } catch(IOException e2) {
+        e2.printStackTrace();
+      }
     }
+    
+    
   }
 
-  private void dumpException(GrizzlyResponse<?> response, Exception e) throws IOException {
+  private static void dumpException(GrizzlyResponse<?> response, Exception e) throws IOException {
     response.setError();
     PrintStream output = new PrintStream(response.getOutputStream());
     try {
       e.printStackTrace(output);
     } finally {
       output.close();
+    }
+  }
+  
+  private static void copy(InputStream input, OutputStream output) throws IOException {
+    byte[] buffer = new byte[8192];
+    int read;
+    while((read = input.read(buffer)) != -1) {
+      output.write(buffer, 0, read);
     }
   }
   
@@ -80,7 +108,7 @@ public class WebScriptDispatcher extends GrizzlyAdapter {
     server.__set__("REQUEST_METHOD", request.getMethod());
     server.__set__("REQUEST_URI", request.getRequestURI());
     server.__set__("DOCUMENT_ROOT", rootPath.toString());
-    server.__set__("AUTH_TYPE", request.getAuthType());
+    //server.__set__("AUTH_TYPE", request.getAuthType());
     
     scope.register(new ScriptVar("_SERVER", PrimitiveType.ANY, server));
   }
@@ -104,21 +132,20 @@ public class WebScriptDispatcher extends GrizzlyAdapter {
       }
   }
   
-  private void handleScript(Path path, GrizzlyRequest request, GrizzlyResponse<?> response) throws IOException {
-    Scope scope = new Scope(null);
-    fillRequestInfos(request, scope);
+  private void handleScript(InputStream input, OutputStream output, GrizzlyRequest request) {
+    Scope rootScope = new Scope(null);
+    fillRequestInfos(request, rootScope);
     
-    Reader reader = new InputStreamReader(path.newInputStream());
+    GenericSQLConnection sqlConnection = new GenericSQLConnection(jdbcURL, evaluator);
+    rootScope.register(new ScriptVar("SQL_CONNECTION", PrimitiveType.ANY, sqlConnection));
+    
+    Reader reader = new InputStreamReader(input);
+    PrintWriter writer = new PrintWriter(output);
     try {
-      PrintWriter writer = new PrintWriter(response.getOutputStream());
-      try {
-        Interpreter interpreter = new Interpreter(writer, new Evaluator(), scope);
-        Analyzers.run(reader, interpreter, interpreter, null, null);
-      } finally {
-        writer.close();
-      }
+      Interpreter interpreter = new Interpreter(writer, evaluator, new Scope(rootScope));
+      Analyzers.run(reader, interpreter, interpreter, null, null);
     } finally {
-      reader.close();
+      sqlConnection.close();
     }
   }
 }

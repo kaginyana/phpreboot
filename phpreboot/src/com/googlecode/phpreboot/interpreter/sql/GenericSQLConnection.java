@@ -30,9 +30,13 @@ public class GenericSQLConnection implements SQLConnection {
     sqlTreeVisitor.executeQuery(connection, sql, scope);
   }
 
-  public void close() throws SQLException {
+  public void close() {
     if (connection != null) {
-      connection.close();
+      try {
+        connection.close();
+      } catch (SQLException e) {
+        // do nothing
+      }
       connection = null;
     }
   }

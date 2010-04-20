@@ -114,23 +114,25 @@ productions:
   where_clause = 'where' search_condition   { where_clause }
                ;
                
-  search_condition = search_condition 'or' search_condition               [bool]      { search_condition_or }
-                   | search_condition 'and' search_condition              [bool]      { search_condition_and }
-                   | 'not' search_condition                               [unary]     { search_condition_not }
-                   | condition_value 'is' 'not'? condition_value                      { search_condition_is }
+  search_condition = 'not' search_condition                               [unary]     { search_condition_not }
                    | '(' search_condition ')'                                         { search_condition_parens }
+                   | condition_value 'like' 'string_literal'                          { search_condition_like }
+                   | search_condition 'or' search_condition               [bool]      { search_condition_or }
+                   | search_condition 'and' search_condition              [bool]      { search_condition_and }
+                   | condition_value 'is' condition_value                             { search_condition_is }
+                   | condition_value 'is' 'not' condition_value                       { search_condition_is_not }
                    | condition_value '=' condition_value                [eq]          { search_condition_assign }
                    | condition_value 'spaceship' condition_value        [eq]          { search_condition_spaceship }
                    | condition_value '<' condition_value                [eq]          { search_condition_lt }
                    | condition_value '<=' condition_value               [eq]          { search_condition_le }
                    | condition_value '>' condition_value                [eq]          { search_condition_gt }
                    | condition_value '>=' condition_value               [eq]          { search_condition_ge }
-                   | condition_value 'like' 'string_literal'                          { search_condition_like }
                    ;
                    
   condition_value = 'id'                       { condition_value_id }
                   | 'id' '.' 'id'              { condition_value_table_id }
                   | single_literal             { condition_value_literal }
+                  | dollar_access              { condition_value_dollar_access }
                   ;
   
   groupby_clause = 'group' 'by' 'id'/'comma'+     { groupby_clause }

@@ -1,16 +1,16 @@
 package com.googlecode.phpreboot.interpreter.sql;
 
 import java.sql.Connection;
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.googlecode.phpreboot.interpreter.Scope;
-import com.googlecode.phpreboot.model.Symbol;
 
 public class SQLEnv {
   private final Scope scope;
   private final Connection connection;
-  private final HashSet<Symbol> parameterSet =
-    new HashSet<Symbol>();
+  private final ArrayList<Object> parameters =
+    new ArrayList<Object>();
   private final StringBuilder builder =
     new StringBuilder();
   
@@ -26,8 +26,8 @@ public class SQLEnv {
     return connection;
   }
   
-  public void addParameter(Symbol symbol) {
-    parameterSet.add(symbol); 
+  public List<Object> getParameters() {
+    return parameters;
   }
   
   public SQLEnv append(String s) {

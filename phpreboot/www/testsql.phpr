@@ -1,0 +1,12 @@
+<html>
+ <body>
+  <ol>
+   {
+     resultset = select * from foo
+     foreach(resultset as value) {
+       echo <li>$(value.name)</li>
+     }
+   }
+  </ol>
+ </body>
+</html>

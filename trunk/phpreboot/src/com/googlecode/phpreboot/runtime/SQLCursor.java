@@ -6,7 +6,7 @@ import java.sql.SQLException;
 
 public class SQLCursor implements Sequence, ArrayAccess {
   private final ResultSet resultSet;
-  private int row = 0;
+  private int row = 1;
 
   public SQLCursor(ResultSet resultSet) {
     this.resultSet = resultSet;
@@ -67,10 +67,6 @@ public class SQLCursor implements Sequence, ArrayAccess {
   
   @Override
   public String toString() {
-    if (row == 0) {
-      return super.toString();
-    }
-    
     StringBuilder builder = new StringBuilder();
     builder.append('[');
     int columnCount;

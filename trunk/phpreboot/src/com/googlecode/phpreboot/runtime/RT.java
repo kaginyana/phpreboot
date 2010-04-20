@@ -316,6 +316,17 @@ public class RT {
     return left >= right;
   }
   
+  
+  public static Sequence foreach_expression(Object value) {
+    if (value instanceof Array) {
+      return ((Array)value).__sequence__();
+    }
+    if (value instanceof Sequence) {
+      return (Sequence)value; 
+    }
+    throw RT.error("foreach needs a sequence or an array: %s", value);
+  }
+  
   static StringBuilder append(StringBuilder builder, Object o) {
     if (o instanceof String) {
       return builder.append('\"').append(o).append('\"');

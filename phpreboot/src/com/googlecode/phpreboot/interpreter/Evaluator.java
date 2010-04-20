@@ -285,10 +285,10 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   public Object visit(LabeledInstrForeach labeled_instr_foreach, EvalEnv env) {
     Expr expr = labeled_instr_foreach.getExpr();
     Object expression = eval(expr, env);
-    if (!(expression instanceof Sequence)) {
-      throw RT.error("foreach needs a sequence: %s", expression);
-    }
-    Sequence sequence = (Sequence)expression;
+    Sequence sequence = RT.foreach_expression(expression);
+    if (sequence == null)
+      return null;
+    
     Scope foreachScope = new Scope(env.getScope());
     EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getEchoer());
     String name = labeled_instr_foreach.getId().getValue();
@@ -296,10 +296,10 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     foreachScope.register(value);
     
     Instr instr = labeled_instr_foreach.getInstr();
-    while((sequence = sequence.__next__()) != null) {
+    while(sequence != null) {
       value.setValue(sequence.__value__());
-      
       eval(instr, foreachEnv);
+      sequence = sequence.__next__();
     }
     return null;
   }
@@ -308,10 +308,10 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   public Object visit(LabeledInstrForeachEntry labeled_instr_foreach_entry, EvalEnv env) {
     Expr expr = labeled_instr_foreach_entry.getExpr();
     Object expression = eval(expr, env);
-    if (!(expression instanceof Sequence)) {
-      throw RT.error("foreach needs a sequence: %s", expression);
-    }
-    Sequence sequence = (Sequence)expression;
+    Sequence sequence = RT.foreach_expression(expression);
+    if (sequence == null)
+      return null;
+    
     Scope foreachScope = new Scope(env.getScope());
     EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getEchoer());
     String keyName = labeled_instr_foreach_entry.getId().getValue();
@@ -322,11 +322,11 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     foreachScope.register(value);
     
     Instr instr = labeled_instr_foreach_entry.getInstr();
-    while((sequence = sequence.__next__()) != null) {
+    while(sequence != null) {
       key.setValue(sequence.__key__());
       value.setValue(sequence.__value__());
-      
       eval(instr, foreachEnv);
+      sequence = sequence.__next__();
     }
     return null;
   }

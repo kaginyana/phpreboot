@@ -62,7 +62,7 @@ public class WebScriptDispatcher extends GrizzlyAdapter {
         input.close();
       }
     } catch(Exception e) {
-      
+      e.printStackTrace();
       try {
         dumpException(response, e);
       } catch(IOException e2) {
@@ -123,12 +123,19 @@ public class WebScriptDispatcher extends GrizzlyAdapter {
       parameters.__set__(entry.getKey(), value);
     }
     
+    ScriptVar get = new ScriptVar("_GET", PrimitiveType.ANY, null);
+    ScriptVar post = new ScriptVar("_POST", PrimitiveType.ANY, null);
+    scope.register(get);
+    scope.register(post);
+    
     String method = request.getMethod();
     if ("GET".equals(method)) {
-      scope.register(new ScriptVar("_GET", PrimitiveType.ANY, parameters));   
+      get.setValue(parameters);
+      post.setValue(new Array());
     } else
       if ("POST".equals(method)) {
-        scope.register(new ScriptVar("_POST", PrimitiveType.ANY, parameters));
+        post.setValue(parameters);
+        get.setValue(new Array());
       }
   }
   

@@ -1,11 +1,15 @@
 package com.googlecode.phpreboot.test;
 
 import com.googlecode.phpreboot.runtime.Array;
-import com.googlecode.phpreboot.runtime.Sequence;
 
 
 public class ArrayTest {
   public static void main(String[] args) {
+    Array one = new Array();
+    one.__set__("foo", "bar");
+    System.out.println(one.__sequence__());
+    
+    
     Array array = new Array();
     array.__set__("foo", "bar");
     array.__set__("foo2", "bar2");

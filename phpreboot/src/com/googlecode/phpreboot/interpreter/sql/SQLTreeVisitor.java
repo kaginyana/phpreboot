@@ -127,9 +127,8 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException>{
     List<Object> parameters = env.getParameters();
     Connection connection = env.getConnection();
     try {
-      Statement statement;
       if (parameters.isEmpty()) {
-        statement = connection.createStatement();
+        Statement statement = connection.createStatement();
         resultSet = statement.executeQuery(sqlQuery);
         
       } else {
@@ -139,12 +138,19 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException>{
           prepareStatement.setObject(index++, value);
         }
         resultSet = prepareStatement.executeQuery();
+        
+      }
+    
+      if (!resultSet.next())  { // starts with first row, free result set if empty
+        resultSet.getStatement().close();
+        resultSet = null;
       }
       
     } catch (SQLException e) {
       throw (RuntimeException)new RuntimeException(sqlQuery).initCause(e);
     }
-    SQLCursor cursor = new SQLCursor(resultSet);
+    
+    SQLCursor cursor = (resultSet == null)? null: new SQLCursor(resultSet);
     
     Scope scope = env.getScope();
     Symbol symbol = scope.lookup(name);
@@ -180,9 +186,15 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException>{
     tree(sql_insert.getInsertStatement(), env);
     String sql = env.getBuilder().toString();
     
+    Connection connection = env.getConnection();
+    List<Object> parameters = env.getParameters();
     try {
-      Statement statement = env.getConnection().createStatement();
-      statement.executeUpdate(sql);
+      PreparedStatement prepareStatement = connection.prepareStatement(sql);
+      int index = 1;
+      for(Object value: parameters) {
+        prepareStatement.setObject(index++, value);
+      }
+      prepareStatement.executeUpdate();
     } catch (SQLException e) {
       throw (RuntimeException)new RuntimeException(sql).initCause(e);
     }
@@ -201,12 +213,8 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException>{
     StringBuilder builder = env.getBuilder();
     for(Expr expr: insert_statement.getExprPlus()) {
       Object exprValue = evaluator.eval(expr, new EvalEnv(env.getScope(), /*FIXME*/null));
-      if (exprValue instanceof String) {
-        builder.append('\'').append(exprValue).append('\'');
-      } else {
-        builder.append(exprValue);
-      }
-      builder.append(", ");
+      env.getParameters().add(exprValue);
+      builder.append("?, ");
     }
     builder.setLength(builder.length() - 2);
     builder.append(')');
@@ -479,13 +487,8 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException>{
   @Override
   public Void visit(ConditionValueLiteral condition_value_literal, SQLEnv env) {
     Object value = evaluator.eval(condition_value_literal.getSingleLiteral(), new EvalEnv(env.getScope(), null));
-    String text;
-    if (value instanceof String) {
-      text = "'"+value.toString()+"'";
-    } else {
-      text = String.valueOf(value);
-    }
-    env.append(text);
+    env.getParameters().add(value);
+    env.append("?");
     return null;
   }
   @Override
@@ -502,8 +505,8 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException>{
   @Override
   public Void visit(ConditionValueDollarAccess condition_value_dollar_access,SQLEnv env) {
     Object value = evaluator.eval(condition_value_dollar_access.getDollarAccess(), new EvalEnv(env.getScope(), null));
-    env.append("?");
     env.getParameters().add(value);
+    env.append("?");
     return null;
   }
 }

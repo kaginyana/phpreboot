@@ -31,7 +31,7 @@ public class ArrayTest {
     
     array.__set__("array2", array2);
     
-    System.out.println(array.__json__());
+    System.out.println(array/*.__json__()*/);
     
     /*
     System.out.println(array2);

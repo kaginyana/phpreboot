@@ -106,7 +106,9 @@ public class Array implements Sequenceable, ArrayAccess {
   }
   
   public void __set__(Entry entry) {
-    entry.next.getClass();   // entry already added ?
+    if (entry.next != null)
+      throw entryAlreadyStoredInAnotherArray();
+      
     Object key = entry.key;
     Entry[] table = this.table;
     int i = hashIndex(key, table.length);
@@ -130,6 +132,10 @@ public class Array implements Sequenceable, ArrayAccess {
     
     if (size++ >= threshold)
       resize(table);
+  }
+  
+  private static IllegalArgumentException entryAlreadyStoredInAnotherArray() {
+    return new IllegalArgumentException("entry already stored in another array");
   }
   
   public void __set__(int key, Object value) {
@@ -191,7 +197,7 @@ public class Array implements Sequenceable, ArrayAccess {
     header.before = header.after = header;
   }*/
 
-  @Override
+  /*@Override
   public String toString() {
     if (size == 0)
       return "[]";
@@ -221,11 +227,13 @@ public class Array implements Sequenceable, ArrayAccess {
     
     builder.setLength(builder.length() - 2);
     return builder.append(']').toString();
-  }
+  }*/
   
-  public String __json__() {
+  /*public String __json__() {*/
+  @Override
+  public String toString() {
     if (size == 0)
-      return "{}";
+      return "[]";
     
     Entry header = this.header;
     StringBuilder builder = new StringBuilder(); 
@@ -242,7 +250,7 @@ public class Array implements Sequenceable, ArrayAccess {
         }
         Object value = e.value;
         if (value instanceof Array) {
-          builder.append(((Array)value).__json__());
+          builder.append((/*(Array)*/value)/*.__json__()*/);
         } else {
           RT.append(builder, value);
         }
@@ -261,7 +269,7 @@ public class Array implements Sequenceable, ArrayAccess {
       Object value = e.value;
       builder.append('\"').append(e.key).append("\": ");
       if (value instanceof Array) {
-        builder.append(((Array)value).__json__());
+        builder.append((/*(Array)*/value)/*.__json__()*/);
       } else {
         RT.append(builder, value);    
       }

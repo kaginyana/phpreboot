@@ -19,7 +19,7 @@ import com.googlecode.phpreboot.ast.LiteralValue;
 import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.ast.Parameter;
 import com.googlecode.phpreboot.ast.ParameterTyped;
-import com.googlecode.phpreboot.ast.PrimaryLiteral;
+import com.googlecode.phpreboot.ast.ExprLiteral;
 import com.googlecode.phpreboot.ast.Signature;
 import com.googlecode.phpreboot.ast.TypeAny;
 import com.googlecode.phpreboot.ast.TypeBoolean;
@@ -34,7 +34,6 @@ import com.googlecode.phpreboot.parser.ProductionEnum;
 import com.googlecode.phpreboot.runtime.RT;
 
 public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
-  
   public void typeCheck(Fun functionNode, Scope scope) {
     Signature signature = functionNode.getSignature();
     
@@ -274,7 +273,7 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   // --- literals
   
   @Override
-  public Type visit(PrimaryLiteral primary_literal, TypeCheckEnv env) {
+  public Type visit(ExprLiteral primary_literal, TypeCheckEnv env) {
     return typeCheck(primary_literal.getLiteral(), env);
   }
   

@@ -68,7 +68,7 @@ public class SQLCursor implements Sequence, ArrayAccess {
   @Override
   public String toString() {
     StringBuilder builder = new StringBuilder();
-    builder.append('[');
+    builder.append('{');
     int columnCount;
     try {
       ResultSetMetaData metaData = resultSet.getMetaData();
@@ -85,6 +85,6 @@ public class SQLCursor implements Sequence, ArrayAccess {
     if (columnCount != 0) {
       builder.setLength(builder.length() - 2);  
     }
-    return builder.append(']').toString();
+    return builder.append('}').toString();
   }
 }

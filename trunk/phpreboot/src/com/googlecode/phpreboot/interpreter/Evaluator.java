@@ -3,6 +3,7 @@ package com.googlecode.phpreboot.interpreter;
 import java.dyn.MethodHandle;
 import java.util.List;
 
+import com.googlecode.phpreboot.ast.ArrayEntry;
 import com.googlecode.phpreboot.ast.ArrayValue;
 import com.googlecode.phpreboot.ast.ArrayValueEntry;
 import com.googlecode.phpreboot.ast.ArrayValueSingle;
@@ -31,6 +32,7 @@ import com.googlecode.phpreboot.ast.EoiEoln;
 import com.googlecode.phpreboot.ast.EoiSemi;
 import com.googlecode.phpreboot.ast.Expr;
 import com.googlecode.phpreboot.ast.ExprId;
+import com.googlecode.phpreboot.ast.ExprLiteral;
 import com.googlecode.phpreboot.ast.ExprPrimary;
 import com.googlecode.phpreboot.ast.ExprXmls;
 import com.googlecode.phpreboot.ast.ForInit;
@@ -59,6 +61,7 @@ import com.googlecode.phpreboot.ast.LabeledInstrForeach;
 import com.googlecode.phpreboot.ast.LabeledInstrForeachEntry;
 import com.googlecode.phpreboot.ast.LabeledInstrWhile;
 import com.googlecode.phpreboot.ast.LiteralArray;
+import com.googlecode.phpreboot.ast.LiteralArrayEntry;
 import com.googlecode.phpreboot.ast.LiteralBool;
 import com.googlecode.phpreboot.ast.LiteralNull;
 import com.googlecode.phpreboot.ast.LiteralSingle;
@@ -68,7 +71,6 @@ import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.ast.PrimaryArrayAccess;
 import com.googlecode.phpreboot.ast.PrimaryFieldAccess;
 import com.googlecode.phpreboot.ast.PrimaryFuncall;
-import com.googlecode.phpreboot.ast.PrimaryLiteral;
 import com.googlecode.phpreboot.ast.PrimaryParens;
 import com.googlecode.phpreboot.ast.PrimaryPrimaryArrayAccess;
 import com.googlecode.phpreboot.ast.PrimaryPrimaryFieldAccess;
@@ -561,11 +563,15 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     return null;
   }
   
-  private static void arraySet(Object varValue, Object key, Object value) {
+  private static void arraySet(Object varValue, Object key, Object value, boolean keyMustExist) {
     if (!(varValue instanceof Array)) {
       throw RT.error("value is not an array: %s", varValue);
     }
-    ((Array)varValue).__set__(key, value);
+    Array array = (Array)varValue;
+    if (keyMustExist && array.__get__(key) == null) {
+      throw RT.error("member %s doesn't exist for array: %s", key, array);
+    }
+    array.__set__(key, value);
   }
   
   @Override
@@ -578,7 +584,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     
     Object key = eval(assignment_array.getExpr(), env);
     Object value = eval(assignment_array.getExpr2(), env);  
-    arraySet(var.getValue(), key, value);
+    arraySet(var.getValue(), key, value, false);
     return null;
   }
   
@@ -588,7 +594,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Object key = eval(assignment_primary_array.getExpr(), env);
     Object value = eval(assignment_primary_array.getExpr2(), env);
     
-    arraySet(array, key, value);
+    arraySet(array, key, value, false);
     return null;
   }
   
@@ -602,7 +608,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     } 
     
     Object value = eval(assignment_field.getExpr(), env);  
-    arraySet(var.getValue(), assignment_field.getId2().getValue(), value);
+    arraySet(var.getValue(), assignment_field.getId2().getValue(), value, true);
     return null;
   }
   
@@ -611,7 +617,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Object array = eval(assignment_primary_field.getPrimary(), env);
     Object value = eval(assignment_primary_field.getExpr(), env);
     
-    arraySet(array, assignment_primary_field.getId().getValue(), value);
+    arraySet(array, assignment_primary_field.getId().getValue(), value, true);
     return null;
   }
   
@@ -674,36 +680,40 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     return eval(primary_funcall.getFuncall(), env);
   }
   
-  private static Object arrayGet(Object array, Object key) {
+  private static Object arrayGet(Object array, Object key, boolean keyMustExist) {
     if (!(array instanceof ArrayAccess)) {
-      throw RT.error("value is not an accessible as an array: %s", array);
+      throw RT.error("value is not as an array or a cursor: %s", array);
     }
-    return ((ArrayAccess)array).__get__(key);
+    Object value = ((ArrayAccess)array).__get__(key);
+    if (keyMustExist && value == null) {
+      throw RT.error("member %s doesn't exist for array/cursor: %s", key, array);
+    }
+    return value;
   }
   
   @Override
   public Object visit(PrimaryArrayAccess primary_array_access, EvalEnv env) {
     Object array = lookupVarValue(primary_array_access.getId().getValue(), env.getScope());
     Object key = eval(primary_array_access.getExpr(), env);
-    return arrayGet(array, key);
+    return arrayGet(array, key, false);
   }
   @Override
   public Object visit(PrimaryPrimaryArrayAccess primary_primary_array_access, EvalEnv env) {
     Object array = eval(primary_primary_array_access.getPrimary(), env);
     Object key = eval(primary_primary_array_access.getExpr(), env);
-    return arrayGet(array, key);
+    return arrayGet(array, key, false);
   }
   @Override
   public Object visit(PrimaryFieldAccess primary_field_access, EvalEnv env) {
     Object array = lookupVarValue(primary_field_access.getId().getValue(), env.getScope());
     String key = primary_field_access.getId2().getValue();
-    return arrayGet(array, key);
+    return arrayGet(array, key, true);
   }
   @Override
   public Object visit(PrimaryPrimaryFieldAccess primary_primary_field_access, EvalEnv env) {
     Object array = eval(primary_primary_field_access.getPrimary(), env);
     String key = primary_primary_field_access.getId().getValue();
-    return arrayGet(array, key);
+    return arrayGet(array, key, true);
   }
   
   // --- expressions
@@ -713,7 +723,10 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     return eval(expr_primary.getPrimary(), env);
   }
 
-  
+  @Override
+  public Object visit(ExprLiteral expr_literal, EvalEnv env) {
+    return eval(expr_literal.getLiteral(), env);
+  }
   
   @Override
   public Object visit(ExprId expr_id, EvalEnv env) {
@@ -780,11 +793,6 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   // --- literals
 
   @Override
-  public Object visit(PrimaryLiteral primary_literal, EvalEnv env) {
-    return eval(primary_literal.getLiteral(), env);
-  }
-
-  @Override
   public Object visit(LiteralSingle literal_single, EvalEnv env) {
     return eval(literal_single.getSingleLiteral(), env);
   }
@@ -822,17 +830,29 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     }
     return array;
   }
-  
   @Override
-  public Object visit(ArrayValueSingle array_value_single, EvalEnv env) {
-    return eval(array_value_single.getLiteral(), env);
+  public Object visit(LiteralArrayEntry literal_array_entry, EvalEnv env) {
+    Array array = new Array();
+    for(ArrayEntry arrayEntry: literal_array_entry.getArrayEntryStar()) {
+      Array.Entry entry = (Array.Entry)eval(arrayEntry, env);
+      array.__set__(entry);
+    }
+    return array;
   }
   
   @Override
-  public Object visit(ArrayValueEntry array_value_entry, EvalEnv env) {
-    Object key = eval(array_value_entry.getLiteral(), env);
-    Object value = eval(array_value_entry.getLiteral2(), env);
+  public Object visit(ArrayEntry array_entry, EvalEnv env) {
+    Object key = eval(array_entry.getExpr(), env);
+    Object value = eval(array_entry.getExpr2(), env);
     return new Array.Entry(key, value);
+  }
+  @Override
+  public Object visit(ArrayValueSingle array_value_single, EvalEnv env) {
+    return eval(array_value_single.getExpr(), env);
+  }
+  @Override
+  public Object visit(ArrayValueEntry array_value_entry, EvalEnv env) {
+    return eval(array_value_entry.getArrayEntry(), env);
   }
   
   // --- dollar access

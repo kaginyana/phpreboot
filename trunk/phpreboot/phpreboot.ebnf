@@ -222,6 +222,7 @@ productions:
   
   literal = single_literal                     { literal_single }
           | '[' array_value/'comma'* ']'       { literal_array }
+          | '{' array_entry/'comma'* '}'       { literal_array_entry }
           ; 
           
   single_literal = 'null_literal'      { literal_null }
@@ -229,13 +230,17 @@ productions:
                  | 'value_literal'     { literal_value }
                  | 'string_literal'    { literal_string }
                  ;
-          
-  array_value = literal                 { array_value_single }
-              | literal ':' literal     { array_value_entry }
-              ;
   
-  primary = literal                 { primary_literal }
-          | 'id' '[' expr ']'       { primary_array_access }     
+  array_entry = expr ':' expr   { array_entry }
+              ;
+          
+  array_value = expr            { array_value_single }
+              | array_entry     { array_value_entry }
+              ;
+              
+  
+  
+  primary = 'id' '[' expr ']'       { primary_array_access }     
           | primary '[' expr ']'    { primary_primary_array_access }                          
           | 'id' '.' 'id'           { primary_field_access }
           | primary '.' 'id'        { primary_primary_field_access }                  
@@ -244,6 +249,7 @@ productions:
           ;
   
   expr = 'id'                       { expr_id }
+       | literal                    { expr_literal }
        | primary                    { expr_primary }
        | '+' expr        [unary]    { expr_unary_plus }
        | '-' expr        [unary]    { expr_unary_minus }

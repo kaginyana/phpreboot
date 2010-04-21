@@ -24,6 +24,9 @@ tokens:
   _switch = 'switch'
   _case = 'case'
   _default = 'default'
+  _return = 'return'
+  _break = 'break'
+  _continue = 'continue'
   echo = 'echo'
   dot = '\.'
   comma = ','
@@ -164,6 +167,9 @@ productions:
         | 'echo' expr eoi                           { instr_echo }
         | action 'if' '(' expr ')' instr else_if    { instr_if }
         | label labeled_instr                       { instr_labeled }
+        | 'return' expr? eoi                        { instr_return }
+        | 'break' 'id'? eoi                         { instr_break }
+        | 'continue' 'id'? eoi                      { instr_continue }
         | block                                     { instr_block }
         | action xmls                               { instr_xmls }
         ;

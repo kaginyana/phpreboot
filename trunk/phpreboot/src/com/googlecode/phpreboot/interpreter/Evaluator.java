@@ -34,14 +34,25 @@ import com.googlecode.phpreboot.ast.ExprId;
 import com.googlecode.phpreboot.ast.ExprPrimary;
 import com.googlecode.phpreboot.ast.ExprXmls;
 import com.googlecode.phpreboot.ast.ForInit;
+import com.googlecode.phpreboot.ast.ForInitAssignment;
+import com.googlecode.phpreboot.ast.ForInitDeclaration;
+import com.googlecode.phpreboot.ast.ForInitFuncall;
 import com.googlecode.phpreboot.ast.ForStep;
+import com.googlecode.phpreboot.ast.ForStepAssignment;
+import com.googlecode.phpreboot.ast.ForStepFuncall;
 import com.googlecode.phpreboot.ast.Funcall;
+import com.googlecode.phpreboot.ast.IdToken;
 import com.googlecode.phpreboot.ast.Instr;
+import com.googlecode.phpreboot.ast.InstrBreak;
+import com.googlecode.phpreboot.ast.InstrContinue;
 import com.googlecode.phpreboot.ast.InstrEcho;
 import com.googlecode.phpreboot.ast.InstrIf;
 import com.googlecode.phpreboot.ast.InstrLabeled;
+import com.googlecode.phpreboot.ast.InstrReturn;
 import com.googlecode.phpreboot.ast.InstrSql;
 import com.googlecode.phpreboot.ast.InstrXmls;
+import com.googlecode.phpreboot.ast.Label;
+import com.googlecode.phpreboot.ast.LabelId;
 import com.googlecode.phpreboot.ast.LabeledInstrDoWhile;
 import com.googlecode.phpreboot.ast.LabeledInstrFor;
 import com.googlecode.phpreboot.ast.LabeledInstrForeach;
@@ -79,6 +90,66 @@ import com.googlecode.phpreboot.runtime.Sequence;
 import com.googlecode.phpreboot.runtime.XML;
 
 public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
+  @SuppressWarnings("serial")
+  static class ReturnError extends Error {
+    Object value;
+    ReturnError() {
+      // do nothing
+    }
+    
+    static ReturnError instance(Object value) {
+      ReturnError instance = INSTANCE;
+      instance.value = value;
+      return instance;
+    }
+    
+    private static final ReturnError INSTANCE = new ReturnError();
+  }
+  
+  @SuppressWarnings("serial")
+  static class BreakError extends Error {
+    String label;
+    BreakError() {
+      // do nothing
+    }
+    
+    public void mayRethrow(EvalEnv env) {
+      String label = this.label;
+      if (label != null && !label.equals(env.getLabel()))
+        throw this;
+    }
+    
+    static BreakError instance(String label) {
+      BreakError instance = INSTANCE;
+      instance.label = label;
+      return instance;
+    }
+    
+    private static final BreakError INSTANCE = new BreakError();
+  }
+  
+  @SuppressWarnings("serial")
+  static class ContinueError extends Error {
+    String label;
+    ContinueError() {
+      // do nothing
+    }
+    
+    public void mayRethrow(EvalEnv env) {
+      String label = this.label;
+      if (label != null && !label.equals(env.getLabel()))
+        throw this;
+    }
+    
+    static ContinueError instance(String label) {
+      ContinueError instance = INSTANCE;
+      instance.label = label;
+      return instance;
+    }
+    
+    private static final ContinueError INSTANCE = new ContinueError();
+  }
+  
   public Object eval(Node node, EvalEnv env) {
     return node.accept(this, env);
   }
@@ -166,24 +237,48 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   }
   
   @Override
-  public Object visit(InstrXmls instr_xmls, EvalEnv env) {
-    env.getEchoer().echo(eval(instr_xmls.getXmls(), env));
-    return null;
-  }
-  
-  @Override
   public Object visit(InstrLabeled instr_labeled, EvalEnv env) {
-    //FIXME need to register the label if necessary
+    Label label = instr_labeled.getLabel();
+    if (label instanceof LabelId) {
+      String labelText = ((LabelId)label).getId().getValue();
+      env = new EvalEnv(env.getScope(), env.getEchoer(), labelText);
+    }
     eval(instr_labeled.getLabeledInstr(), env);
     return null;
   }
   
   @Override
+  public Object visit(InstrReturn instr_return, EvalEnv env) {
+    Expr exprOptional = instr_return.getExprOptional();
+    Object value =(exprOptional == null)? null: eval(exprOptional, env);
+    throw ReturnError.instance(value);
+  }
+  @Override
+  public Object visit(InstrBreak instr_break, EvalEnv env) {
+    IdToken idToken = instr_break.getIdOptional();
+    String label = (idToken == null)? env.getLabel(): idToken.getValue();
+    throw BreakError.instance(label);
+  }
+  @Override
+  public Object visit(InstrContinue instr_continue, EvalEnv env) {
+    IdToken idToken = instr_continue.getIdOptional();
+    String label = (idToken == null)? env.getLabel(): idToken.getValue();
+    throw ContinueError.instance(label);
+  }
+  
+  
+  @Override
   public Object visit(Block block, EvalEnv env) {
-    EvalEnv newEnv = new EvalEnv(new Scope(env.getScope()), env.getEchoer());
+    EvalEnv newEnv = new EvalEnv(new Scope(env.getScope()), env.getEchoer(), env.getLabel());
     for(Instr instr: block.getInstrStar()) {
       eval(instr, newEnv);
     }
+    return null;
+  }
+  
+  @Override
+  public Object visit(InstrXmls instr_xmls, EvalEnv env) {
+    env.getEchoer().echo(eval(instr_xmls.getXmls(), env));
     return null;
   }
   
@@ -238,8 +333,16 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   public Object visit(LabeledInstrWhile labeled_instr_while, EvalEnv env) {
     Instr instr = labeled_instr_while.getInstr();
     Expr expr = labeled_instr_while.getExpr();
-    while(checkBoolean(expr, env)) {
-      eval(instr, env);
+    try {
+      while(checkBoolean(expr, env)) {
+        try {
+          eval(instr, env);
+        } catch(ContinueError e) {
+          e.mayRethrow(env);
+        }
+      }
+    } catch(BreakError e) {
+      e.mayRethrow(env);
     }
     return null;
   }
@@ -248,9 +351,17 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   public Object visit(LabeledInstrDoWhile labeled_instr_do_while, EvalEnv env) {
     Instr instr = labeled_instr_do_while.getInstr();
     Expr expr = labeled_instr_do_while.getExpr();
-    do {
-      eval(instr, env);
-    } while(checkBoolean(expr, env));
+    try {
+      do {
+        try {
+          eval(instr, env);
+        } catch(ContinueError e) {
+          e.mayRethrow(env);
+        }
+      } while(checkBoolean(expr, env));
+    } catch(BreakError e) {
+      e.mayRethrow(env); 
+    }
     return null;
   }
   
@@ -263,21 +374,58 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     if (init != null) {
       eval(init, env);
     }
-    if (expr == null) {
-      for(;;) {
-        eval(instr, env);
-        if (step != null) {
-          eval(step, env);
+    try {
+      if (expr == null) {
+        for(;;) {
+          try {
+            eval(instr, env);
+          } catch(ContinueError e) {
+            e.mayRethrow(env);
+          }
+          if (step != null) {
+            eval(step, env);
+          }
+        }
+      } else {
+        while(checkBoolean(expr, env)) {
+          try {
+            eval(instr, env);
+          } catch(ContinueError e) {
+            e.mayRethrow(env);
+          }
+          if (step != null) {
+            eval(step, env);
+          }
         }
       }
-    } else {
-      while(checkBoolean(expr, env)) {
-        eval(instr, env);
-        if (step != null) {
-          eval(step, env);
-        }
-      }
+    } catch(BreakError e) {
+      e.mayRethrow(env);
     }
+    return null;
+  }
+  @Override
+  public Object visit(ForInitAssignment for_init_assignment, EvalEnv env) {
+    eval(for_init_assignment.getAssignment(), env);
+    return null;
+  }
+  @Override
+  public Object visit(ForInitDeclaration for_init_declaration, EvalEnv env) {
+    eval(for_init_declaration.getDeclaration(), env);
+    return null;
+  }
+  @Override
+  public Object visit(ForInitFuncall for_init_funcall, EvalEnv env) {
+    eval(for_init_funcall.getFuncall(), env);
+    return null;
+  }
+  @Override
+  public Object visit(ForStepAssignment for_step_assignment, EvalEnv env) {
+    eval(for_step_assignment.getAssignment(), env);
+    return null;
+  }
+  @Override
+  public Object visit(ForStepFuncall for_step_funcall, EvalEnv env) {
+    eval(for_step_funcall.getFuncall(), env);
     return null;
   }
   
@@ -290,16 +438,24 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       return null;
     
     Scope foreachScope = new Scope(env.getScope());
-    EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getEchoer());
+    EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getEchoer(), env.getLabel());
     String name = labeled_instr_foreach.getId().getValue();
     ScriptVar value = new ScriptVar(name, PrimitiveType.ANY, null);
     foreachScope.register(value);
     
     Instr instr = labeled_instr_foreach.getInstr();
-    while(sequence != null) {
-      value.setValue(sequence.__value__());
-      eval(instr, foreachEnv);
-      sequence = sequence.__next__();
+    try {
+      while(sequence != null) {
+        value.setValue(sequence.__value__());
+        try {
+          eval(instr, foreachEnv);
+        } catch(ContinueError e) {
+          e.mayRethrow(env);
+        }
+        sequence = sequence.__next__();
+      }
+    } catch(BreakError e) {
+      e.mayRethrow(env);
     }
     return null;
   }
@@ -313,7 +469,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       return null;
     
     Scope foreachScope = new Scope(env.getScope());
-    EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getEchoer());
+    EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getEchoer(), env.getLabel());
     String keyName = labeled_instr_foreach_entry.getId().getValue();
     String valueName = labeled_instr_foreach_entry.getId2().getValue();
     ScriptVar key = new ScriptVar(keyName, PrimitiveType.ANY, null);
@@ -322,11 +478,19 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     foreachScope.register(value);
     
     Instr instr = labeled_instr_foreach_entry.getInstr();
-    while(sequence != null) {
-      key.setValue(sequence.__key__());
-      value.setValue(sequence.__value__());
-      eval(instr, foreachEnv);
-      sequence = sequence.__next__();
+    try {
+      while(sequence != null) {
+        key.setValue(sequence.__key__());
+        value.setValue(sequence.__value__());
+        try {
+          eval(instr, foreachEnv);
+        } catch(ContinueError e) {
+          e.mayRethrow(env);
+        }
+        sequence = sequence.__next__();
+      }
+    } catch(BreakError e) {
+      e.mayRethrow(env);
     }
     return null;
   }
@@ -736,7 +900,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   @Override
   public Object visit(ContentBlock content_block, EvalEnv env) {
     Array array = (Array)eval(content_block.getContent(), env);
-    EvalEnv xmlEnv = new EvalEnv(env.getScope(), Echoer.xmlEchoer(array));
+    EvalEnv xmlEnv = new EvalEnv(env.getScope(), Echoer.xmlEchoer(array), env.getLabel());
     eval(content_block.getBlock(), xmlEnv);
     return array;
   }

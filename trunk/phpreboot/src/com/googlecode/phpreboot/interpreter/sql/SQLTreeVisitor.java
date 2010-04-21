@@ -212,7 +212,7 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException>{
     
     StringBuilder builder = env.getBuilder();
     for(Expr expr: insert_statement.getExprPlus()) {
-      Object exprValue = evaluator.eval(expr, new EvalEnv(env.getScope(), /*FIXME*/null));
+      Object exprValue = evaluator.eval(expr, new EvalEnv(env.getScope(), null, null));
       env.getParameters().add(exprValue);
       builder.append("?, ");
     }
@@ -486,7 +486,7 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException>{
   
   @Override
   public Void visit(ConditionValueLiteral condition_value_literal, SQLEnv env) {
-    Object value = evaluator.eval(condition_value_literal.getSingleLiteral(), new EvalEnv(env.getScope(), null));
+    Object value = evaluator.eval(condition_value_literal.getSingleLiteral(), new EvalEnv(env.getScope(), null, null));
     env.getParameters().add(value);
     env.append("?");
     return null;
@@ -504,7 +504,7 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException>{
   }
   @Override
   public Void visit(ConditionValueDollarAccess condition_value_dollar_access,SQLEnv env) {
-    Object value = evaluator.eval(condition_value_dollar_access.getDollarAccess(), new EvalEnv(env.getScope(), null));
+    Object value = evaluator.eval(condition_value_dollar_access.getDollarAccess(), new EvalEnv(env.getScope(), null, null));
     env.getParameters().add(value);
     env.append("?");
     return null;

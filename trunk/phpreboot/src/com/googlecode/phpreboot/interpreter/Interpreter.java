@@ -36,7 +36,6 @@ import com.googlecode.phpreboot.model.Symbol;
 import com.googlecode.phpreboot.runtime.RT;
 import com.googlecode.phpreboot.tools.TerminalEvaluator;
 
-
 public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluator<CharSequence> {
   private final Echoer echoer;
   private final Evaluator evaluator;
@@ -139,7 +138,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     if (interpreter != 0) {
       return instr_echo;
     }
-    evaluator.eval(instr_echo, new EvalEnv(currentScope, echoer));
+    evaluator.eval(instr_echo, new EvalEnv(currentScope, echoer, null));
     return null;
   }
   
@@ -149,7 +148,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     if (interpreter != 0) {
       return instr_decl;
     }
-    evaluator.eval(instr_decl, new EvalEnv(currentScope, echoer));
+    evaluator.eval(instr_decl, new EvalEnv(currentScope, echoer, null));
     return null; 
   }
   
@@ -159,7 +158,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     if (interpreter != 0) {
       return instr_assign;
     }
-    evaluator.eval(instr_assign, new EvalEnv(currentScope, echoer));
+    evaluator.eval(instr_assign, new EvalEnv(currentScope, echoer, null));
     return null;
   }
   
@@ -169,7 +168,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     if (interpreter != 0) {
       return instr_funcall;
     }
-    evaluator.eval(instr_funcall, new EvalEnv(currentScope, echoer));
+    evaluator.eval(instr_funcall, new EvalEnv(currentScope, echoer, null));
     return null;
   }
   
@@ -194,7 +193,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     if (interpreter != 0) {
       return instr_if;
     }
-    evaluator.eval(instr_if, new EvalEnv(currentScope, echoer));
+    evaluator.eval(instr_if, new EvalEnv(currentScope, echoer, null));
     return null;
   }
   @Override
@@ -204,7 +203,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     if (interpreter != 0) { 
       return instr_xmls;
     }
-    evaluator.eval(instr_xmls, new EvalEnv(currentScope, echoer));
+    evaluator.eval(instr_xmls, new EvalEnv(currentScope, echoer, null));
     return null;
   }
   
@@ -225,7 +224,35 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     if (interpreter != 0)
       return instr_labeled;
     
-    evaluator.eval(instr_labeled, new EvalEnv(currentScope, echoer));
+    evaluator.eval(instr_labeled, new EvalEnv(currentScope, echoer, null));
+    return null;
+  }
+  
+  @Override
+  public Instr instr_return(Expr expr_optional_3, Eoi eoi) {
+    Instr instr_return = super.instr_return(expr_optional_3, eoi);
+    if (interpreter != 0)
+      return instr_return;
+    
+    evaluator.eval(instr_return, new EvalEnv(currentScope, echoer, null));
+    return null;
+  }
+  @Override
+  public Instr instr_break(IdToken id_optional_4, Eoi eoi) {
+    Instr instr_break = super.instr_break(id_optional_4, eoi);
+    if (interpreter != 0)
+      return instr_break;
+    
+    evaluator.eval(instr_break, new EvalEnv(currentScope, echoer, null));
+    return null;
+  }
+  @Override
+  public Instr instr_continue(IdToken id_optional_5, Eoi eoi) {
+    Instr instr_continue = super.instr_continue(id_optional_5, eoi);
+    if (interpreter != 0)
+      return instr_continue;
+    
+    evaluator.eval(instr_continue, new EvalEnv(currentScope, echoer, null));
     return null;
   }
   
@@ -236,7 +263,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     if (interpreter != 0)
       return instr_sql;
     
-    evaluator.eval(instr_sql, new EvalEnv(currentScope, echoer));
+    evaluator.eval(instr_sql, new EvalEnv(currentScope, echoer, null));
     return instr_sql;
   }
   

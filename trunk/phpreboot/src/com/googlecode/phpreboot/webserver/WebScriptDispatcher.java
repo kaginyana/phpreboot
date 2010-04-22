@@ -10,12 +10,10 @@ import java.io.Reader;
 import java.nio.file.Path;
 import java.util.Map;
 
-import com.googlecode.phpreboot.compiler.PrimitiveType;
-import com.googlecode.phpreboot.interpreter.Evaluator;
 import com.googlecode.phpreboot.interpreter.Interpreter;
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.interpreter.sql.GenericSQLConnection;
-import com.googlecode.phpreboot.model.ScriptVar;
+import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.runtime.Array;
 import com.googlecode.phpreboot.tools.Analyzers;
 import com.sun.grizzly.tcp.http11.GrizzlyAdapter;
@@ -25,12 +23,10 @@ import com.sun.grizzly.tcp.http11.GrizzlyResponse;
 public class WebScriptDispatcher extends GrizzlyAdapter {
   private final Path rootPath;
   private final String jdbcURL;
-  private final Evaluator evaluator;
   
-  public WebScriptDispatcher(Path rootPath, Evaluator evaluator, String jdbcURL) {
+  public WebScriptDispatcher(Path rootPath, String jdbcURL) {
     this.rootPath = rootPath;
     addRootFolder(rootPath.toAbsolutePath().toString());
-    this.evaluator = evaluator;
     this.jdbcURL = jdbcURL;
   }
   
@@ -110,7 +106,7 @@ public class WebScriptDispatcher extends GrizzlyAdapter {
     server.__set__("DOCUMENT_ROOT", rootPath.toString());
     //server.__set__("AUTH_TYPE", request.getAuthType());
     
-    scope.register(new ScriptVar("_SERVER", PrimitiveType.ANY, server));
+    scope.register(new Var("_SERVER", false, server));
   }
   
   private void fillGetOrPost(GrizzlyRequest request, Scope scope) {
@@ -123,33 +119,35 @@ public class WebScriptDispatcher extends GrizzlyAdapter {
       parameters.__set__(entry.getKey(), value);
     }
     
-    ScriptVar get = new ScriptVar("_GET", PrimitiveType.ANY, null);
-    ScriptVar post = new ScriptVar("_POST", PrimitiveType.ANY, null);
-    scope.register(get);
-    scope.register(post);
-    
+    Object get,post;
     String method = request.getMethod();
     if ("GET".equals(method)) {
-      get.setValue(parameters);
-      post.setValue(new Array());
+      get = parameters;
+      post = new Array();
     } else
       if ("POST".equals(method)) {
-        post.setValue(parameters);
-        get.setValue(new Array());
+        post = parameters;
+        get = new Array();
+      } else {
+        post = new Array();
+        get = new Array();
       }
+    
+    scope.register(new Var("_GET", false, get));
+    scope.register(new Var("_POST", false, post));
   }
   
   private void handleScript(InputStream input, OutputStream output, GrizzlyRequest request) {
     Scope rootScope = new Scope(null);
     fillRequestInfos(request, rootScope);
     
-    GenericSQLConnection sqlConnection = new GenericSQLConnection(jdbcURL, evaluator);
-    rootScope.register(new ScriptVar("SQL_CONNECTION", PrimitiveType.ANY, sqlConnection));
+    GenericSQLConnection sqlConnection = new GenericSQLConnection(jdbcURL);
+    rootScope.register(new Var("SQL_CONNECTION", true, sqlConnection));
     
     Reader reader = new InputStreamReader(input);
     PrintWriter writer = new PrintWriter(output);
     try {
-      Interpreter interpreter = new Interpreter(writer, evaluator, new Scope(rootScope));
+      Interpreter interpreter = new Interpreter(writer, new Scope(rootScope));
       Analyzers.run(reader, interpreter, interpreter, null, null);
     } finally {
       sqlConnection.close();

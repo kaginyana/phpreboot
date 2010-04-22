@@ -11,19 +11,20 @@ import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.Iterator;
 
-import com.googlecode.phpreboot.compiler.PrimitiveType;
-import com.googlecode.phpreboot.interpreter.Evaluator;
 import com.googlecode.phpreboot.interpreter.Interpreter;
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.interpreter.sql.GenericSQLConnection;
-import com.googlecode.phpreboot.model.ScriptVar;
+import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.tools.Analyzers;
 import com.googlecode.phpreboot.webserver.WebScriptDispatcher;
 import com.sun.grizzly.http.embed.GrizzlyWebServer;
 
+import fr.umlv.tatoo.runtime.log.SyserrHandler;
+
 public class Main {
   enum Option {
     webserver(": start a web server"),
+    verbose(": turn on verbose mode"),
     db("[db name] : specify the database name") {
       @Override
       boolean parse(EnumMap<Option, Object> optionMap, Iterator<String> it) {
@@ -113,18 +114,18 @@ public class Main {
 
     // common inits
 
-    Evaluator evaluator = new Evaluator();
-
     //String driverName = get(optionMap, Option.driverName, String.class, "org.apache.derby.jdbc.EmbeddedDriver");
     String dbName = get(optionMap, Option.db, String.class, "phprDB");
     String protocolScheme = get(optionMap, Option.jdbcScheme, String.class, "jdbc:derby");
     //Class.forName(driverName);
     String jdbcURL = protocolScheme + ":" + dbName + ";create=true";
 
+    boolean verbose = optionMap.containsKey(Option.verbose);
+    
     if (optionMap.containsKey(Option.webserver)) {
       GrizzlyWebServer ws = new GrizzlyWebServer(8080);
       Path rootPath = Paths.get(get(optionMap, Option.documentRoot, String.class, "www"));
-      WebScriptDispatcher webDispatcher = new WebScriptDispatcher(rootPath, evaluator, jdbcURL);
+      WebScriptDispatcher webDispatcher = new WebScriptDispatcher(rootPath, jdbcURL);
       ws.addGrizzlyAdapter(webDispatcher, new String[]{"/"});
       ws.start();
       
@@ -139,13 +140,18 @@ public class Main {
       InputStreamReader reader = new InputStreamReader(input);
       PrintWriter writer = new PrintWriter(System.out);
       
-      GenericSQLConnection sqlConnection = new GenericSQLConnection(jdbcURL, evaluator);
+      GenericSQLConnection sqlConnection = new GenericSQLConnection(jdbcURL);
       Scope rootScope = new Scope(null);
-      rootScope.register(new ScriptVar("SQL_CONNECTION", PrimitiveType.ANY, sqlConnection));
+      rootScope.register(new Var("SQL_CONNECTION", true, sqlConnection));
       
-      Interpreter interpreter = new Interpreter(writer, evaluator, rootScope);
+      Interpreter interpreter = new Interpreter(writer, rootScope);
       try {
         Analyzers.run(reader, interpreter, interpreter, null, null);
+      } catch(Throwable t) {
+        if (verbose)
+          t.printStackTrace(System.err);
+        else
+          System.err.println(t.getMessage());
       } finally {
         sqlConnection.close();
       }

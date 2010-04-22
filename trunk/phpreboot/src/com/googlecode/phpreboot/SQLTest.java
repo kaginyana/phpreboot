@@ -8,7 +8,7 @@ import com.googlecode.phpreboot.interpreter.Evaluator;
 import com.googlecode.phpreboot.interpreter.Interpreter;
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.interpreter.sql.GenericSQLConnection;
-import com.googlecode.phpreboot.model.ScriptVar;
+import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.tools.Analyzers;
 
 public class SQLTest {
@@ -20,20 +20,18 @@ public class SQLTest {
         reader = new java.io.InputStreamReader(System.in);
       }
   
-      Evaluator evaluator = new Evaluator();
-      
       Class.forName("org.apache.derby.jdbc.EmbeddedDriver");
       String dbName="phprDB";
       String url = "jdbc:derby:" + dbName + ";create=true";
 
       
-      GenericSQLConnection sqlConnection = new GenericSQLConnection(url, evaluator);
+      GenericSQLConnection sqlConnection = new GenericSQLConnection(url);
       
       Scope scope = new Scope(null);
-      scope.register(new ScriptVar("SQL_CONNECTION", PrimitiveType.ANY, sqlConnection));
+      scope.register(new Var("SQL_CONNECTION", true, sqlConnection));
       
       PrintWriter writer = new PrintWriter(System.out);
-      Interpreter interpreter = new Interpreter(writer, evaluator, scope);
+      Interpreter interpreter = new Interpreter(writer, scope);
       Analyzers.run(reader, interpreter, interpreter, null, null);
       //System.out.println(interpreter.getScript());
       

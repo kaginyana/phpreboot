@@ -106,7 +106,7 @@ blanks:
   space = '( |\t|\r|\n)'
   
 comments:
-  oneline_comment = "\/\/([^\r\n])*(\r)?\n" 
+  oneline_comment = "\/\/([^\r\n])*" 
   multiline_comment = "\/\*([^*]|[(\r)?\n]|(\*+([^*/]|((\r)?\n))))*\*+\/"
   
 types:

@@ -77,13 +77,10 @@ import com.googlecode.phpreboot.ast.PrimaryPrimaryFieldAccess;
 import com.googlecode.phpreboot.ast.Visitor;
 import com.googlecode.phpreboot.ast.XmlsEmptyTag;
 import com.googlecode.phpreboot.ast.XmlsStartEndTag;
-import com.googlecode.phpreboot.compiler.PrimitiveType;
-import com.googlecode.phpreboot.compiler.Type;
-import com.googlecode.phpreboot.compiler.TypeChecker;
 import com.googlecode.phpreboot.interpreter.sql.SQLConnection;
 import com.googlecode.phpreboot.model.Function;
-import com.googlecode.phpreboot.model.ScriptVar;
-import com.googlecode.phpreboot.model.Symbol;
+import com.googlecode.phpreboot.model.Parameter;
+import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.parser.ProductionEnum;
 import com.googlecode.phpreboot.runtime.Array;
 import com.googlecode.phpreboot.runtime.ArrayAccess;
@@ -94,7 +91,7 @@ import com.googlecode.phpreboot.runtime.XML;
 public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   @SuppressWarnings("serial")
   static class ReturnError extends Error {
-    Object value;
+    public Object value;
     ReturnError() {
       // do nothing
     }
@@ -152,33 +149,54 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     private static final ContinueError INSTANCE = new ContinueError();
   }
   
+  public static final Evaluator INSTANCE = new Evaluator();
+  
+  private Evaluator() {
+    // enforce singleton
+  }
+  
   public Object eval(Node node, EvalEnv env) {
     return node.accept(this, env);
+  }
+  
+  public Object evalFunction(Function function, Object[] arguments, EvalEnv env) {
+    Scope scope = new Scope(function.getScope().duplicate());
+    scope.register(new Var(function.getName(), true, function.getMethodHandle()));
+    
+    List<Parameter> parameters = function.getParameters();
+    for(int i = 0; i<parameters.size(); i++) {
+      Parameter parameter = parameters.get(i);
+      scope.register(new Var(parameter.getName(), true, arguments[i]));
+    }
+    
+    Block block = function.getNode().getBlock();
+    EvalEnv evalEnv = new EvalEnv(scope, env.getEchoer(), null);
+    try {
+      Evaluator.INSTANCE.eval(block, evalEnv);
+    } catch(ReturnError e) {
+      return e.value;
+    }
+    return null;
   }
   
   // --- helper methods
   
   private Object lookupVarValue(String name, Scope scope) {
-    Symbol symbol = scope.lookup(name);
-    if (symbol == null) {
+    Var var = scope.lookup(name);
+    if (var == null) {
       throw RT.error("variable %s not defined", name);
     }
-    if (symbol instanceof ScriptVar) {
-      ScriptVar var = (ScriptVar)symbol;
-      return var.getValue();
-    } else {
-      throw RT.error("Function as variable, NYI");
-    }
+    return var.getValue();
   }
   
   private static void checkVar(String name, Scope scope) {
-    Symbol symbol = scope.lookup(name);
-    if (symbol != null) {
-      throw RT.error("symbol %s already exists", name);
+    Var var = scope.lookup(name);
+    if (var != null) {
+      throw RT.error("variable %s already exists", name);
     }
   }
   
-  private static Type asType(Object value) {
+  /*private static Type asType(Object value) {
     if (value instanceof Integer) {
       return PrimitiveType.INT;
     }
@@ -192,9 +210,9 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       return PrimitiveType.DOUBLE;
     }
     return PrimitiveType.ANY;
-  }
+  }*/
   
-  private static Object defaultValue(Type type) {
+  /*private static Object defaultValue(Type type) {
     if (!(type instanceof PrimitiveType)) {
       return null;
     }
@@ -211,7 +229,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     default:
       return null;
     }
-  }
+  }*/
   
   // --- instructions
   
@@ -439,16 +457,15 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     if (sequence == null)
       return null;
     
-    Scope foreachScope = new Scope(env.getScope());
-    EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getEchoer(), env.getLabel());
     String name = labeled_instr_foreach.getId().getValue();
-    ScriptVar value = new ScriptVar(name, PrimitiveType.ANY, null);
-    foreachScope.register(value);
     
     Instr instr = labeled_instr_foreach.getInstr();
     try {
       while(sequence != null) {
-        value.setValue(sequence.__value__());
+        Scope foreachScope = new Scope(env.getScope());
+        EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getEchoer(), env.getLabel());
+        foreachScope.register(new Var(name, true, sequence.__value__()));
+        
         try {
           eval(instr, foreachEnv);
         } catch(ContinueError e) {
@@ -470,20 +487,17 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     if (sequence == null)
       return null;
     
-    Scope foreachScope = new Scope(env.getScope());
-    EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getEchoer(), env.getLabel());
     String keyName = labeled_instr_foreach_entry.getId().getValue();
     String valueName = labeled_instr_foreach_entry.getId2().getValue();
-    ScriptVar key = new ScriptVar(keyName, PrimitiveType.ANY, null);
-    ScriptVar value = new ScriptVar(valueName, PrimitiveType.ANY, null);
-    foreachScope.register(key);
-    foreachScope.register(value);
     
     Instr instr = labeled_instr_foreach_entry.getInstr();
     try {
       while(sequence != null) {
-        key.setValue(sequence.__key__());
-        value.setValue(sequence.__value__());
+        Scope foreachScope = new Scope(env.getScope());
+        EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getEchoer(), env.getLabel());
+        foreachScope.register(new Var(keyName, true, sequence.__key__()));
+        foreachScope.register(new Var(valueName, true, sequence.__value__()));
+        
         try {
           eval(instr, foreachEnv);
         } catch(ContinueError e) {
@@ -505,12 +519,13 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Scope scope = env.getScope();
     checkVar(name, scope);
     Object value = eval(declaration_let.getExpr(), env);
-    ScriptVar var = new ScriptVar(name, asType(value), value);
+    Var var = new Var(name, true, value);
     scope.register(var);
     return null;
   }
   @Override
   public Object visit(DeclarationTypeEmpty declaration_type_empty, EvalEnv env) {
+    /*
     String name = declaration_type_empty.getId().getValue();
     Scope scope = env.getScope();
     checkVar(name, scope);
@@ -518,9 +533,12 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     ScriptVar var = new ScriptVar(name, type, defaultValue(type));
     scope.register(var);
     return null;
+    */
+    throw new UnsupportedOperationException("NYI");
   }
   @Override
   public Object visit(DeclarationTypeInit declaration_type_init, EvalEnv env) {
+    /*
     String name = declaration_type_init.getId().getValue();
     Scope scope = env.getScope();
     checkVar(name, scope);
@@ -532,30 +550,20 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     ScriptVar var = new ScriptVar(name, type, value);
     scope.register(var);
     return null;
-  }
-  
-  
-  private static ScriptVar checkAssignmentVar(String name, Scope scope) {
-    Symbol symbol = scope.lookup(name);
-    if (symbol == null) {
-      return null;
-    } 
-    if (symbol instanceof ScriptVar) {
-      return (ScriptVar)symbol;
-    } 
-    throw RT.error("illegal assignment, %s is a function", name);
+    */
+    throw new UnsupportedOperationException("NYI");
   }
   
   @Override
   public Object visit(AssignmentId assignment_id, EvalEnv env) {
     String name = assignment_id.getId().getValue();
     Scope scope = env.getScope();
-    ScriptVar var = checkAssignmentVar(name, scope);
+    Var var = scope.lookup(name);
     
     Object value = eval(assignment_id.getExpr(), env);
     if (var == null) {
       // auto declaration
-      var = new ScriptVar(name, PrimitiveType.ANY, value);
+      var = new Var(name, false, value);
       scope.register(var);
     } else {
       var.setValue(value);
@@ -577,7 +585,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   @Override
   public Object visit(AssignmentArray assignment_array, EvalEnv env) {
     String name = assignment_array.getId().getValue();
-    ScriptVar var = checkAssignmentVar(name, env.getScope());
+    Var var = env.getScope().lookup(name);
     if (var == null) {
       throw RT.error("unknown variable named %s", name);
     } 
@@ -602,7 +610,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   public Object visit(AssignmentField assignment_field, EvalEnv env) {
     String name = assignment_field.getId().getValue();
     Scope scope = env.getScope();
-    ScriptVar var = checkAssignmentVar(name, scope);
+    Var var = scope.lookup(name);
     if (var == null) {
       throw RT.error("unknown variable named %s", name);
     } 
@@ -635,20 +643,19 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   public Object visit(Funcall funcall, EvalEnv env) {
     String name = funcall.getId().getValue();
     Scope scope = env.getScope();
-    Symbol symbol = scope.lookup(name);
-    if (symbol == null) {
+    Var var = scope.lookup(name);
+    if (var == null) {
       throw RT.error("unknown function %s", name);
     }
-    com.googlecode.phpreboot.compiler.Type type = symbol.getType();
-    if (!(type instanceof Function)) {
-      throw RT.error("variable %s is not a function", name);
+    Object value = var.getValue();
+    if (!(value instanceof MethodHandle)) {
+      throw RT.error("value is not a function: %s", value);
     }
     
-    Function function = (Function)type;
-    MethodHandle mh = function.getMethodHandle(scope);
+    MethodHandle mh = (MethodHandle)value;
     
     Object[] values = new Object[1 + funcall.getExprStar().size()];
-    values[0] = scope;
+    values[0] = env;
     int i=1;
     for(Expr expr: funcall.getExprStar()) {
       values[i++] = eval(expr, env);

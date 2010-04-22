@@ -15,6 +15,7 @@ import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.Function;
 
 public class Compiler {
+  /*
   private static int counter;
   
   public static MethodHandle compile(Function function, Scope scope) {
@@ -70,5 +71,5 @@ public class Compiler {
     }
     method.setAccessible(true);
     define = method;
-  }
+  }*/
 }

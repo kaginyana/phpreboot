@@ -1,0 +1,13 @@
+
+function g() {
+  return 1
+}
+
+function f(a) {
+  if (a < 2)
+    return g()
+  return f(a - 1) + f(a - 2)
+}
+
+echo f(4)
+

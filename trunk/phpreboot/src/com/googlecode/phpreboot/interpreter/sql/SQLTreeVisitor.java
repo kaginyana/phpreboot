@@ -54,23 +54,14 @@ import com.googlecode.phpreboot.ast.UniqueSpecificationPrimarykey;
 import com.googlecode.phpreboot.ast.UniqueSpecificationUnique;
 import com.googlecode.phpreboot.ast.Visitor;
 import com.googlecode.phpreboot.ast.WhereClause;
-import com.googlecode.phpreboot.compiler.PrimitiveType;
 import com.googlecode.phpreboot.interpreter.EvalEnv;
 import com.googlecode.phpreboot.interpreter.Evaluator;
 import com.googlecode.phpreboot.interpreter.Scope;
-import com.googlecode.phpreboot.model.ScriptVar;
-import com.googlecode.phpreboot.model.Symbol;
+import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.parser.ProductionEnum;
-import com.googlecode.phpreboot.runtime.RT;
 import com.googlecode.phpreboot.runtime.SQLCursor;
 
-public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException>{
-  private final Evaluator evaluator;
-  
-  public SQLTreeVisitor(Evaluator evaluator) {
-    this.evaluator = evaluator;
-  }
-
+public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException> {
   public void executeQuery(Connection connection, Sql sql, Scope scope) {
     SQLEnv env = new SQLEnv(scope, connection);
     tree(sql, env);
@@ -153,15 +144,11 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException>{
     SQLCursor cursor = (resultSet == null)? null: new SQLCursor(resultSet);
     
     Scope scope = env.getScope();
-    Symbol symbol = scope.lookup(name);
-    if (symbol == null) {
-      ScriptVar scriptVar = new ScriptVar(name, PrimitiveType.ANY, cursor);
+    Var scriptVar = scope.lookup(name);
+    if (scriptVar == null) {
+      scriptVar = new Var(name, false, cursor);
       scope.register(scriptVar);
     } else {
-      if (!(symbol instanceof ScriptVar)) {
-        throw RT.error("%s is not a variable", name);
-      }
-      ScriptVar scriptVar = (ScriptVar)symbol;
       scriptVar.setValue(cursor);
     }
     return null;
@@ -212,7 +199,7 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException>{
     
     StringBuilder builder = env.getBuilder();
     for(Expr expr: insert_statement.getExprPlus()) {
-      Object exprValue = evaluator.eval(expr, new EvalEnv(env.getScope(), null, null));
+      Object exprValue = Evaluator.INSTANCE.eval(expr, new EvalEnv(env.getScope(), null, null));
       env.getParameters().add(exprValue);
       builder.append("?, ");
     }
@@ -439,6 +426,7 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException>{
       tree(nodeList.get(0), env);
       env.append(")");
       return null;
+    default:
     }
     
     // binary
@@ -478,6 +466,8 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException>{
     case search_condition_ge:
       env.append(" >= ");
       break;
+    default:
+      throw new AssertionError("Unknown search condition kind "+kind);
     }
     
     tree(nodeList.get(1), env);
@@ -486,7 +476,7 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException>{
   
   @Override
   public Void visit(ConditionValueLiteral condition_value_literal, SQLEnv env) {
-    Object value = evaluator.eval(condition_value_literal.getSingleLiteral(), new EvalEnv(env.getScope(), null, null));
+    Object value = Evaluator.INSTANCE.eval(condition_value_literal.getSingleLiteral(), new EvalEnv(env.getScope(), null, null));
     env.getParameters().add(value);
     env.append("?");
     return null;
@@ -504,7 +494,7 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException>{
   }
   @Override
   public Void visit(ConditionValueDollarAccess condition_value_dollar_access,SQLEnv env) {
-    Object value = evaluator.eval(condition_value_dollar_access.getDollarAccess(), new EvalEnv(env.getScope(), null, null));
+    Object value = Evaluator.INSTANCE.eval(condition_value_dollar_access.getDollarAccess(), new EvalEnv(env.getScope(), null, null));
     env.getParameters().add(value);
     env.append("?");
     return null;

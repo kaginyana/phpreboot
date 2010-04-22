@@ -5,74 +5,54 @@ import java.dyn.MethodType;
 import java.util.List;
 
 import com.googlecode.phpreboot.ast.Fun;
-import com.googlecode.phpreboot.compiler.Compiler;
-import com.googlecode.phpreboot.compiler.Type;
+import com.googlecode.phpreboot.interpreter.EvalEnv;
+import com.googlecode.phpreboot.interpreter.Evaluator;
 import com.googlecode.phpreboot.interpreter.Scope;
 
-public class Function implements Symbol, Type {
+public class Function {
   private final String name;
+  private final List<Parameter> parameters;
+  private final Scope scope;
   private final Fun node;
-  private final Type returnType;
-  private final List<Type> parameterTypes;
-  private /*lazy*/MethodHandle methodHandle;
+  private MethodHandle methodHandle;
   
-  private static org.objectweb.asm.Type FUNCTION_TYPE =
-    org.objectweb.asm.Type.getType(MethodHandle.class);
-  
-  public Function(String name, Type returnType, List<Type> parameterTypes, Fun node) {
+  public Function(String name, List<Parameter> parameters, Scope scope, Fun node) {
     this.name = name;
-    this.returnType = returnType;
-    this.parameterTypes = parameterTypes;
+    this.parameters = parameters;
+    this.scope = scope;
     this.node = node;
   }
 
-  public Type getReturnType() {
-    return returnType;
+  public String getName() {
+    return name;
   }
-  public List<Type> getParameterTypes() {
-    return parameterTypes;
+  public List<Parameter> getParameters() {
+    return parameters;
+  }
+  public Scope getScope() {
+    return scope;
   }
   public Fun getNode() {
     return node;
   }
   
-  public MethodHandle getMethodHandle(Scope scope) {
-    if (methodHandle == null) {
-      methodHandle = Compiler.compile(this, scope);
-    }
+  public MethodHandle getMethodHandle() {
     return methodHandle;
   }
-  
-  @Override
-  public String getName() {
-    return name;
-  }
-  @Override
-  public Type getType() {
-    return this;
+  public void setMethodHandle(MethodHandle methodHandle) {
+    this.methodHandle = methodHandle;
   }
   
-  @Override
-  public org.objectweb.asm.Type asASMType() {
-    return FUNCTION_TYPE;
+  public Object call(/*EvalEnv*/Object env, Object[] arguments) {
+    return Evaluator.INSTANCE.evalFunction(this, arguments, (EvalEnv)env);
   }
-  @Override
-  public Class<?> asRuntimeType() {
-    return MethodHandle.class;
-  }
+  
   public MethodType asMethodType() {
-    Class<?>[] parameterArray = new Class<?>[parameterTypes.size()];
-    int index = 0;
-    for(Type type: parameterTypes) {
-      parameterArray[index++] = type.asRuntimeType();
+    Class<?>[] parameterArray = new Class<?>[parameters.size() + 1];
+    parameterArray[0] = /*EvalEnv.class*/Object.class;
+    for(int i = 1; i < parameterArray.length; i++) {
+      parameterArray[i] = Object.class;
     }
-    return MethodType.methodType(returnType.asRuntimeType(), parameterArray);
-  }
-  @Override
-  public Object checkCast(Object value) {
-    if (!(value instanceof MethodHandle)) {
-      throw new ClassCastException(value + "is not a function");
-    }
-    return value;
+    return MethodType.methodType(Object.class, parameterArray);
   }
 }

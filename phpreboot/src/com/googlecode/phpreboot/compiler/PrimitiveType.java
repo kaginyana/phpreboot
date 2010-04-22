@@ -1,7 +1,8 @@
 package com.googlecode.phpreboot.compiler;
 
+import java.dyn.MethodHandle;
+
 import com.googlecode.phpreboot.runtime.RT;
-import com.googlecode.phpreboot.runtime.Sequence;
 
 public enum PrimitiveType implements Type {
   ANY(Object.class) {
@@ -46,7 +47,16 @@ public enum PrimitiveType implements Type {
       return value;
     }
   },
-  //XML(??)
+  //XML(??),
+  FUNCTION(MethodHandle.class) {
+    @Override
+    public Object checkCast(Object value) {
+      if (!(value instanceof MethodHandle)) {
+        throw RT.error("%s is not a function ", value);
+      }
+      return value;
+    }
+  },
   VOID(null, void.class),
   NULL(null, null)
   ;

@@ -18,7 +18,7 @@ public class OldMain {
   
       PrintWriter writer = new PrintWriter(System.out);
       Scope scope = new Scope(null);
-      Interpreter interpreter = new Interpreter(writer, new Evaluator(), scope);
+      Interpreter interpreter = new Interpreter(writer, scope);
       Analyzers.run(reader, interpreter, interpreter, null, null);
       //System.out.println(interpreter.getScript());
     }

@@ -34,6 +34,7 @@ import com.googlecode.phpreboot.parser.ProductionEnum;
 import com.googlecode.phpreboot.runtime.RT;
 
 public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
+  /*
   public void typeCheck(Fun functionNode, Scope scope) {
     Signature signature = functionNode.getSignature();
     
@@ -80,25 +81,6 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     }
   };
   
-  // ---
-  
-  public static Function createFunction(Fun fun) {
-    Signature signature = fun.getSignature();
-    String name = signature.getId().getValue();
-    com.googlecode.phpreboot.ast.Type typeOptional = signature.getTypeOptional();
-    Type returnType = (typeOptional !=null)? asType(typeOptional): PrimitiveType.VOID;
-    
-    ArrayList<Type> parameterTypes = new ArrayList<Type>();
-    for(Parameter parameter: signature.getParameterStar()) {
-      Type type = (parameter instanceof ParameterTyped)?
-          asType(((ParameterTyped)parameter).getType()):
-          PrimitiveType.ANY;
-      parameterTypes.add(type);
-    }
-    
-    Function function = new Function(name, returnType, parameterTypes, fun);
-    return function;
-  }
   
   
   // ---
@@ -296,5 +278,5 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   @Override
   public Type visit(LiteralString literal_string, TypeCheckEnv env) {
     return PrimitiveType.STRING;
-  }
+  }*/
 }

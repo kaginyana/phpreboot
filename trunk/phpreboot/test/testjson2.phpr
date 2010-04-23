@@ -1,0 +1,20 @@
+persons = [
+ {
+  "name": "Smith",
+  "age": 20,
+  "color": "blue" 
+ },
+ {
+  "name": "Wesson",
+  "age": 17,
+  "color": "red" 
+ }
+]
+ 
+foreach(persons as person) {
+  echo "Name:" +person.name
+  echo "Color:" + person.color
+}
+
+
+

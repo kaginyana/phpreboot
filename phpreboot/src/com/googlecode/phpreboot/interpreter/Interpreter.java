@@ -1,13 +1,7 @@
 package com.googlecode.phpreboot.interpreter;
 
-import java.dyn.MethodHandle;
-import java.dyn.MethodHandles;
-import java.dyn.MethodType;
 import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import com.googlecode.phpreboot.ast.ASTGrammarEvaluator;
 import com.googlecode.phpreboot.ast.Action;
@@ -26,9 +20,8 @@ import com.googlecode.phpreboot.ast.Label;
 import com.googlecode.phpreboot.ast.LabeledInstr;
 import com.googlecode.phpreboot.ast.LcurlToken;
 import com.googlecode.phpreboot.ast.Member;
+import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.ast.NullLiteralToken;
-import com.googlecode.phpreboot.ast.ParameterAny;
-import com.googlecode.phpreboot.ast.ParameterTyped;
 import com.googlecode.phpreboot.ast.RcurlToken;
 import com.googlecode.phpreboot.ast.Script;
 import com.googlecode.phpreboot.ast.Signature;
@@ -37,10 +30,6 @@ import com.googlecode.phpreboot.ast.StringLiteralToken;
 import com.googlecode.phpreboot.ast.TextToken;
 import com.googlecode.phpreboot.ast.ValueLiteralToken;
 import com.googlecode.phpreboot.ast.Xmls;
-import com.googlecode.phpreboot.model.Function;
-import com.googlecode.phpreboot.model.Parameter;
-import com.googlecode.phpreboot.model.Var;
-import com.googlecode.phpreboot.runtime.RT;
 import com.googlecode.phpreboot.tools.TerminalEvaluator;
 
 public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluator<CharSequence> {
@@ -51,6 +40,12 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
   public Interpreter(PrintWriter writer, Scope scope) {
     this.echoer = Echoer.writerEchoer(writer);
     this.currentScope = scope;
+  }
+  
+  // --- helper methods
+  
+  private void eval(Node node) {
+    Evaluator.INSTANCE.eval(node, new EvalEnv(currentScope, echoer, null));
   }
 
   // --- terminal evaluator
@@ -143,7 +138,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     if (interpreter != 0) {
       return instr_echo;
     }
-    Evaluator.INSTANCE.eval(instr_echo, new EvalEnv(currentScope, echoer, null));
+    eval(instr_echo);
     return null;
   }
   
@@ -153,7 +148,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     if (interpreter != 0) {
       return instr_decl;
     }
-    Evaluator.INSTANCE.eval(instr_decl, new EvalEnv(currentScope, echoer, null));
+    eval(instr_decl);
     return null; 
   }
   
@@ -163,7 +158,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     if (interpreter != 0) {
       return instr_assign;
     }
-    Evaluator.INSTANCE.eval(instr_assign, new EvalEnv(currentScope, echoer, null));
+    eval(instr_assign);
     return null;
   }
   
@@ -173,7 +168,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     if (interpreter != 0) {
       return instr_funcall;
     }
-    Evaluator.INSTANCE.eval(instr_funcall, new EvalEnv(currentScope, echoer, null));
+    eval(instr_funcall);
     return null;
   }
   
@@ -198,7 +193,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     if (interpreter != 0) {
       return instr_if;
     }
-    Evaluator.INSTANCE.eval(instr_if, new EvalEnv(currentScope, echoer, null));
+    eval(instr_if);
     return null;
   }
   @Override
@@ -208,7 +203,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     if (interpreter != 0) { 
       return instr_xmls;
     }
-    Evaluator.INSTANCE.eval(instr_xmls, new EvalEnv(currentScope, echoer, null));
+    eval(instr_xmls);
     return null;
   }
   
@@ -229,7 +224,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     if (interpreter != 0)
       return instr_labeled;
     
-    Evaluator.INSTANCE.eval(instr_labeled, new EvalEnv(currentScope, echoer, null));
+    eval(instr_labeled);
     return null;
   }
   
@@ -239,7 +234,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     if (interpreter != 0)
       return instr_return;
     
-    Evaluator.INSTANCE.eval(instr_return, new EvalEnv(currentScope, echoer, null));
+    eval(instr_return);
     return null;
   }
   @Override
@@ -248,7 +243,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     if (interpreter != 0)
       return instr_break;
     
-    Evaluator.INSTANCE.eval(instr_break, new EvalEnv(currentScope, echoer, null));
+    eval(instr_break);
     return null;
   }
   @Override
@@ -257,7 +252,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     if (interpreter != 0)
       return instr_continue;
     
-    Evaluator.INSTANCE.eval(instr_continue, new EvalEnv(currentScope, echoer, null));
+    eval(instr_continue);
     return null;
   }
   
@@ -268,34 +263,12 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     if (interpreter != 0)
       return instr_sql;
     
-    Evaluator.INSTANCE.eval(instr_sql, new EvalEnv(currentScope, echoer, null));
-    return instr_sql;
+    eval(instr_sql);
+    return null;
   }
   
   
   // --- function declaration
-  
-  private static void filterReadOnlyVars(HashMap<String,Object> map, Scope scope) {
-    if (scope == null)
-      return;
-    filterReadOnlyVars(map, scope.getParent());
-    for(Var var: scope.varMap()) {
-      if (var.isReadOnly()) {
-        map.put(var.getName(), var.getValue());
-      }
-    }
-  }
-  
-  private static Scope filterReadOnlyVars(Scope scope) {
-    HashMap<String,Object> map = new HashMap<String, Object>();
-    filterReadOnlyVars(map, scope);
-    
-    Scope newScope = new Scope(null);
-    for(Map.Entry<String, Object> entry: map.entrySet()) {
-      newScope.register(new Var(entry.getKey(), true, entry.getValue()));
-    }
-    return newScope;
-  }
   
   @Override
   public Signature signature(com.googlecode.phpreboot.ast.Type type_optional_1, IdToken id, List<com.googlecode.phpreboot.ast.Parameter> parameters) {
@@ -304,49 +277,14 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     return signature;
   }
   
-  static MethodHandle createFunction(Fun fun, Scope scope) {
-    Signature signature = fun.getSignature();
-    String name = signature.getId().getValue();
-    /*
-    com.googlecode.phpreboot.ast.Type typeOptional = signature.getTypeOptional();
-    Type returnType = (typeOptional !=null)? TypeChecker.asType(typeOptional): PrimitiveType.VOID;
-    */
-    ArrayList<Parameter> parameters = new ArrayList<Parameter>();
-    for(com.googlecode.phpreboot.ast.Parameter parameter: signature.getParameterStar()) {
-      String parameterName;
-      if (parameter instanceof ParameterAny) {
-        parameterName = ((ParameterAny)parameter).getId().getValue();
-      } else {
-        parameterName = ((ParameterTyped)parameter).getId().getValue();
-      }
-      parameters.add(new Parameter(parameterName));
-    }
-    
-    Function function = new Function(name, parameters, filterReadOnlyVars(scope), fun);
-    
-    MethodHandle mh = MethodHandles.lookup().findVirtual(Function.class, "call",
-        MethodType.methodType(Object.class, /*EvalEnv.class*/ Object.class, Object[].class));
-    mh = MethodHandles.insertArguments(mh, 0, function);
-    mh = MethodHandles.collectArguments(mh, function.asMethodType());
-    function.setMethodHandle(mh);
-    return mh;
-  }
-  
   @Override
   public Fun fun(Signature signature, Block block) {
     Fun fun = super.fun(signature, block);
-    interpreter--;
+    interpreter--;  // match with signature()
+    if (interpreter != 0)
+      return fun;
     
-    String name = signature.getId().getValue();
-    Scope scope = currentScope;
-    Var var = scope.lookup(name);
-    if (var != null) {
-      throw RT.error("a variable %s is already defined", name);
-    }
-    
-    MethodHandle mh = createFunction(fun, scope);
-    var = new Var(name, true, mh);
-    scope.register(var);
-    return fun;
+    eval(fun);
+    return null;
   }
 }

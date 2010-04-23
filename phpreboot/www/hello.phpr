@@ -3,7 +3,7 @@
    <body>
     <h1>
     {
-      echo "Hello World !";
+      echo "Hello World !"
     }
     </h1>
    </body>

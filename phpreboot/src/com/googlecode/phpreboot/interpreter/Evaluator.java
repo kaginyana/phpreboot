@@ -1,7 +1,12 @@
 package com.googlecode.phpreboot.interpreter;
 
 import java.dyn.MethodHandle;
+import java.dyn.MethodHandles;
+import java.dyn.MethodType;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.googlecode.phpreboot.ast.ArrayEntry;
 import com.googlecode.phpreboot.ast.ArrayValue;
@@ -42,6 +47,7 @@ import com.googlecode.phpreboot.ast.ForInitFuncall;
 import com.googlecode.phpreboot.ast.ForStep;
 import com.googlecode.phpreboot.ast.ForStepAssignment;
 import com.googlecode.phpreboot.ast.ForStepFuncall;
+import com.googlecode.phpreboot.ast.Fun;
 import com.googlecode.phpreboot.ast.Funcall;
 import com.googlecode.phpreboot.ast.IdToken;
 import com.googlecode.phpreboot.ast.Instr;
@@ -68,12 +74,15 @@ import com.googlecode.phpreboot.ast.LiteralSingle;
 import com.googlecode.phpreboot.ast.LiteralString;
 import com.googlecode.phpreboot.ast.LiteralValue;
 import com.googlecode.phpreboot.ast.Node;
+import com.googlecode.phpreboot.ast.ParameterAny;
+import com.googlecode.phpreboot.ast.ParameterTyped;
 import com.googlecode.phpreboot.ast.PrimaryArrayAccess;
 import com.googlecode.phpreboot.ast.PrimaryFieldAccess;
 import com.googlecode.phpreboot.ast.PrimaryFuncall;
 import com.googlecode.phpreboot.ast.PrimaryParens;
 import com.googlecode.phpreboot.ast.PrimaryPrimaryArrayAccess;
 import com.googlecode.phpreboot.ast.PrimaryPrimaryFieldAccess;
+import com.googlecode.phpreboot.ast.Signature;
 import com.googlecode.phpreboot.ast.Visitor;
 import com.googlecode.phpreboot.ast.XmlsEmptyTag;
 import com.googlecode.phpreboot.ast.XmlsStartEndTag;
@@ -230,6 +239,70 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       return null;
     }
   }*/
+  
+  // --- function definition
+  
+  private static void filterReadOnlyVars(HashMap<String,Object> map, Scope scope) {
+    if (scope == null)
+      return;
+    filterReadOnlyVars(map, scope.getParent());
+    for(Var var: scope.varMap()) {
+      if (var.isReadOnly()) {
+        map.put(var.getName(), var.getValue());
+      }
+    }
+  }
+  
+  private static Scope filterReadOnlyVars(Scope scope) {
+    HashMap<String,Object> map = new HashMap<String, Object>();
+    filterReadOnlyVars(map, scope);
+    
+    Scope newScope = new Scope(null);
+    for(Map.Entry<String, Object> entry: map.entrySet()) {
+      newScope.register(new Var(entry.getKey(), true, entry.getValue()));
+    }
+    return newScope;
+  }
+  
+  private static MethodHandle createFunction(Fun fun, Scope scope) {
+    Signature signature = fun.getSignature();
+    String name = signature.getId().getValue();
+    /*
+    com.googlecode.phpreboot.ast.Type typeOptional = signature.getTypeOptional();
+    Type returnType = (typeOptional !=null)? TypeChecker.asType(typeOptional): PrimitiveType.VOID;
+    */
+    ArrayList<Parameter> parameters = new ArrayList<Parameter>();
+    for(com.googlecode.phpreboot.ast.Parameter parameter: signature.getParameterStar()) {
+      String parameterName;
+      if (parameter instanceof ParameterAny) {
+        parameterName = ((ParameterAny)parameter).getId().getValue();
+      } else {
+        parameterName = ((ParameterTyped)parameter).getId().getValue();
+      }
+      parameters.add(new Parameter(parameterName));
+    }
+    
+    Function function = new Function(name, parameters, filterReadOnlyVars(scope), fun);
+    
+    MethodHandle mh = MethodHandles.lookup().findVirtual(Function.class, "call",
+        MethodType.methodType(Object.class, /*EvalEnv.class*/ Object.class, Object[].class));
+    mh = MethodHandles.insertArguments(mh, 0, function);
+    mh = MethodHandles.collectArguments(mh, function.asMethodType());
+    function.setMethodHandle(mh);
+    return mh;
+  }
+  
+  @Override
+  public Object visit(Fun fun, EvalEnv env) {
+    String name = fun.getSignature().getId().getValue();
+    Scope scope = env.getScope();
+    checkVar(name, scope);
+    
+    MethodHandle mh = createFunction(fun, scope);
+    Var var = new Var(name, true, mh);
+    scope.register(var);
+    return null;
+  }
   
   // --- instructions
   

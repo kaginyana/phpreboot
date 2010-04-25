@@ -21,7 +21,7 @@ public abstract class Echoer {
     return new Echoer() {
       @Override
       public void echo(Object value) {
-        array.__add__(value);
+        array.add(value);
       }
     };
   }

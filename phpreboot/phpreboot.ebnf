@@ -122,6 +122,7 @@ types:
 attributes:
   symbol: com.googlecode.phpreboot.model.Symbol
   type: com.googlecode.phpreboot.compiler.Type  
+  callsite: java.dyn.CallSite
   
 starts:
   script  

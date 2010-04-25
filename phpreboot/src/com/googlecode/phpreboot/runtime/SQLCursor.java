@@ -13,7 +13,7 @@ public class SQLCursor implements Sequence, ArrayAccess {
   }
   
   @Override
-  public Sequence __next__() {
+  public Sequence next() {
     try {
       row++;
       if (resultSet.next())
@@ -26,7 +26,7 @@ public class SQLCursor implements Sequence, ArrayAccess {
   }
   
   @Override
-  public Object __key__() {
+  public Object getKey() {
     /*
     try {
       return resultSet.getRow();
@@ -37,12 +37,12 @@ public class SQLCursor implements Sequence, ArrayAccess {
   }
   
   @Override
-  public Object __value__() {
+  public Object getValue() {
     return this;
   }
   
   @Override
-  public Object __get__(Object key) {
+  public Object get(Object key) {
     try {
       if (key instanceof String) {
         return resultSet.getObject((String)key);
@@ -57,7 +57,7 @@ public class SQLCursor implements Sequence, ArrayAccess {
   }
   
   @Override
-  public Object __get__(int index) {
+  public Object get(int index) {
     try {
       return resultSet.getObject(index);
     } catch (SQLException e) {

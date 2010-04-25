@@ -6,30 +6,30 @@ import com.googlecode.phpreboot.runtime.Array;
 public class ArrayTest {
   public static void main(String[] args) {
     Array one = new Array();
-    one.__set__("foo", "bar");
-    System.out.println(one.__sequence__());
+    one.set("foo", "bar");
+    System.out.println(one.sequence());
     
     
     Array array = new Array();
-    array.__set__("foo", "bar");
-    array.__set__("foo2", "bar2");
-    array.__set__("foo3", "bar3");
-    array.__set__("foo4", "bar4");
+    array.set("foo", "bar");
+    array.set("foo2", "bar2");
+    array.set("foo3", "bar3");
+    array.set("foo4", "bar4");
     
     System.out.println(array);
     
-    array.__remove__("foo2");
+    array.remove("foo2");
     
     System.out.println(array);
     
     Array array2 = new Array();
-    array2.__add__(1);
-    array2.__add__(2);
+    array2.add(1);
+    array2.add(2);
     //array2.__set__(4, "foo");
-    array2.__add__(3);
-    array2.__add__(4);
+    array2.add(3);
+    array2.add(4);
     
-    array.__set__("array2", array2);
+    array.set("array2", array2);
     
     System.out.println(array/*.__json__()*/);
     

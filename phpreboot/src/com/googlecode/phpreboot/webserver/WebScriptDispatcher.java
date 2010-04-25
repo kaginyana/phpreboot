@@ -95,15 +95,15 @@ public class WebScriptDispatcher extends GrizzlyAdapter {
   
   private void fillServer(GrizzlyRequest request, Scope scope) {
     Array server = new Array();
-    server.__set__("SERVER_PROTOCOL", request.getProtocol());
-    server.__set__("SERVER_ADDR", request.getLocalAddr());
-    server.__set__("SERVER_NAME", request.getLocalName());
-    server.__set__("REMOTE_ADDR", request.getRemoteAddr());
-    server.__set__("REMOTE_NAME", request.getRemoteHost());
-    server.__set__("REMOTE_PORT", request.getRemotePort());
-    server.__set__("REQUEST_METHOD", request.getMethod());
-    server.__set__("REQUEST_URI", request.getRequestURI());
-    server.__set__("DOCUMENT_ROOT", rootPath.toString());
+    server.set("SERVER_PROTOCOL", request.getProtocol());
+    server.set("SERVER_ADDR", request.getLocalAddr());
+    server.set("SERVER_NAME", request.getLocalName());
+    server.set("REMOTE_ADDR", request.getRemoteAddr());
+    server.set("REMOTE_NAME", request.getRemoteHost());
+    server.set("REMOTE_PORT", request.getRemotePort());
+    server.set("REQUEST_METHOD", request.getMethod());
+    server.set("REQUEST_URI", request.getRequestURI());
+    server.set("DOCUMENT_ROOT", rootPath.toString());
     //server.__set__("AUTH_TYPE", request.getAuthType());
     
     scope.register(new Var("_SERVER", false, server));
@@ -116,7 +116,7 @@ public class WebScriptDispatcher extends GrizzlyAdapter {
       if (value instanceof Object[]) {
         value = ((Object[])value)[0];
       }
-      parameters.__set__(entry.getKey(), value);
+      parameters.set(entry.getKey(), value);
     }
     
     Object get,post;

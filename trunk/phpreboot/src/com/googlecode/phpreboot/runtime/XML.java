@@ -21,16 +21,16 @@ public class XML implements Sequenceable {
     this("");
   }
   
-  public String _name__() {
+  public String getName() {
     return name;
   }
-  public void __name__(String name) {
+  public void setName(String name) {
     this.name = name;
   }
-  public Array __attributes__() {
+  public Array attributes() {
     return attributes;
   }
-  public Array __elements__() {
+  public Array elements() {
     return elements;
   }
   
@@ -38,52 +38,52 @@ public class XML implements Sequenceable {
   public String toString() {
     StringBuilder builder = new StringBuilder();
     builder.append('<').append(name);
-    for(Sequence seq = attributes.__entries__(); seq != null; seq = seq.__next__()) {
-      builder.append(' ').append(seq.__key__()).append("=\"").append(seq.__value__()).append('\"');
+    for(Sequence seq = attributes.entries(); seq != null; seq = seq.next()) {
+      builder.append(' ').append(seq.getKey()).append("=\"").append(seq.getValue()).append('\"');
     }
-    Sequence seq = elements.__entries__();
+    Sequence seq = elements.entries();
     if (seq == null) {
       builder.append("\\>");
       return builder.toString();
     }
     builder.append('>');
-    for(; seq != null; seq = seq.__next__()) {
-      builder.append(seq.__value__());
+    for(; seq != null; seq = seq.next()) {
+      builder.append(seq.getValue());
     }
     builder.append("</").append(name).append(">");
     return builder.toString();
   }
   
   @Override
-  public Sequence __entries__() {
-    return elements.__entries__();
+  public Sequence entries() {
+    return elements.entries();
   }
   
   @Override
-  public Sequence __sequence__() {
-    if (elements.__size__() == 0)
+  public Sequence sequence() {
+    if (elements.size() == 0)
       return null;
     
     return new Sequence() {
       private final ArrayDeque<Sequence> stack = new ArrayDeque<Sequence>(); 
-      private Sequence current = elements.__sequence__();
+      private Sequence current = elements.sequence();
       
       @Override
-      public Object __value__() {
-        return current.__value__();
+      public Object getValue() {
+        return current.getValue();
       }
       
       @Override
-      public Object __key__() {
-        return current.__key__();
+      public Object getKey() {
+        return current.getKey();
       }
       
       @Override
-      public Sequence __next__() {
+      public Sequence next() {
         Sequence current = this.current;
-        Object value = current.__value__();
+        Object value = current.getValue();
         if (value instanceof Sequenceable) {
-          Sequence seq = ((Sequenceable)value).__entries__();
+          Sequence seq = ((Sequenceable)value).entries();
           if (seq != null) {
             System.out.println("push "+current);
             
@@ -93,7 +93,7 @@ public class XML implements Sequenceable {
           }
         }
         
-        while ((current = current.__next__()) == null) {
+        while ((current = current.next()) == null) {
           if (stack.isEmpty())
             return null;
           current = stack.pop();

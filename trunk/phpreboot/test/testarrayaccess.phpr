@@ -1,0 +1,22 @@
+
+master_array = []
+
+array = []
+array["name"] = "bar"
+master_array[0] = array
+
+xml = <foo>text</foo>
+master_array[1] = xml
+
+foreach(master_array as item) {
+  item.name = "hourra"
+}
+
+echo array
+echo xml
+
+foreach(master_array as item) {
+  echo item.name
+  echo item["name"]
+}
+

@@ -92,7 +92,6 @@ import com.googlecode.phpreboot.model.Parameter;
 import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.parser.ProductionEnum;
 import com.googlecode.phpreboot.runtime.Array;
-import com.googlecode.phpreboot.runtime.ArrayAccess;
 import com.googlecode.phpreboot.runtime.RT;
 import com.googlecode.phpreboot.runtime.Sequence;
 import com.googlecode.phpreboot.runtime.XML;
@@ -537,14 +536,14 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       while(sequence != null) {
         Scope foreachScope = new Scope(env.getScope());
         EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getEchoer(), env.getLabel());
-        foreachScope.register(new Var(name, true, sequence.__value__()));
+        foreachScope.register(new Var(name, true, sequence.getValue()));
         
         try {
           eval(instr, foreachEnv);
         } catch(ContinueError e) {
           e.mayRethrow(env);
         }
-        sequence = sequence.__next__();
+        sequence = sequence.next();
       }
     } catch(BreakError e) {
       e.mayRethrow(env);
@@ -568,15 +567,15 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       while(sequence != null) {
         Scope foreachScope = new Scope(env.getScope());
         EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getEchoer(), env.getLabel());
-        foreachScope.register(new Var(keyName, true, sequence.__key__()));
-        foreachScope.register(new Var(valueName, true, sequence.__value__()));
+        foreachScope.register(new Var(keyName, true, sequence.getKey()));
+        foreachScope.register(new Var(valueName, true, sequence.getValue()));
         
         try {
           eval(instr, foreachEnv);
         } catch(ContinueError e) {
           e.mayRethrow(env);
         }
-        sequence = sequence.__next__();
+        sequence = sequence.next();
       }
     } catch(BreakError e) {
       e.mayRethrow(env);
@@ -644,17 +643,6 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     return null;
   }
   
-  private static void arraySet(Object varValue, Object key, Object value, boolean keyMustExist) {
-    if (!(varValue instanceof Array)) {
-      throw RT.error("value is not an array: %s", varValue);
-    }
-    Array array = (Array)varValue;
-    if (keyMustExist && array.__get__(key) == null) {
-      throw RT.error("member %s doesn't exist for array: %s", key, array);
-    }
-    array.__set__(key, value);
-  }
-  
   @Override
   public Object visit(AssignmentArray assignment_array, EvalEnv env) {
     String name = assignment_array.getId().getValue();
@@ -665,7 +653,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     
     Object key = eval(assignment_array.getExpr(), env);
     Object value = eval(assignment_array.getExpr2(), env);  
-    arraySet(var.getValue(), key, value, false);
+    RT.interpreterArraySet(assignment_array, var.getValue(), key, value, false);
     return null;
   }
   
@@ -675,7 +663,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Object key = eval(assignment_primary_array.getExpr(), env);
     Object value = eval(assignment_primary_array.getExpr2(), env);
     
-    arraySet(array, key, value, false);
+    RT.interpreterArraySet(assignment_primary_array, array, key, value, false);
     return null;
   }
   
@@ -689,7 +677,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     } 
     
     Object value = eval(assignment_field.getExpr(), env);  
-    arraySet(var.getValue(), assignment_field.getId2().getValue(), value, true);
+    RT.interpreterArraySet(assignment_field, var.getValue(), assignment_field.getId2().getValue(), value, true);
     return null;
   }
   
@@ -698,7 +686,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Object array = eval(assignment_primary_field.getPrimary(), env);
     Object value = eval(assignment_primary_field.getExpr(), env);
     
-    arraySet(array, assignment_primary_field.getId().getValue(), value, true);
+    RT.interpreterArraySet(assignment_primary_field, array, assignment_primary_field.getId().getValue(), value, true);
     return null;
   }
   
@@ -759,41 +747,41 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   public Object visit(PrimaryFuncall primary_funcall, EvalEnv env) {
     return eval(primary_funcall.getFuncall(), env);
   }
-  
+  /*
   private static Object arrayGet(Object array, Object key, boolean keyMustExist) {
     if (!(array instanceof ArrayAccess)) {
       throw RT.error("value is not as an array or a cursor: %s", array);
     }
-    Object value = ((ArrayAccess)array).__get__(key);
+    Object value = ((ArrayAccess)array).get(key);
     if (keyMustExist && value == null) {
       throw RT.error("member %s doesn't exist for array/cursor: %s", key, array);
     }
     return value;
-  }
+  }*/
   
   @Override
   public Object visit(PrimaryArrayAccess primary_array_access, EvalEnv env) {
     Object array = lookupVarValue(primary_array_access.getId().getValue(), env.getScope());
     Object key = eval(primary_array_access.getExpr(), env);
-    return arrayGet(array, key, false);
+    return RT.interpreterArrayGet(primary_array_access, array, key, false);
   }
   @Override
   public Object visit(PrimaryPrimaryArrayAccess primary_primary_array_access, EvalEnv env) {
     Object array = eval(primary_primary_array_access.getPrimary(), env);
     Object key = eval(primary_primary_array_access.getExpr(), env);
-    return arrayGet(array, key, false);
+    return RT.interpreterArrayGet(primary_primary_array_access, array, key, false);
   }
   @Override
   public Object visit(PrimaryFieldAccess primary_field_access, EvalEnv env) {
     Object array = lookupVarValue(primary_field_access.getId().getValue(), env.getScope());
     String key = primary_field_access.getId2().getValue();
-    return arrayGet(array, key, true);
+    return RT.interpreterArrayGet(primary_field_access, array, key, true);
   }
   @Override
   public Object visit(PrimaryPrimaryFieldAccess primary_primary_field_access, EvalEnv env) {
     Object array = eval(primary_primary_field_access.getPrimary(), env);
     String key = primary_primary_field_access.getId().getValue();
-    return arrayGet(array, key, true);
+    return RT.interpreterArrayGet(primary_primary_field_access, array, key, true);
   }
   
   // --- expressions
@@ -905,7 +893,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       if (value instanceof Array.Entry) {
         array.__set__((Array.Entry)value);
       } else {
-        array.__add__(value);
+        array.add(value);
       }
     }
     return array;
@@ -977,7 +965,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   @Override
   public Object visit(AttrsStringLiteral attributes_string_literal, EvalEnv env) {
     Array array = (Array)eval(attributes_string_literal.getAttrs(), env);
-    array.__set__(attributes_string_literal.getId(), eval(attributes_string_literal.getStringLiteral(), env));
+    array.set(attributes_string_literal.getId(), eval(attributes_string_literal.getStringLiteral(), env));
     return array;
   }
   
@@ -988,13 +976,13 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   @Override
   public Object visit(ContentText content_text, EvalEnv env) {
     Array array = (Array)eval(content_text.getContent(), env);
-    array.__add__(content_text.getText().getValue());
+    array.add(content_text.getText().getValue());
     return array;
   }
   @Override
   public Object visit(ContentXmls content_xmls, EvalEnv env) {
     Array array = (Array)eval(content_xmls.getContent(), env);
-    array.__add__(eval(content_xmls.getXmls(), env));
+    array.add(eval(content_xmls.getXmls(), env));
     return array;
   }
   @Override
@@ -1007,7 +995,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   @Override
   public Object visit(ContentDollarAccess content_dollar_access, EvalEnv env) {
     Array array = (Array)eval(content_dollar_access.getContent(), env);
-    array.__add__(String.valueOf(eval(content_dollar_access.getDollarAccess(), env)));
+    array.add(String.valueOf(eval(content_dollar_access.getDollarAccess(), env)));
     return array;
   }
 }

@@ -24,18 +24,18 @@ public class Array implements Sequenceable, ArrayAccess {
     }
 
     @Override
-    public Sequence __next__() {
+    public Sequence next() {
       Entry after = this.after;
       return (after == header) ? null: after;
     }
 
     @Override
-    public Object __key__() {
+    public Object getKey() {
       return key;
     }
 
     @Override
-    public Object __value__() {
+    public Object getValue() {
       return value;
     }
   }
@@ -53,7 +53,7 @@ public class Array implements Sequenceable, ArrayAccess {
     header.before = header.after = header;
   }
 
-  public int __size__() {
+  public int size() {
     return size;
   }
 
@@ -62,7 +62,7 @@ public class Array implements Sequenceable, ArrayAccess {
   }
   
   @Override
-  public Object __get__(Object key) {
+  public Object get(Object key) {
     Entry[] table = this.table;
     for (Entry e = table[hashIndex(key, table.length)];
          e != null;
@@ -75,11 +75,11 @@ public class Array implements Sequenceable, ArrayAccess {
   }
 
   @Override
-  public Object __get__(int key) {
-    return __get__((Integer)key);
+  public Object get(int key) {
+    return get((Integer)key);
   }
   
-  public void __set__(Object key, Object value) {
+  public void set(Object key, Object value) {
     value.getClass();
     Entry[] table = this.table;
     int i = hashIndex(key, table.length);
@@ -103,6 +103,32 @@ public class Array implements Sequenceable, ArrayAccess {
     
     if (size++ >= threshold)
       resize(table);
+  }
+  
+  Entry getEntry(Object key) {
+    Entry[] table = this.table;
+    int i = hashIndex(key, table.length);
+    for (Entry e = table[i]; e != null; e = e.next) {
+      if (e.key.equals(key)) {
+        return e;
+      }
+    }
+    
+    Entry e = new Entry(key, null, table[i], header);
+    e.after  = header;
+    e.before = header.before;
+    e.before.after = e; 
+    e.after.before = e;
+    table[i] = e;
+    
+    if (key instanceof Integer) {
+      nextIndex = 1 + (Integer)key;
+    }
+    
+    if (size++ >= threshold)
+      resize(table);
+    
+    return e;
   }
   
   public void __set__(Entry entry) {
@@ -138,12 +164,12 @@ public class Array implements Sequenceable, ArrayAccess {
     return new IllegalArgumentException("entry already stored in another array");
   }
   
-  public void __set__(int key, Object value) {
-    __set__((Object)key, value);
+  public void set(int key, Object value) {
+    set((Object)key, value);
   }
   
-  public void __add__(Object value) {
-    __set__(nextIndex, value);
+  public void add(Object value) {
+    set(nextIndex, value);
   }
 
   private void resize(Entry[] table) {
@@ -160,7 +186,7 @@ public class Array implements Sequenceable, ArrayAccess {
     threshold = newCapacity + newCapacity >> 1;
   }
 
-  public void __remove__(Object key) {
+  public void remove(Object key) {
     Entry[] table = this.table;
     int i = hashIndex(key, table.length);
     Entry prev = table[i];
@@ -186,8 +212,8 @@ public class Array implements Sequenceable, ArrayAccess {
     return ;
   }
   
-  public void __remove__(int key) {
-    __remove__((Integer)key);
+  public void remove(int key) {
+    remove((Integer)key);
   }
 
   /*public void clear() {
@@ -281,12 +307,12 @@ public class Array implements Sequenceable, ArrayAccess {
   }
   
   @Override
-  public Sequence __entries__() {
-    return __sequence__();
+  public Sequence entries() {
+    return sequence();
   }
   
   @Override
-  public Sequence __sequence__() {
+  public Sequence sequence() {
     if (size == 0)
       return null;
     return header.after;

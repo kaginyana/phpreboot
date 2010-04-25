@@ -1,5 +1,14 @@
 package com.googlecode.phpreboot.runtime;
 
+import java.dyn.CallSite;
+import java.dyn.MethodHandle;
+import java.dyn.MethodHandles;
+import java.dyn.MethodHandles.Lookup;
+import java.dyn.MethodType;
+
+import com.googlecode.phpreboot.ast.Node;
+import com.googlecode.phpreboot.runtime.Array.Entry;
+
 
 
 public class RT {
@@ -11,6 +20,13 @@ public class RT {
   }
   public static RuntimeException error(String format, Object... args) {
     return new RuntimeException(String.format(format, args));
+  }
+  
+  public static RuntimeException error(Throwable t) {
+    while (t.getCause() != null) {
+      t = t.getCause();
+    }
+    return new RuntimeException(t);
   }
   
   public static Object unary_plus(Object value) {
@@ -317,9 +333,196 @@ public class RT {
   }
   
   
+  
+  
+  private final static MethodHandle array_set;
+  private final static MethodHandle array_access_get;
+  private final static MethodHandle test_receiver_asArray;
+  private final static MethodHandle test_receiver_and_key;
+  private final static MethodHandle slowPathArraySet;
+  private final static MethodHandle slowPathArrayGet;
+  
+  static {
+    Lookup lookup = MethodHandles.publicLookup();
+    array_set = MethodHandles.convertArguments(
+        lookup.findVirtual(Array.class, "set",
+          MethodType.methodType(void.class, Object.class, Object.class)),
+        MethodType.methodType(void.class, Object.class, Object.class, Object.class));
+    array_access_get = MethodHandles.convertArguments(
+        lookup.findVirtual(ArrayAccess.class, "get",
+          MethodType.methodType(Object.class, Object.class)),
+        MethodType.methodType(Object.class, Object.class, Object.class));
+    
+    test_receiver_asArray = lookup.findStatic(RT.class, "test_receiver_asArray",
+        MethodType.methodType(boolean.class, Object.class));
+    test_receiver_and_key = lookup.findStatic(RT.class, "test_receiver_and_key",
+        MethodType.methodType(boolean.class, Class.class, Object.class, Object.class));
+    
+    
+    slowPathArraySet = lookup.findStatic(RT.class, "slowPathArraySet",
+        MethodType.methodType(void.class, CallSite.class, boolean.class, Object.class, Object.class, Object.class));
+    slowPathArrayGet = lookup.findStatic(RT.class, "slowPathArrayGet",
+        MethodType.methodType(Object.class, CallSite.class, boolean.class, Object.class, Object.class));
+  }
+  
+  public static boolean test_receiver_asArray(Object refValue) {
+    return refValue instanceof Array;
+  }
+  
+  public static boolean test_receiver_and_key(Class<?> receiverClass, Object refValue, Object key) {
+    return key instanceof String && receiverClass.isInstance(refValue);
+  }
+  
+  public static void slowPathArraySet(CallSite callsite, boolean keyMustExist, Object refValue, Object key, Object value) {
+    Class<?> refClass = refValue.getClass(); // also nullcheck
+    Class<?> valueClass = value.getClass(); // also nullcheck
+    
+    MethodHandle mh;
+    MethodHandle test;
+    String name;
+    if (key instanceof String && (!(name = (String)key).isEmpty())) {
+      mh = MethodResolver.findSetter(refClass, name, valueClass);
+      if (mh != null) {
+        mh = MethodHandles.convertArguments(mh,  
+            MethodType.methodType(void.class, Object.class, Object.class));
+        try {
+          //FIXME should be invokeExact
+          mh.invokeGeneric(refValue, value);
+        } catch (Throwable e) {
+          throw RT.error(e);
+        }
+        mh = MethodHandles.dropArguments(mh, 1, Object.class);
+        test = MethodHandles.insertArguments(test_receiver_and_key, 0, refClass);
+        mh = MethodHandles.guardWithTest(test, mh, callsite.getTarget());
+        callsite.setTarget(mh);
+        return;
+      }
+    }
+      
+    if (refValue instanceof Array) {
+      Array array = (Array)refValue;
+      Entry entry = array.getEntry(key);
+      
+      if (keyMustExist && entry.value == null) {
+        array.remove(key);
+        throw RT.error("member %s doesn't exist for array: %s", key, array);
+      }
+      entry.value = value; 
+
+      mh = array_set;
+      test = test_receiver_asArray;
+
+      mh = MethodHandles.guardWithTest(test, mh, callsite.getTarget());
+      callsite.setTarget(mh);
+      return;
+    } 
+    throw RT.error("member %s doesn't exist for object: %s", key, refValue);  
+  }
+  
+  public static void interpreterArraySet(Node node, Object refValue, Object key, Object value, boolean keyMustExist) {
+    CallSite callSite = node.getCallsiteAttribute();
+    MethodHandle target;
+    if (callSite == null) {
+      
+      // cache for next call
+      
+      MethodType methodType = MethodType.methodType(void.class, Object.class, Object.class, Object.class);
+      callSite = new CallSite(RT.class, "", methodType);
+      target = MethodHandles.insertArguments(slowPathArraySet, 0, callSite, keyMustExist);
+      callSite.setTarget(target);
+      
+      slowPathArraySet(callSite, keyMustExist, refValue, key, value);
+      
+      node.setCallsiteAttribute(callSite);
+      
+    } else {
+      target = callSite.getTarget();
+      
+      try {
+        //FIXME should be invokeExact
+        target.invokeGeneric(refValue, key, value);
+      } catch (Throwable e) {
+        throw RT.error(e);
+      } 
+    }
+  }
+  
+  
+  public static Object slowPathArrayGet(CallSite callsite, boolean keyMustExist, Object refValue, Object key) {
+    Class<?> refClass = refValue.getClass(); // also nullcheck
+    
+    MethodHandle mh;
+    MethodHandle test;
+    String name;
+    if (key instanceof String && (!(name = (String)key).isEmpty())) {
+      mh = MethodResolver.findGetter(refClass, name);
+      if (mh != null) {
+        mh = MethodHandles.convertArguments(mh,  
+            MethodType.methodType(Object.class, Object.class));
+        Object result;
+        try {
+          //FIXME should be invokeExact
+          result = mh.invokeGeneric(refValue);
+        } catch (Throwable e) {
+          throw RT.error(e);
+        }
+        mh = MethodHandles.dropArguments(mh, 1, Object.class);
+        test = MethodHandles.insertArguments(test_receiver_and_key, 0, refClass);
+        mh = MethodHandles.guardWithTest(test, mh, callsite.getTarget());
+        callsite.setTarget(mh);
+        return result;
+      }
+    }
+      
+    if (refValue instanceof ArrayAccess) {
+      ArrayAccess arrayAccess = (ArrayAccess)refValue;
+      Object result = arrayAccess.get(key);
+      if (keyMustExist && result == null) {
+        throw RT.error("member %s doesn't exist for array: %s", key, arrayAccess);
+      }
+      
+      mh = array_access_get;
+      test = test_receiver_asArray;
+
+      mh = MethodHandles.guardWithTest(test, mh, callsite.getTarget());
+      callsite.setTarget(mh);
+      return result;
+    } 
+    throw RT.error("member %s doesn't exist for object: %s", key, refValue);  
+  }
+  
+  public static Object interpreterArrayGet(Node node, Object refValue, Object key, boolean keyMustExist) {
+    CallSite callSite = node.getCallsiteAttribute();
+    MethodHandle target;
+    if (callSite == null) {
+      
+      // cache for next call
+      
+      MethodType methodType = MethodType.methodType(Object.class, Object.class, Object.class);
+      callSite = new CallSite(RT.class, "", methodType);
+      target = MethodHandles.insertArguments(slowPathArrayGet, 0, callSite, keyMustExist);
+      callSite.setTarget(target);
+      
+      Object result = slowPathArrayGet(callSite, keyMustExist, refValue, key);
+      node.setCallsiteAttribute(callSite);
+      return result;
+      
+    } else {
+      target = callSite.getTarget();
+      
+      try {
+        //FIXME should be invokeExact
+        return target.invokeGeneric(refValue, key);
+      } catch (Throwable e) {
+        throw RT.error(e);
+      } 
+    }
+  }
+  
+  
   public static Sequence foreach_expression(Object value) {
     if (value instanceof Array) {
-      return ((Array)value).__sequence__();
+      return ((Array)value).sequence();
     }
     if (value instanceof Sequence) {
       return (Sequence)value; 

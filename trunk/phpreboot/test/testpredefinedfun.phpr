@@ -1,0 +1,25 @@
+
+a = <foo name="myname"><bar/></foo>
+
+echo attributes(a)
+
+echo isEmpty("foo")
+echo substring("foo", 0, 2)
+echo length("foo")
+
+array = []
+array["foo"] = "bar"
+echo array
+remove(array, "foo");
+echo array
+
+
+ducks = []
+add(ducks, "quack")   // non empty string
+add(ducks, [])        // empty array
+
+foreach(ducks as duck) {
+  echo isEmpty(duck)
+}
+
+

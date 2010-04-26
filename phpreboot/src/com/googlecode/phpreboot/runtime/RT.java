@@ -5,7 +5,9 @@ import java.dyn.MethodHandle;
 import java.dyn.MethodHandles;
 import java.dyn.MethodHandles.Lookup;
 import java.dyn.MethodType;
+import java.util.Arrays;
 
+import com.googlecode.phpreboot.ast.Funcall;
 import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.runtime.Array.Entry;
 
@@ -23,9 +25,11 @@ public class RT {
   }
   
   public static RuntimeException error(Throwable t) {
-    while (t.getCause() != null) {
+    if (t.getCause() != null) {
       t = t.getCause();
     }
+    if (t instanceof RuntimeException)
+      return (RuntimeException)t;
     return new RuntimeException(t);
   }
   
@@ -332,8 +336,27 @@ public class RT {
     return left >= right;
   }
   
+  public static Sequence foreach_expression(Object value) {
+    if (value instanceof Array) {
+      return ((Array)value).sequence();
+    }
+    if (value instanceof Sequence) {
+      return (Sequence)value; 
+    }
+    throw RT.error("foreach needs a sequence or an array: %s", value);
+  }
   
   
+  
+  static StringBuilder append(StringBuilder builder, Object o) {
+    if (o instanceof String) {
+      return builder.append('\"').append(o).append('\"');
+    }
+    return builder.append(o);
+  }
+  
+  
+  // --- member access
   
   private final static MethodHandle array_set;
   private final static MethodHandle array_access_get;
@@ -375,13 +398,12 @@ public class RT {
   
   public static void slowPathArraySet(CallSite callsite, boolean keyMustExist, Object refValue, Object key, Object value) {
     Class<?> refClass = refValue.getClass(); // also nullcheck
-    Class<?> valueClass = value.getClass(); // also nullcheck
     
     MethodHandle mh;
     MethodHandle test;
     String name;
     if (key instanceof String && (!(name = (String)key).isEmpty())) {
-      mh = MethodResolver.findSetter(refClass, name, valueClass);
+      mh = MethodResolver.findSetter(refClass, name);
       if (mh != null) {
         mh = MethodHandles.convertArguments(mh,  
             MethodType.methodType(void.class, Object.class, Object.class));
@@ -519,21 +541,55 @@ public class RT {
     }
   }
   
+  // --- function call
   
-  public static Sequence foreach_expression(Object value) {
-    if (value instanceof Array) {
-      return ((Array)value).sequence();
-    }
-    if (value instanceof Sequence) {
-      return (Sequence)value; 
-    }
-    throw RT.error("foreach needs a sequence or an array: %s", value);
+  private static final MethodHandle test_receiver_class;
+  private static final MethodHandle slowPathMethodCall;
+  static {
+    Lookup lookup = MethodHandles.publicLookup();
+    test_receiver_class = lookup.findVirtual(Class.class, "isInstance",
+        MethodType.methodType(boolean.class, Object.class));
+    slowPathMethodCall = lookup.findStatic(RT.class, "slowPathMethodCall",
+        MethodType.methodType(Object.class, CallSite.class, String.class, Object[].class));
   }
   
-  static StringBuilder append(StringBuilder builder, Object o) {
-    if (o instanceof String) {
-      return builder.append('\"').append(o).append('\"');
+  public static Object interpreterMethodCall(Funcall funcall, String name, Object[] values) {
+    CallSite callSite = funcall.getCallsiteAttribute();
+    if (callSite == null) {
+      MethodType type = MethodType.genericMethodType(values.length);
+      callSite = new CallSite(RT.class, "", type);
+      funcall.setCallsiteAttribute(callSite);
+      MethodHandle mh = MethodHandles.insertArguments(slowPathMethodCall, 0, callSite, name);
+      mh = MethodHandles.collectArguments(mh, type);
+      callSite.setTarget(mh);
+      
+      return slowPathMethodCall(callSite, name, values);
     }
-    return builder.append(o);
+    
+    MethodHandle target = callSite.getTarget();
+    try {
+      return target.invokeVarargs(values);
+    } catch (Throwable e) {
+      throw RT.error(e);
+    } 
+  }
+  
+  public static Object slowPathMethodCall(CallSite callSite, String name, Object[] values) {
+    Class<?> receiverClass = values[0].getClass(); // nullcheck
+    MethodHandle target = MethodResolver.findMethodHandle(receiverClass, name, values.length - 1);
+    if (target == null) {
+      throw RT.error("no function %s with values %s", name, Arrays.toString(values));
+    }
+    
+    target = MethodHandles.convertArguments(target, callSite.type());
+    MethodHandle test = MethodHandles.insertArguments(test_receiver_class, 0, receiverClass);
+    MethodHandle guard = MethodHandles.guardWithTest(test, target, callSite.getTarget());
+    callSite.setTarget(guard);
+    
+    try {
+      return target.invokeVarargs(values);
+    } catch (Throwable e) {
+      throw RT.error(e);
+    } 
   }
 }

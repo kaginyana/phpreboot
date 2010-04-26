@@ -17,6 +17,7 @@ import com.googlecode.phpreboot.ast.AssignmentField;
 import com.googlecode.phpreboot.ast.AssignmentId;
 import com.googlecode.phpreboot.ast.AssignmentPrimaryArray;
 import com.googlecode.phpreboot.ast.AssignmentPrimaryField;
+import com.googlecode.phpreboot.ast.AttrsDollarAccess;
 import com.googlecode.phpreboot.ast.AttrsEmpty;
 import com.googlecode.phpreboot.ast.AttrsStringLiteral;
 import com.googlecode.phpreboot.ast.Block;
@@ -38,6 +39,7 @@ import com.googlecode.phpreboot.ast.EoiSemi;
 import com.googlecode.phpreboot.ast.Expr;
 import com.googlecode.phpreboot.ast.ExprId;
 import com.googlecode.phpreboot.ast.ExprLiteral;
+import com.googlecode.phpreboot.ast.ExprPlus;
 import com.googlecode.phpreboot.ast.ExprPrimary;
 import com.googlecode.phpreboot.ast.ExprXmls;
 import com.googlecode.phpreboot.ast.ForInit;
@@ -703,35 +705,44 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   @Override
   public Object visit(Funcall funcall, EvalEnv env) {
     String name = funcall.getId().getValue();
-    Scope scope = env.getScope();
-    Var var = scope.lookup(name);
-    if (var == null) {
-      throw RT.error("unknown function %s", name);
+    Var var = env.getScope().lookup(name);
+    if (var != null) {
+      return methodHandleCall(funcall, var, env);
     }
+    
+    List<Expr> exprStar = funcall.getExprStar();
+    int size = exprStar.size();
+    if (size == 0) {
+      throw RT.error("%s is not a valid variable name", name);
+    }
+    
+    Object[] values = new Object[size];
+    for(int i=0; i<size; i++) {
+      Expr expr = exprStar.get(i);
+      values[i] = eval(expr, env);
+    }
+    
+    return RT.interpreterMethodCall(funcall, name, values);
+  }
+  
+  private Object methodHandleCall(Funcall funcall, Var var, EvalEnv env) {
+    List<Expr> exprStar = funcall.getExprStar();
+    int size = exprStar.size();
+    Object[] values = new Object[1 + size];
+    values[0] = env;
+    for(int i = 1; i<size; i++) {
+      Expr expr = exprStar.get(i);
+      values[i + 1] = eval(expr, env);
+    }
+
     Object value = var.getValue();
     if (!(value instanceof MethodHandle)) {
       throw RT.error("value is not a function: %s", value);
     }
-    
-    MethodHandle mh = (MethodHandle)value;
-    
-    Object[] values = new Object[1 + funcall.getExprStar().size()];
-    values[0] = env;
-    int i=1;
-    for(Expr expr: funcall.getExprStar()) {
-      values[i++] = eval(expr, env);
-    }
-    
     try {
-      return mh.invokeVarargs(values);
+      return ((MethodHandle)value).invokeVarargs(values);
     } catch (Throwable e) {
-      if (e instanceof RuntimeException) {
-        throw (RuntimeException)e;
-      }
-      if (e instanceof Error) {
-        throw (Error)e;
-      }
-      throw new RuntimeException(e);
+      throw RT.error(e);
     }
   }
   
@@ -965,7 +976,13 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   @Override
   public Object visit(AttrsStringLiteral attributes_string_literal, EvalEnv env) {
     Array array = (Array)eval(attributes_string_literal.getAttrs(), env);
-    array.set(attributes_string_literal.getId(), eval(attributes_string_literal.getStringLiteral(), env));
+    array.set(attributes_string_literal.getId(), attributes_string_literal.getStringLiteral().getValue());
+    return array;
+  }
+  @Override
+  public Object visit(AttrsDollarAccess attrs_dollar_access, EvalEnv env) {
+    Array array = (Array)eval(attrs_dollar_access.getAttrs(), env);
+    array.set(attrs_dollar_access.getId(), eval(attrs_dollar_access.getDollarAccess(), env));
     return array;
   }
   

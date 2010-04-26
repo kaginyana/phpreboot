@@ -56,6 +56,10 @@ public class Array implements Sequenceable, ArrayAccess {
   public int size() {
     return size;
   }
+  
+  public boolean isEmpty() {
+    return size == 0;
+  }
 
   private static int hashIndex(Object key, int length) {
     return key.hashCode() & (length-1);
@@ -164,9 +168,10 @@ public class Array implements Sequenceable, ArrayAccess {
     return new IllegalArgumentException("entry already stored in another array");
   }
   
+  /*
   public void set(int key, Object value) {
     set((Object)key, value);
-  }
+  }*/
   
   public void add(Object value) {
     set(nextIndex, value);
@@ -212,9 +217,10 @@ public class Array implements Sequenceable, ArrayAccess {
     return ;
   }
   
+  /*
   public void remove(int key) {
     remove((Integer)key);
-  }
+  }*/
 
   /*public void clear() {
     table = new Entry[16];

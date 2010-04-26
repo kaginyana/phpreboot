@@ -14,67 +14,43 @@ class MethodResolver {
     return Character.toUpperCase(s.charAt(0)) + s.substring(1);
   }
   
-  public static MethodHandle findSetter(Class<?> declaringClass, String name, Class<?> actualParameterClass) {
-    return findMethodHandle(declaringClass, "set" + capitalize(name), actualParameterClass);
+  public static MethodHandle findSetter(Class<?> declaringClass, String name) {
+    return findMethodHandle(declaringClass, "set" + capitalize(name), 1);
   }
   
   public static MethodHandle findGetter(Class<?> declaringClass, String name) {
-    return findMethodHandle(declaringClass, "get" + capitalize(name));
+    return findMethodHandle(declaringClass, "get" + capitalize(name), 0);
   }
   
-  private static MethodHandle findMethodHandle(Class<?> declaringClass, String name, Class<?>... actualParameterClasses) {
-    Method method = findMethod(declaringClass, name, actualParameterClasses);
+  public static MethodHandle findMethodHandle(Class<?> declaringClass, String name, int parameterCount) {
+    Method method = findMethod(declaringClass, name, parameterCount);
     if (method == null)
       return null;
     return PUBLIC_LOOKUP.unreflect(method);
   }
   
-  private static Method findMethod(Class<?> declaringClass, String name, Class<?>[] actualParameterClasses) {
-    ArrayList<Method> list = gatherMethods(declaringClass, name, actualParameterClasses);
-    
-    switch(list.size()) {
-    case 0:
-      return null;
-    case 1:
+  private static Method findMethod(Class<?> declaringClass, String name, int parameterCount) {
+    ArrayList<Method> list = gatherMethods(declaringClass, name, parameterCount);
+    if (list.size() == 1) {
       return list.get(0);
     }
-    return findMostSpecific(list);
-  }
-  
-  private static Method findMostSpecific(ArrayList<Method> list) {
-    //TODO
-    return list.get(0);
+    return null; // zaro method or too much methods
   }
 
-  private static ArrayList<Method> gatherMethods(Class<?> declaringClass, String name, Class<?>[] actualParameterClasses) {
+  private static ArrayList<Method> gatherMethods(Class<?> declaringClass, String name, int parameterCount) {
     ArrayList<Method> list = new ArrayList<Method>();
     loop: for(Method method: declaringClass.getMethods()) {
       String methodName = method.getName();
       Class<?>[] parameterTypes = method.getParameterTypes();
-      if (parameterTypes.length != actualParameterClasses.length) {
+      if (parameterTypes.length != parameterCount) {
         continue loop; 
       }
       if (!name.equals(methodName)) {
         continue loop;
       }
       
-      /*
-      for(int i=0; i<parameterTypes.length; i++) {
-        if (!isCompatible(parameterTypes[i], actualParameterClasses[i])) {
-          continue loop;
-        }
-      }*/
-      
       list.add(method);
     }
     return list;
   }
-
-  /*
-  private static boolean isCompatible(Class<?> parameterType, Class<?> actualClass) {
-    if (parameterType == actualClass)
-      return true;
-    //FIXME doesn't work with primitive types
-    return parameterType.isAssignableFrom(actualClass);
-  }*/
 }

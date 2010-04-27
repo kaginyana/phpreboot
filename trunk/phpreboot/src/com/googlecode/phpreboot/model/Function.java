@@ -4,7 +4,7 @@ import java.dyn.MethodHandle;
 import java.dyn.MethodType;
 import java.util.List;
 
-import com.googlecode.phpreboot.ast.Fun;
+import com.googlecode.phpreboot.ast.Block;
 import com.googlecode.phpreboot.interpreter.EvalEnv;
 import com.googlecode.phpreboot.interpreter.Evaluator;
 import com.googlecode.phpreboot.interpreter.Scope;
@@ -13,14 +13,14 @@ public class Function {
   private final String name;
   private final List<Parameter> parameters;
   private final Scope scope;
-  private final Fun node;
+  private final Block block;
   private MethodHandle methodHandle;
   
-  public Function(String name, List<Parameter> parameters, Scope scope, Fun node) {
+  public Function(String name, List<Parameter> parameters, Scope scope, Block block) {
     this.name = name;
     this.parameters = parameters;
     this.scope = scope;
-    this.node = node;
+    this.block = block;
   }
 
   public String getName() {
@@ -32,8 +32,8 @@ public class Function {
   public Scope getScope() {
     return scope;
   }
-  public Fun getNode() {
-    return node;
+  public Block getBlock() {
+    return block;
   }
   
   public MethodHandle getMethodHandle() {

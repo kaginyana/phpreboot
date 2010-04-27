@@ -5,11 +5,17 @@ import java.dyn.MethodHandle;
 import java.dyn.MethodHandles;
 import java.dyn.MethodHandles.Lookup;
 import java.dyn.MethodType;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.util.Arrays;
+import java.util.Iterator;
+import java.util.Map;
 
 import com.googlecode.phpreboot.ast.Funcall;
 import com.googlecode.phpreboot.ast.Node;
+import com.googlecode.phpreboot.interpreter.Interpreter;
 import com.googlecode.phpreboot.runtime.Array.Entry;
+import com.googlecode.phpreboot.tools.Analyzers;
 
 
 
@@ -31,6 +37,12 @@ public class RT {
     if (t instanceof RuntimeException)
       return (RuntimeException)t;
     return new RuntimeException(t);
+  }
+  
+  
+  public static void includeDefaultFunctions(Interpreter interpreter) {
+    Reader reader = new InputStreamReader(RT.class.getResourceAsStream("functions.phpr"));
+    Analyzers.run(reader, interpreter, interpreter, null, null);
   }
   
   public static Object unary_plus(Object value) {
@@ -337,6 +349,8 @@ public class RT {
   }
   
   public static Sequence foreach_expression(Object value) {
+    if (value == null)
+      return null;
     if (value instanceof Array) {
       return ((Array)value).sequence();
     }
@@ -346,6 +360,295 @@ public class RT {
     throw RT.error("foreach needs a sequence or an array: %s", value);
   }
   
+  
+  // --- conversions
+  
+  public static Object toBoolean(Object o) {
+    /*
+    if (o instanceof Boolean) {
+      return o;
+    }
+    if (o instanceof Byte) {
+      return (Byte)o == 0;
+    }
+    if (o instanceof Character) {
+      return (Character)o == 0;
+    }
+    if (o instanceof Short) {
+      return (Short)o == 0;
+    }
+    if (o instanceof Integer) {
+      return (Integer)o == 0;
+    }
+    if (o instanceof Long) {
+      return (Long)o == 0L;
+    }
+    if (o instanceof Float) {
+      return (Float)o == 0F;
+    }
+    if (o instanceof Double) {
+      return (Double)o == 0.0;
+    }*/
+    if (o instanceof Boolean) {
+      return o;
+    }
+    if (o instanceof String) {
+      return Boolean.parseBoolean((String)o);
+    }
+    throw RT.error("value not convertible to boolean: %s", o);
+  }
+  
+  public static Object toInt(Object o) {
+    if (o instanceof Byte) {
+      return (int)(Byte)o;
+    }
+    if (o instanceof Character) {
+      return (int)(Character)o;
+    }
+    if (o instanceof Short) {
+      return (int)(Short)o;
+    }
+    if (o instanceof Integer) {
+      return o;
+    }
+    if (o instanceof Long) {
+      return (int)(long)(Long)o;
+    }
+    if (o instanceof Float) {
+      return (int)(float)(Float)o;
+    }
+    if (o instanceof Double) {
+      return (int)(double)(Double)o;
+    }
+    if (o instanceof String) {
+      return Integer.parseInt((String)o);
+    }
+    throw RT.error("value not convertible to int: %s", o);
+  }
+  
+  public static Object toDouble(Object o) {
+    if (o instanceof Byte) {
+      return (double)(Byte)o;
+    }
+    if (o instanceof Character) {
+      return (double)(Character)o;
+    }
+    if (o instanceof Short) {
+      return (double)(Short)o;
+    }
+    if (o instanceof Integer) {
+      return (double)(Integer)o;
+    }
+    if (o instanceof Long) {
+      return (double)(Long)o;
+    }
+    if (o instanceof Float) {
+      return (double)(Float)o;
+    }
+    if (o instanceof Double) {
+      return o;
+    }
+    if (o instanceof String) {
+      return Double.parseDouble((String)o);
+    }
+    throw RT.error("value not convertible to double: %s", o);
+  }
+  
+  public static Object toString(Object o) {
+    return String.valueOf(o);
+  }
+  
+  public static Object toArray(Object o) {
+    Class<?> clazz = o.getClass();   // nullcheck
+    
+    //TODO String to Array (JSON parser)
+    
+    // sequence to array
+    if (o instanceof Sequence) {
+      return sequenceToArray((Sequence)o);
+    }
+    
+    //Java conversions
+    if (o instanceof Object[]) {
+      return objectArrayToArray((Object[])o);
+    }
+    if (clazz.isArray()) {
+      return primitiveArrayToArray(o);
+    }
+    if (o instanceof Iterable<?>) {
+      return iterableToArray((Iterable<?>)o);
+    }
+    if (o instanceof Map<?,?>) {
+      return mapToArray((Map<?,?>)o);
+    }
+    if (o instanceof Iterator<?>) {
+      return iteratorToArray((Iterator<?>)o);
+    }
+    
+    throw RT.error("value not convertible to array: %s", o);
+  }
+  private static Array sequenceToArray(Sequence sequence) {
+    Array array = new Array();
+    for(;sequence!=null; sequence = sequence.next()) {
+      array.set(sequence.getKey(), sequence.getValue());
+    }
+    return array;
+  }
+  private static Array objectArrayToArray(Object[] objects) {
+    Array array = new Array();
+    for(Object o: objects) {
+      array.add(o);
+    }
+    return array;
+  }
+  private static Array primitiveArrayToArray(Object object) {
+    Array array = new Array();
+    int length = java.lang.reflect.Array.getLength(object);
+    for(int i=0; i<length; i++) {
+      array.add(java.lang.reflect.Array.get(object, i));
+    }
+    return array;
+  }
+  private static Array iterableToArray(Iterable<?> iterable) {
+    Array array = new Array();
+    for(Object o: iterable) {
+      array.add(o);
+    }
+    return array;
+  }
+  private static Array iteratorToArray(Iterator<?> iterator) {
+    Array array = new Array();
+    while(iterator.hasNext()) {
+      array.add(iterator.next());
+    }
+    return array;
+  }
+  private static Array mapToArray(Map<?,?> map) {
+    Array array = new Array();
+    for(Map.Entry<?,?> entry: map.entrySet()) {
+      array.set(entry.getKey(), entry.getKey());
+    }
+    return array;
+  }
+  
+  public static Object toSequence(Object o) {
+    Class<?> clazz = o.getClass(); // nullcheck
+    
+    if (o instanceof Sequenceable) {
+      return ((Sequenceable)o).sequence();
+    }
+    if (o instanceof Object[]) {
+      return objectArrayToSequence((Object[])o);
+    }
+    if (clazz.isArray()) {
+      return primitiveArrayToSequence(o);
+    }
+    
+    //Java types
+    if (o instanceof Iterable<?>) {
+      return iteratorToSequence(((Iterable<?>)o).iterator());
+    }
+    if (o instanceof Map<?,?>) {
+      return iteratorToSequence(((Map<?,?>)o).entrySet().iterator());
+    }
+    if (o instanceof Iterator<?>) {
+      return iteratorToSequence(((Iterator<?>)o));
+    }
+    
+    throw RT.error("value not convertible to sequence: %s", o);
+  }
+  private static Sequence objectArrayToSequence(final Object[] objects) {
+    final int length = objects.length;
+    if (length == 0)
+      return null;
+    return new Sequence() {
+      private int index = 0;
+      
+      @Override
+      public Sequence next() {
+        if (index == length - 1)
+          return null;
+        index++;
+        return this;
+      }
+      @Override
+      public Object getValue() {
+        return objects[index];
+      }
+      @Override
+      public Object getKey() {
+        return index;
+      }
+      
+      @Override
+      public String toString() {
+        return "{"+getKey()+": "+getValue()+'}';
+      }
+    };
+  }
+  private static Sequence primitiveArrayToSequence(final Object object) {
+    final int length = java.lang.reflect.Array.getLength(object);
+    if (length == 0)
+      return null;
+    return new Sequence() {
+      private int index = 0;
+      
+      @Override
+      public Sequence next() {
+        if (index == length)
+          return null;
+        index++;
+        return this;
+      }
+      @Override
+      public Object getValue() {
+        return java.lang.reflect.Array.get(object, index);
+      }
+      @Override
+      public Object getKey() {
+        return index;
+      }
+      
+      @Override
+      public String toString() {
+        return "{"+getKey()+": "+getValue()+'}';
+      }
+    };
+  }
+  private static Sequence iteratorToSequence(final Iterator<?> iterator) {
+    if (!iterator.hasNext())
+      return null;
+    
+    final Object value = iterator.next();
+    return new Sequence() {
+      private Object currentValue = value;
+      private int index;
+      
+      @Override
+      public Sequence next() {
+        if (!iterator.hasNext())
+          return null;
+        currentValue = iterator.next();
+        index ++;
+        return this;
+      }
+      @Override
+      public Object getValue() {
+        return currentValue;
+      }
+      @Override
+      public Object getKey() {
+        return index;
+      }
+      
+      @Override
+      public String toString() {
+        return "{"+getKey()+": "+getValue()+'}';
+      }
+    };
+  }
+  
+  // --- escape ---
   
   
   static StringBuilder append(StringBuilder builder, Object o) {
@@ -438,7 +741,7 @@ public class RT {
       callsite.setTarget(mh);
       return;
     } 
-    throw RT.error("member %s doesn't exist for object: %s", key, refValue);  
+    throw RT.error("member %s doesn't exist  (or is not accessible) for object: %s", key, refValue);  
   }
   
   public static void interpreterArraySet(Node node, Object refValue, Object key, Object value, boolean keyMustExist) {
@@ -478,6 +781,9 @@ public class RT {
     String name;
     if (key instanceof String && (!(name = (String)key).isEmpty())) {
       mh = MethodResolver.findGetter(refClass, name);
+      if (mh == null) {
+        mh = MethodResolver.findMethodHandle(refClass, name, 0);
+      }
       if (mh != null) {
         mh = MethodHandles.convertArguments(mh,  
             MethodType.methodType(Object.class, Object.class));
@@ -510,7 +816,7 @@ public class RT {
       callsite.setTarget(mh);
       return result;
     } 
-    throw RT.error("member %s doesn't exist for object: %s", key, refValue);  
+    throw RT.error("member %s doesn't exist (or is not accessible) for object: %s", key, refValue);  
   }
   
   public static Object interpreterArrayGet(Node node, Object refValue, Object key, boolean keyMustExist) {

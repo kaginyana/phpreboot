@@ -20,7 +20,6 @@ import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.ast.Parameter;
 import com.googlecode.phpreboot.ast.ParameterTyped;
 import com.googlecode.phpreboot.ast.ExprLiteral;
-import com.googlecode.phpreboot.ast.Signature;
 import com.googlecode.phpreboot.ast.TypeAny;
 import com.googlecode.phpreboot.ast.TypeBoolean;
 import com.googlecode.phpreboot.ast.TypeDouble;

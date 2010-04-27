@@ -37,10 +37,11 @@ import com.googlecode.phpreboot.ast.ElseIfEmpty;
 import com.googlecode.phpreboot.ast.EoiEoln;
 import com.googlecode.phpreboot.ast.EoiSemi;
 import com.googlecode.phpreboot.ast.Expr;
+import com.googlecode.phpreboot.ast.ExprFun;
 import com.googlecode.phpreboot.ast.ExprId;
 import com.googlecode.phpreboot.ast.ExprLiteral;
-import com.googlecode.phpreboot.ast.ExprPlus;
 import com.googlecode.phpreboot.ast.ExprPrimary;
+import com.googlecode.phpreboot.ast.ExprToType;
 import com.googlecode.phpreboot.ast.ExprXmls;
 import com.googlecode.phpreboot.ast.ForInit;
 import com.googlecode.phpreboot.ast.ForInitAssignment;
@@ -78,13 +79,20 @@ import com.googlecode.phpreboot.ast.LiteralValue;
 import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.ast.ParameterAny;
 import com.googlecode.phpreboot.ast.ParameterTyped;
+import com.googlecode.phpreboot.ast.Parameters;
 import com.googlecode.phpreboot.ast.PrimaryArrayAccess;
 import com.googlecode.phpreboot.ast.PrimaryFieldAccess;
 import com.googlecode.phpreboot.ast.PrimaryFuncall;
 import com.googlecode.phpreboot.ast.PrimaryParens;
 import com.googlecode.phpreboot.ast.PrimaryPrimaryArrayAccess;
 import com.googlecode.phpreboot.ast.PrimaryPrimaryFieldAccess;
-import com.googlecode.phpreboot.ast.Signature;
+import com.googlecode.phpreboot.ast.TypeAny;
+import com.googlecode.phpreboot.ast.TypeArray;
+import com.googlecode.phpreboot.ast.TypeBoolean;
+import com.googlecode.phpreboot.ast.TypeDouble;
+import com.googlecode.phpreboot.ast.TypeInt;
+import com.googlecode.phpreboot.ast.TypeSequence;
+import com.googlecode.phpreboot.ast.TypeString;
 import com.googlecode.phpreboot.ast.Visitor;
 import com.googlecode.phpreboot.ast.XmlsEmptyTag;
 import com.googlecode.phpreboot.ast.XmlsStartEndTag;
@@ -170,7 +178,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   }
   
   public Object evalFunction(Function function, Object[] arguments, EvalEnv env) {
-    Scope scope = new Scope(function.getScope().duplicate());
+    Scope scope = new Scope(function.getScope()/*.duplicate()*/);
     scope.register(new Var(function.getName(), true, function.getMethodHandle()));
     
     List<Parameter> parameters = function.getParameters();
@@ -179,7 +187,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       scope.register(new Var(parameter.getName(), true, arguments[i]));
     }
     
-    Block block = function.getNode().getBlock();
+    Block block = function.getBlock();
     EvalEnv evalEnv = new EvalEnv(scope, env.getEchoer(), null);
     try {
       Evaluator.INSTANCE.eval(block, evalEnv);
@@ -265,15 +273,9 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     return newScope;
   }
   
-  private static MethodHandle createFunction(Fun fun, Scope scope) {
-    Signature signature = fun.getSignature();
-    String name = signature.getId().getValue();
-    /*
-    com.googlecode.phpreboot.ast.Type typeOptional = signature.getTypeOptional();
-    Type returnType = (typeOptional !=null)? TypeChecker.asType(typeOptional): PrimitiveType.VOID;
-    */
+  private static MethodHandle createFunction(String name, Parameters parametersNode, Block block, Scope scope) {
     ArrayList<Parameter> parameters = new ArrayList<Parameter>();
-    for(com.googlecode.phpreboot.ast.Parameter parameter: signature.getParameterStar()) {
+    for(com.googlecode.phpreboot.ast.Parameter parameter: parametersNode.getParameterStar()) {
       String parameterName;
       if (parameter instanceof ParameterAny) {
         parameterName = ((ParameterAny)parameter).getId().getValue();
@@ -283,7 +285,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       parameters.add(new Parameter(parameterName));
     }
     
-    Function function = new Function(name, parameters, filterReadOnlyVars(scope), fun);
+    Function function = new Function(name, parameters, filterReadOnlyVars(scope), block);
     
     MethodHandle mh = MethodHandles.lookup().findVirtual(Function.class, "call",
         MethodType.methodType(Object.class, /*EvalEnv.class*/ Object.class, Object[].class));
@@ -295,11 +297,11 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   @Override
   public Object visit(Fun fun, EvalEnv env) {
-    String name = fun.getSignature().getId().getValue();
+    String name = fun.getId().getValue();
     Scope scope = env.getScope();
     checkVar(name, scope);
     
-    MethodHandle mh = createFunction(fun, scope);
+    MethodHandle mh = createFunction(name, fun.getParameters(), fun.getBlock(), scope);
     Var var = new Var(name, true, mh);
     scope.register(var);
     return null;
@@ -730,7 +732,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     int size = exprStar.size();
     Object[] values = new Object[1 + size];
     values[0] = env;
-    for(int i = 1; i<size; i++) {
+    for(int i = 0; i< size; i++) {
       Expr expr = exprStar.get(i);
       values[i + 1] = eval(expr, env);
     }
@@ -817,6 +819,11 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   public Object visit(ExprXmls expr_xmls, EvalEnv env) {
     return eval(expr_xmls.getXmls(), env);
   }
+  
+  @Override
+  public Object visit(ExprFun expr_fun, EvalEnv env) {
+    return createFunction("it", expr_fun.getParameters(), expr_fun.getBlock(), env.getScope());
+  }
 
   @Override
   protected Object visit(Expr expr, EvalEnv env) {
@@ -867,8 +874,72 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     throw new AssertionError("unknown expression "+kind);
   }
 
-
-
+ 
+  // --- type conversions
+  
+  enum TypeToken {
+    ANY,
+    BOOLEAN,
+    INT,
+    DOUBLE,
+    STRING,
+    ARRAY,
+    SEQUENCE
+  }
+  
+  @Override
+  public Object visit(TypeAny type_any, EvalEnv env) {
+    return TypeToken.ANY;
+  }
+  @Override
+  public Object visit(TypeBoolean type_boolean, EvalEnv env) {
+    return TypeToken.BOOLEAN;
+  }
+  @Override
+  public Object visit(TypeInt type_int, EvalEnv env) {
+    return TypeToken.INT;
+  }
+  @Override
+  public Object visit(TypeDouble type_double, EvalEnv env) {
+    return TypeToken.DOUBLE;
+  }
+  @Override
+  public Object visit(TypeString type_string, EvalEnv env) {
+    return TypeToken.STRING;
+  }
+  @Override
+  public Object visit(TypeArray type_array, EvalEnv env) {
+    return TypeToken.ARRAY;
+  }
+  @Override
+  public Object visit(TypeSequence type_sequence, EvalEnv env) {
+    return TypeToken.SEQUENCE;
+  }
+  
+  @Override
+  public Object visit(ExprToType expr_to_type, EvalEnv env) {
+    Object value = eval(expr_to_type.getExpr(), env);
+    TypeToken typeToken = (TypeToken)eval(expr_to_type.getType(), env);
+    switch(typeToken) {
+    case ANY:
+      return value;
+    case BOOLEAN:
+      return RT.toBoolean(value);
+    case INT:
+      return RT.toInt(value);
+    case DOUBLE:
+      return RT.toDouble(value);
+    case STRING:
+      return RT.toString(value);
+    case ARRAY:
+      return RT.toArray(value);
+    case SEQUENCE:
+      return RT.toSequence(value);
+    default:
+      throw new AssertionError("conversion to an unknown type "+typeToken);
+    }
+  }
+  
   // --- literals
 
   @Override
@@ -976,13 +1047,13 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   @Override
   public Object visit(AttrsStringLiteral attributes_string_literal, EvalEnv env) {
     Array array = (Array)eval(attributes_string_literal.getAttrs(), env);
-    array.set(attributes_string_literal.getId(), attributes_string_literal.getStringLiteral().getValue());
+    array.set(attributes_string_literal.getId().getValue(), attributes_string_literal.getStringLiteral().getValue());
     return array;
   }
   @Override
   public Object visit(AttrsDollarAccess attrs_dollar_access, EvalEnv env) {
     Array array = (Array)eval(attrs_dollar_access.getAttrs(), env);
-    array.set(attrs_dollar_access.getId(), eval(attrs_dollar_access.getDollarAccess(), env));
+    array.set(attrs_dollar_access.getId().getValue(), eval(attrs_dollar_access.getDollarAccess(), env));
     return array;
   }
   

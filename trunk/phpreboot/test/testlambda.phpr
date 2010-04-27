@@ -1,0 +1,5 @@
+
+sqr = function(x) { return x * x; }
+
+echo sqr(2)
+ 

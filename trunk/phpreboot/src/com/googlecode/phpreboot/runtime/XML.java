@@ -21,15 +21,31 @@ public class XML implements Sequenceable {
     this("");
   }
   
+  /** Gets the name of the XML markup
+   * @return the name of the current XML markup
+   */
   public String getName() {
     return name;
   }
+  
+  /** Change the name of the XML markup
+   * @param name the new name of the current XML markup
+   */
   public void setName(String name) {
     this.name = name;
   }
+  
+  /** Returns the attributs of the XML markups
+   * @return the attributs of the XML markups as an array
+   */
   public Array attributes() {
     return attributes;
   }
+  
+  /** Returns the elements of the XML markups.
+   *  Elements are texts (string) and sub-elements (XML)
+   * @return the elements of the current XML markups.
+   */
   public Array elements() {
     return elements;
   }

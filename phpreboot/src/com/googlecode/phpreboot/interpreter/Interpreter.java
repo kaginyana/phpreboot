@@ -22,12 +22,14 @@ import com.googlecode.phpreboot.ast.LcurlToken;
 import com.googlecode.phpreboot.ast.Member;
 import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.ast.NullLiteralToken;
+import com.googlecode.phpreboot.ast.Parameter;
+import com.googlecode.phpreboot.ast.Parameters;
 import com.googlecode.phpreboot.ast.RcurlToken;
 import com.googlecode.phpreboot.ast.Script;
-import com.googlecode.phpreboot.ast.Signature;
 import com.googlecode.phpreboot.ast.Sql;
 import com.googlecode.phpreboot.ast.StringLiteralToken;
 import com.googlecode.phpreboot.ast.TextToken;
+import com.googlecode.phpreboot.ast.Type;
 import com.googlecode.phpreboot.ast.ValueLiteralToken;
 import com.googlecode.phpreboot.ast.Xmls;
 import com.googlecode.phpreboot.tools.TerminalEvaluator;
@@ -268,23 +270,30 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
   }
   
   
-  // --- function declaration
+  // --- function declaration & lambda
   
   @Override
-  public Signature signature(com.googlecode.phpreboot.ast.Type type_optional_1, IdToken id, List<com.googlecode.phpreboot.ast.Parameter> parameters) {
-    Signature signature = super.signature(type_optional_1, id, parameters);
+  public Parameters parameters(List<Parameter> parameter_star_1) {
+    Parameters parameters = super.parameters(parameter_star_1);
     interpreter++;
-    return signature;
+    return parameters;
   }
   
   @Override
-  public Fun fun(Signature signature, Block block) {
-    Fun fun = super.fun(signature, block);
-    interpreter--;  // match with signature()
+  public Fun fun(Type type_optional_0, IdToken id, Parameters parameters, Block block) {
+    Fun fun = super.fun(type_optional_0, id, parameters, block);
+    interpreter--;  // match with parameters()
     if (interpreter != 0)
       return fun;
     
     eval(fun);
     return null;
+  }
+  
+  @Override
+  public Expr expr_fun(Parameters parameters, Block block) {
+    Expr expr_fun = super.expr_fun(parameters, block);
+    interpreter--;  // match with parameters()
+    return expr_fun;
   }
 }

@@ -1,0 +1,11 @@
+
+// String conversions
+
+value = "123" to int
+echo value
+
+c = charAt("foo", 0)
+echo c
+echo c to int
+echo c to string
+

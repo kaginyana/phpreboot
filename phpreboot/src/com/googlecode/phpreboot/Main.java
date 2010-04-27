@@ -8,9 +8,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Iterator;
 
+import com.googlecode.phpreboot.doc.Doclet;
 import com.googlecode.phpreboot.interpreter.Interpreter;
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.interpreter.sql.GenericSQLConnection;
@@ -19,12 +21,20 @@ import com.googlecode.phpreboot.tools.Analyzers;
 import com.googlecode.phpreboot.webserver.WebScriptDispatcher;
 import com.sun.grizzly.http.embed.GrizzlyWebServer;
 
-import fr.umlv.tatoo.runtime.log.SyserrHandler;
-
 public class Main {
   enum Option {
-    webserver(": start a web server"),
     verbose(": turn on verbose mode"),
+    webserver(": start a web server"),
+    doc(": start doc") {
+      @Override
+      boolean parse(EnumMap<Option, Object> optionMap, Iterator<String> it) {
+        ArrayList<String> arguments = new ArrayList<String>();
+        while(it.hasNext())
+          arguments.add(it.next());
+        optionMap.put(this, arguments.toArray(new String[arguments.size()]));
+        return true;
+      }
+    },
     db("[db name] : specify the database name") {
       @Override
       boolean parse(EnumMap<Option, Object> optionMap, Iterator<String> it) {
@@ -86,7 +96,7 @@ public class Main {
     }
   }
 
-  public static void main(String[] args) throws IOException, ClassNotFoundException {
+  public static void main(String[] args) throws IOException {
     EnumMap<Option,Object> optionMap = new EnumMap<Option,Object>(Option.class);
 
     ArrayList<Path> filePaths = new ArrayList<Path>(); 
@@ -128,35 +138,43 @@ public class Main {
       WebScriptDispatcher webDispatcher = new WebScriptDispatcher(rootPath, jdbcURL);
       ws.addGrizzlyAdapter(webDispatcher, new String[]{"/"});
       ws.start();
+      return;
       
+    }
+    
+    if (optionMap.containsKey(Option.doc)) {
+      ArrayList<String> arguments = new ArrayList<String>();
+      Collections.addAll(arguments, "-doclet", Doclet.class.getName());
+      Collections.addAll(arguments, (String[])optionMap.get(Option.doc));
+      com.sun.tools.javadoc.Main.main(arguments.toArray(new String[arguments.size()]));
+      return;
+    }
+    
+    InputStream input;
+    if (filePaths.isEmpty()) {
+      input = System.in;
     } else {
-      InputStream input;
-      if (filePaths.isEmpty()) {
-        input = System.in;
-      } else {
-        input = filePaths.get(0).newInputStream();
-      }
-      
-      InputStreamReader reader = new InputStreamReader(input);
-      PrintWriter writer = new PrintWriter(System.out);
-      
-      GenericSQLConnection sqlConnection = new GenericSQLConnection(jdbcURL);
-      Scope rootScope = new Scope(null);
-      rootScope.register(new Var("SQL_CONNECTION", true, sqlConnection));
-      
-      Interpreter interpreter = new Interpreter(writer, rootScope);
-      try {
-        Analyzers.run(reader, interpreter, interpreter, null, null);
-      } catch(Throwable t) {
-        if (verbose)
-          t.printStackTrace(System.err);
-        else
-          System.err.println(t.getMessage());
-      } finally {
-        sqlConnection.close();
-      }
+      input = filePaths.get(0).newInputStream();
     }
 
+    InputStreamReader reader = new InputStreamReader(input);
+    PrintWriter writer = new PrintWriter(System.out);
+
+    GenericSQLConnection sqlConnection = new GenericSQLConnection(jdbcURL);
+    Scope rootScope = new Scope(null);
+    rootScope.register(new Var("SQL_CONNECTION", true, sqlConnection));
+
+    Interpreter interpreter = new Interpreter(writer, rootScope);
+    try {
+      Analyzers.run(reader, interpreter, interpreter, null, null);
+    } catch(Throwable t) {
+      if (verbose)
+        t.printStackTrace(System.err);
+      else
+        System.err.println(t.getMessage());
+    } finally {
+      sqlConnection.close();
+    }
   }
 
   private static <T> T get(EnumMap<Option,Object> map, Option option, Class<T> type, T defaultValue) {

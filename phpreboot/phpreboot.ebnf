@@ -3,12 +3,13 @@ directives:
 
 priorities:
   eq   = 0 left
-  bool = 1 left
-  plus = 2 left
-  mult = 3 left
-  unary = 4 left
-  xml = 5 left
-  ifelse = 6 right
+  to   = 1 left
+  bool = 2 left
+  plus = 3 left
+  mult = 4 left
+  unary = 5 left
+  xml = 6 left
+  ifelse = 7 right
 
 tokens:
   let = 'let'
@@ -21,6 +22,7 @@ tokens:
   foreach = 'foreach'
   function = 'function' 
   as = 'as' 
+  to = 'to'     [to]
   _switch = 'switch'
   _case = 'case'
   _default = 'default'
@@ -93,6 +95,9 @@ tokens:
   _boolean = 'boolean'
   _int = 'int'
   _double = 'double'
+  string = 'string'
+  array = 'array'
+  sequence = 'sequence'
   
   null_literal = 'null'
   bool_literal = 'true|false'
@@ -128,10 +133,13 @@ starts:
   script  
   
 productions:           
-  type = 'any'      { type_any }
-       | 'boolean'  { type_boolean }
-       | 'int'      { type_int }
-       | 'double'   { type_double }
+  type = 'any'       { type_any }
+       | 'boolean'   { type_boolean }
+       | 'int'       { type_int }
+       | 'double'    { type_double }
+       | 'string'    { type_string }
+       | 'array'     { type_array }
+       | 'sequence'  { type_sequence }
        ;
 
   script = script member     { script_script_member }
@@ -142,15 +150,15 @@ productions:
          | instr    { member_instr }
          ;
          
-  fun = 'function' signature block        { fun }
+  fun = 'function' type? 'id' parameters block        { fun }
       ; 
-      
-  signature =  type? 'id' '(' parameter* ')'       { signature }
-            ;
  
   parameter = type 'id'  { parameter_typed }
             | 'id'       { parameter_any }
             ;    
+            
+  parameters = '(' parameter/'comma'* ')'   { parameters }
+             ;
          
   block = '{' instr* '}'            { block }
         ;
@@ -249,25 +257,27 @@ productions:
           | funcall                 { primary_funcall }
           ;
   
-  expr = 'id'                       { expr_id }
-       | literal                    { expr_literal }
-       | primary                    { expr_primary }
-       | '+' expr        [unary]    { expr_unary_plus }
-       | '-' expr        [unary]    { expr_unary_minus }
-       | '!' expr        [unary]    { expr_unary_not }
-       | expr '+' expr   [plus]     { expr_plus }
-       | expr '-' expr   [plus]     { expr_minus }
-       | expr '*' expr   [mult]     { expr_mult }
-       | expr '/' expr   [mult]     { expr_div }
-       | expr '==' expr  [eq]       { expr_eq }
-       | expr '!=' expr  [eq]       { expr_ne }
-       | expr '<' expr   [eq]       { expr_lt }
-       | expr '<=' expr  [eq]       { expr_le }
-       | expr '>' expr   [eq]       { expr_gt }
-       | expr '>=' expr  [eq]       { expr_ge }
-       | expr 'or' expr  [bool]     { expr_or }
-       | expr 'and' expr [bool]     { expr_and }
-       | xmls                       { expr_xmls }
+  expr = 'id'                                         { expr_id }
+       | literal                                      { expr_literal }
+       | primary                                      { expr_primary }
+       | '+' expr                          [unary]    { expr_unary_plus }
+       | '-' expr                          [unary]    { expr_unary_minus }
+       | '!' expr                          [unary]    { expr_unary_not }
+       | expr '+' expr                     [plus]     { expr_plus }
+       | expr '-' expr                     [plus]     { expr_minus }
+       | expr '*' expr                     [mult]     { expr_mult }
+       | expr '/' expr                     [mult]     { expr_div }
+       | expr '==' expr                    [eq]       { expr_eq }
+       | expr '!=' expr                    [eq]       { expr_ne }
+       | expr '<' expr                     [eq]       { expr_lt }
+       | expr '<=' expr                    [eq]       { expr_le }
+       | expr '>' expr                     [eq]       { expr_gt }
+       | expr '>=' expr                    [eq]       { expr_ge }
+       | expr 'or' expr                    [bool]     { expr_or }
+       | expr 'and' expr                   [bool]     { expr_and }
+       | expr 'to' type                    [to]       { expr_to_type }
+       | 'function' parameters block                  { expr_fun }
+       | xmls                                         { expr_xmls }
        ;
        
    dollar_access = '$' 'id'                { dollar_access_id }

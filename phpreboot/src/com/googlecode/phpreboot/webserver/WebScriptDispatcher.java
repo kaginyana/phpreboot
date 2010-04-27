@@ -15,6 +15,7 @@ import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.interpreter.sql.GenericSQLConnection;
 import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.runtime.Array;
+import com.googlecode.phpreboot.runtime.RT;
 import com.googlecode.phpreboot.tools.Analyzers;
 import com.sun.grizzly.tcp.http11.GrizzlyAdapter;
 import com.sun.grizzly.tcp.http11.GrizzlyRequest;
@@ -23,11 +24,19 @@ import com.sun.grizzly.tcp.http11.GrizzlyResponse;
 public class WebScriptDispatcher extends GrizzlyAdapter {
   private final Path rootPath;
   private final String jdbcURL;
+  private final Scope rootScope;
   
   public WebScriptDispatcher(Path rootPath, String jdbcURL) {
     this.rootPath = rootPath;
     addRootFolder(rootPath.toAbsolutePath().toString());
     this.jdbcURL = jdbcURL;
+    
+    Scope rootScope = new Scope(null);
+    PrintWriter writer = new PrintWriter(System.out);
+    Interpreter interpreter = new Interpreter(writer, rootScope);
+    RT.includeDefaultFunctions(interpreter);
+    writer.flush();
+    this.rootScope = rootScope;
   }
   
   @Override
@@ -138,16 +147,16 @@ public class WebScriptDispatcher extends GrizzlyAdapter {
   }
   
   private void handleScript(InputStream input, OutputStream output, GrizzlyRequest request) {
-    Scope rootScope = new Scope(null);
-    fillRequestInfos(request, rootScope);
+    Scope scope = new Scope(rootScope);
+    fillRequestInfos(request, scope);
     
     GenericSQLConnection sqlConnection = new GenericSQLConnection(jdbcURL);
-    rootScope.register(new Var("SQL_CONNECTION", true, sqlConnection));
+    scope.register(new Var("SQL_CONNECTION", true, sqlConnection));
     
     Reader reader = new InputStreamReader(input);
     PrintWriter writer = new PrintWriter(output);
     try {
-      Interpreter interpreter = new Interpreter(writer, new Scope(rootScope));
+      Interpreter interpreter = new Interpreter(writer, new Scope(scope));
       Analyzers.run(reader, interpreter, interpreter, null, null);
     } finally {
       sqlConnection.close();

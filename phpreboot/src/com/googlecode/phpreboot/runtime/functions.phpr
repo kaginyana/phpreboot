@@ -1,0 +1,12 @@
+
+function join(delimiter, sequenceable) {
+  seq = sequenceable to sequence
+  if (seq == null)
+    return ""
+  s = seq.value
+  seq = seq.next
+  foreach(seq as item) {
+    s = s + delimiter + item.value
+  }
+  return s
+}

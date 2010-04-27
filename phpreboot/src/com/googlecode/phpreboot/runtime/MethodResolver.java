@@ -26,6 +26,15 @@ class MethodResolver {
     Method method = findMethod(declaringClass, name, parameterCount);
     if (method == null)
       return null;
+    
+    //FIXME, should try to find if the method doesn't override a public method of an
+    // accessible class
+    try {
+      method.setAccessible(true);
+    } catch(SecurityException e) {
+      return null;
+    }
+    
     return PUBLIC_LOOKUP.unreflect(method);
   }
   

@@ -1,0 +1,51 @@
+
+
+function dump_class(class) {
+  <h1>
+   $(class.name)
+  </h1>
+  <p>
+   $(class.commentText)
+  </p>
+
+  <h2>Methods</h2>
+  let methods = methods(class) to array
+  foreach(methods as method) {
+    let method_name = method.name + '(' + join(method.
+    <a href=$('#' + method_name)>$method_name</a>
+    echo "&nbsp"
+  }
+  
+  <h2>Methods Details</h2>
+  foreach(methods as method) {
+    let method_name = method.name 
+    <h3>$method_name</h3>
+    <a name=$('#' + method_name)/>
+    <p>
+     $(method.commentText)
+    </p>
+    <table>
+     {
+       let tags = tags(method) to sequence
+       foreach(tags as tag) {
+         <tr>
+           <td><b>$(substring(tag.name, 1))</b></td>
+           <td>$(tag.text)</td>
+         </tr>
+       }
+     }
+    </table>
+  }
+}
+
+<html>
+  <body> 
+  {
+    let classes = specifiedClasses(ROOT_DOC) to sequence 
+    foreach(classes as class) {
+      dump_class(class);
+    }
+  }
+  </body>
+</html>
+

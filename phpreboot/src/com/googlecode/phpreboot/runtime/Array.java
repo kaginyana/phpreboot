@@ -1,7 +1,7 @@
 package com.googlecode.phpreboot.runtime;
 
-public class Array implements Sequenceable, ArrayAccess {  
-  public static class Entry implements Sequence {
+public final class Array implements Sequenceable, ArrayAccess {  
+  public static final class Entry implements Sequence {
     /*final*/ Object key;
     Object value;
     Entry next;
@@ -59,6 +59,10 @@ public class Array implements Sequenceable, ArrayAccess {
   
   public boolean isEmpty() {
     return size == 0;
+  }
+  
+  boolean isIndexedArray() {
+    return size == nextIndex;
   }
 
   private static int hashIndex(Object key, int length) {

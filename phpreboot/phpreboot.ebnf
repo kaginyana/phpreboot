@@ -190,7 +190,8 @@ productions:
               | 'let' 'id' '=' expr    { declaration_let }
               ;           
      
-  funcall = 'id' '(' expr/'comma'* ')'   { funcall }
+  funcall = 'id' '(' expr/'comma'* ')'     { funcall_call }
+          | primary '(' expr/'comma'* ')'  { funcall_apply }  
           ;
         
   label = 'id' ':'          { label_id }
@@ -247,7 +248,7 @@ productions:
   primary = 'id' '[' expr ']'       { primary_array_access }     
           | primary '[' expr ']'    { primary_primary_array_access }                          
           | 'id' '.' 'id'           { primary_field_access }
-          | primary '.' 'id'        { primary_primary_field_access }                  
+          | primary '.' 'id'        { primary_primary_field_access }                
           | '(' expr ')'            { primary_parens }
           | funcall                 { primary_funcall }
           ;

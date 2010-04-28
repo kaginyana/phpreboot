@@ -859,12 +859,12 @@ public class RT {
         MethodType.methodType(Object.class, CallSite.class, String.class, Object[].class));
   }
   
-  public static Object interpreterMethodCall(Funcall funcall, String name, Object[] values) {
-    CallSite callSite = funcall.getCallsiteAttribute();
+  public static Object interpreterMethodCall(Node node, String name, Object[] values) {
+    CallSite callSite = node.getCallsiteAttribute();
     if (callSite == null) {
       MethodType type = MethodType.genericMethodType(values.length);
       callSite = new CallSite(RT.class, "", type);
-      funcall.setCallsiteAttribute(callSite);
+      node.setCallsiteAttribute(callSite);
       MethodHandle mh = MethodHandles.insertArguments(slowPathMethodCall, 0, callSite, name);
       mh = MethodHandles.collectArguments(mh, type);
       callSite.setTarget(mh);

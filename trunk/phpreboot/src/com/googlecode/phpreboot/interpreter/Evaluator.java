@@ -51,6 +51,8 @@ import com.googlecode.phpreboot.ast.ForStep;
 import com.googlecode.phpreboot.ast.ForStepAssignment;
 import com.googlecode.phpreboot.ast.ForStepFuncall;
 import com.googlecode.phpreboot.ast.Fun;
+import com.googlecode.phpreboot.ast.FunNoReturnType;
+import com.googlecode.phpreboot.ast.FunReturnType;
 import com.googlecode.phpreboot.ast.Funcall;
 import com.googlecode.phpreboot.ast.IdToken;
 import com.googlecode.phpreboot.ast.Instr;
@@ -86,13 +88,7 @@ import com.googlecode.phpreboot.ast.PrimaryFuncall;
 import com.googlecode.phpreboot.ast.PrimaryParens;
 import com.googlecode.phpreboot.ast.PrimaryPrimaryArrayAccess;
 import com.googlecode.phpreboot.ast.PrimaryPrimaryFieldAccess;
-import com.googlecode.phpreboot.ast.TypeAny;
-import com.googlecode.phpreboot.ast.TypeArray;
-import com.googlecode.phpreboot.ast.TypeBoolean;
-import com.googlecode.phpreboot.ast.TypeDouble;
-import com.googlecode.phpreboot.ast.TypeInt;
-import com.googlecode.phpreboot.ast.TypeSequence;
-import com.googlecode.phpreboot.ast.TypeString;
+import com.googlecode.phpreboot.ast.Type;
 import com.googlecode.phpreboot.ast.Visitor;
 import com.googlecode.phpreboot.ast.XmlsEmptyTag;
 import com.googlecode.phpreboot.ast.XmlsStartEndTag;
@@ -295,15 +291,34 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     return mh;
   }
   
-  @Override
-  public Object visit(Fun fun, EvalEnv env) {
-    String name = fun.getId().getValue();
+  private void visitFun(String name, Parameters parameters, Block block, EvalEnv env) {
     Scope scope = env.getScope();
     checkVar(name, scope);
     
-    MethodHandle mh = createFunction(name, fun.getParameters(), fun.getBlock(), scope);
+    MethodHandle mh = createFunction(name, parameters, block, scope);
     Var var = new Var(name, true, mh);
     scope.register(var);
+  }
+  @Override
+  public Object visit(FunNoReturnType fun_no_return_type, EvalEnv env) {
+    visitFun(fun_no_return_type.getId().getValue(),
+        fun_no_return_type.getParameters(),
+        fun_no_return_type.getBlock(),
+        env);
+    return null;
+  }
+  @Override
+  public Object visit(FunReturnType fun_return_type, EvalEnv env) {
+    visitFun(fun_return_type.getId().getValue(),
+        fun_return_type.getParameters(),
+        fun_return_type.getBlock(),
+        env);
+    return null;
+  }
+  
+  @Override
+  public Object visit(Fun fun, EvalEnv env) {
+    
     return null;
   }
   
@@ -885,35 +900,37 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     STRING,
     ARRAY,
     SEQUENCE
+    ;
+    
+    private String type;
+    private TypeToken() {
+      type = name().toLowerCase();
+    }
+    
+    @Override
+    public String toString() {
+      return type;
+    }
+    
+    static final HashMap<String, TypeToken> tokenMap;
+    static {
+      HashMap<String, TypeToken> map =
+        new HashMap<String, Evaluator.TypeToken>();
+      for(TypeToken token: TypeToken.values()) {
+        map.put(token.type, token);
+      }
+      tokenMap = map;
+    }
   }
   
   @Override
-  public Object visit(TypeAny type_any, EvalEnv env) {
-    return TypeToken.ANY;
-  }
-  @Override
-  public Object visit(TypeBoolean type_boolean, EvalEnv env) {
-    return TypeToken.BOOLEAN;
-  }
-  @Override
-  public Object visit(TypeInt type_int, EvalEnv env) {
-    return TypeToken.INT;
-  }
-  @Override
-  public Object visit(TypeDouble type_double, EvalEnv env) {
-    return TypeToken.DOUBLE;
-  }
-  @Override
-  public Object visit(TypeString type_string, EvalEnv env) {
-    return TypeToken.STRING;
-  }
-  @Override
-  public Object visit(TypeArray type_array, EvalEnv env) {
-    return TypeToken.ARRAY;
-  }
-  @Override
-  public Object visit(TypeSequence type_sequence, EvalEnv env) {
-    return TypeToken.SEQUENCE;
+  public Object visit(Type type, EvalEnv env) {
+    String name = type.getId().getValue();
+    TypeToken token = TypeToken.tokenMap.get(name);
+    if (token == null) {
+      throw RT.error("Unknown type %s", name);
+    }
+    return token;
   }
   
   @Override

@@ -133,13 +133,7 @@ starts:
   script  
   
 productions:           
-  type = 'any'       { type_any }
-       | 'boolean'   { type_boolean }
-       | 'int'       { type_int }
-       | 'double'    { type_double }
-       | 'string'    { type_string }
-       | 'array'     { type_array }
-       | 'sequence'  { type_sequence }
+  type = 'id'       { type }
        ;
 
   script = script member     { script_script_member }
@@ -150,7 +144,8 @@ productions:
          | instr    { member_instr }
          ;
          
-  fun = 'function' type? 'id' parameters block        { fun }
+  fun = 'function' 'id' parameters block             { fun_no_return_type }
+      | 'function' type 'id' parameters block        { fun_return_type }
       ; 
  
   parameter = type 'id'  { parameter_typed }

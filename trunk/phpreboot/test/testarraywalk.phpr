@@ -1,12 +1,12 @@
 
-function array_walk(an_array, lambda) {
+function array_walk(array, lambda) {
   parameter_count = parameterCount(lambda.type)
   if (parameter_count == 2) {   // 1 eval environment + 1 parameter
-    foreach(an_array as value) {
+    foreach(array as value) {
       lambda(value)
     }
   } elseif(parameter_count == 3) {  // 1 eval environment + 2 parameters 
-    foreach(an_array as key: value) {
+    foreach(array as key: value) {
       lambda(key, value)
     }
   }
@@ -15,8 +15,8 @@ function array_walk(an_array, lambda) {
 
 // tests
 
-an_array = ["foo", "bar", "baz"]
-array_walk(an_array, function(value) {
+array = ["foo", "bar", "baz"]
+array_walk(array, function(value) {
   echo value
 })
 

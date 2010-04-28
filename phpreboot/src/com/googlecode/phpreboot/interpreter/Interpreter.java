@@ -280,13 +280,23 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
   }
   
   @Override
-  public Fun fun(Type type_optional_0, IdToken id, Parameters parameters, Block block) {
-    Fun fun = super.fun(type_optional_0, id, parameters, block);
+  public Fun fun_return_type(Type type, IdToken id, Parameters parameters, Block block) {
+    Fun fun_return_type = super.fun_return_type(type, id, parameters, block);
     interpreter--;  // match with parameters()
     if (interpreter != 0)
-      return fun;
+      return fun_return_type;
     
-    eval(fun);
+    eval(fun_return_type);
+    return null;
+  }
+  @Override
+  public Fun fun_no_return_type(IdToken id, Parameters parameters, Block block) {
+    Fun fun_no_return_type = super.fun_no_return_type(id, parameters, block);
+    interpreter--;  // match with parameters()
+    if (interpreter != 0)
+      return fun_no_return_type;
+    
+    eval(fun_no_return_type);
     return null;
   }
   

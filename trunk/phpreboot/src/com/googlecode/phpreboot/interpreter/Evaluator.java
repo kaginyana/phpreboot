@@ -53,7 +53,8 @@ import com.googlecode.phpreboot.ast.ForStepFuncall;
 import com.googlecode.phpreboot.ast.Fun;
 import com.googlecode.phpreboot.ast.FunNoReturnType;
 import com.googlecode.phpreboot.ast.FunReturnType;
-import com.googlecode.phpreboot.ast.Funcall;
+import com.googlecode.phpreboot.ast.FuncallApply;
+import com.googlecode.phpreboot.ast.FuncallCall;
 import com.googlecode.phpreboot.ast.IdToken;
 import com.googlecode.phpreboot.ast.Instr;
 import com.googlecode.phpreboot.ast.InstrBreak;
@@ -720,14 +721,14 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   // --- function call
   
   @Override
-  public Object visit(Funcall funcall, EvalEnv env) {
-    String name = funcall.getId().getValue();
+  public Object visit(FuncallCall funcall_call, EvalEnv env) {
+    String name = funcall_call.getId().getValue();
+    List<Expr> exprStar = funcall_call.getExprStar();
     Var var = env.getScope().lookup(name);
     if (var != null) {
-      return methodHandleCall(funcall, var, env);
+      return methodHandleCall(var.getValue(), exprStar, env);
     }
     
-    List<Expr> exprStar = funcall.getExprStar();
     int size = exprStar.size();
     if (size == 0) {
       throw RT.error("%s is not a valid variable name", name);
@@ -739,11 +740,16 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       values[i] = eval(expr, env);
     }
     
-    return RT.interpreterMethodCall(funcall, name, values);
+    return RT.interpreterMethodCall(funcall_call, name, values);
   }
   
-  private Object methodHandleCall(Funcall funcall, Var var, EvalEnv env) {
-    List<Expr> exprStar = funcall.getExprStar();
+  @Override
+  public Object visit(FuncallApply funcall_apply, EvalEnv env) {
+    Object primary = eval(funcall_apply.getPrimary(), env);
+    return methodHandleCall(primary, funcall_apply.getExprStar(), env);
+  }
+  
+  private Object methodHandleCall(Object value, List<Expr> exprStar, EvalEnv env) {
     int size = exprStar.size();
     Object[] values = new Object[1 + size];
     values[0] = env;
@@ -752,7 +758,6 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       values[i + 1] = eval(expr, env);
     }
 
-    Object value = var.getValue();
     if (!(value instanceof MethodHandle)) {
       throw RT.error("value is not a function: %s", value);
     }

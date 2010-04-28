@@ -7,15 +7,13 @@ function f(value) {
 
 echo f(1)
 
+
 function delayed_add(x) {
   return function(y) { return x + y; }
 }
 
+echo delayed_add(2)(4)
 
-// echo delayed_add(2)(4)
-
-let add = delayed_add(2)
-echo add(4)
 
 
 

@@ -38,6 +38,7 @@ tokens:
   minus = '-'   [plus]
   mult = '\*'   [mult]
   div = '\/'    [mult]
+  mod = '%'     [mult]
   eq = '=='     [eq]
   ne = '!='     [eq]
   lt = '<'  [eq]
@@ -263,6 +264,7 @@ productions:
        | expr '-' expr                     [plus]     { expr_minus }
        | expr '*' expr                     [mult]     { expr_mult }
        | expr '/' expr                     [mult]     { expr_div }
+       | expr '%' expr                     [mult]     { expr_mod } 
        | expr '==' expr                    [eq]       { expr_eq }
        | expr '!=' expr                    [eq]       { expr_ne }
        | expr '<' expr                     [eq]       { expr_lt }

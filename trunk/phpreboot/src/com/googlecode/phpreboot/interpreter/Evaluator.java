@@ -873,6 +873,8 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       return RT.mult(left, right);
     case expr_div:
       return RT.div(left, right);
+    case expr_mod:
+      return RT.mod(left, right);  
 
     case expr_eq:
       return RT.eq(left, right);

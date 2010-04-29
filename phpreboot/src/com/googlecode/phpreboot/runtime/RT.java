@@ -687,6 +687,29 @@ public class RT {
     return builder.append(o);
   }
   
+  static StringBuilder escapeXML(StringBuilder builder, Object o) {
+    if ((o instanceof XML)) {
+      return builder.append(o);
+    }
+    return escapeXML(builder, String.valueOf(o));
+  }
+  static StringBuilder escapeXML(StringBuilder builder, String text) {
+    for(int i = 0; i < text.length(); i++) {
+      char c = text.charAt(i);
+      switch(c) {
+      case '<':
+        builder.append("&lt;");
+        break;
+      case '>':
+        builder.append("&gt;");
+        break;
+      default:
+        builder.append(c);
+      }
+    }
+    return builder;
+  }
+  
   
   // --- member access
   

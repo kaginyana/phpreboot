@@ -59,7 +59,7 @@ public class XML implements Sequenceable {
     }
     Sequence seq = elements.entries();
     if (seq == null) {
-      builder.append("\\>");
+      builder.append("/>");
       return builder.toString();
     }
     builder.append('>');

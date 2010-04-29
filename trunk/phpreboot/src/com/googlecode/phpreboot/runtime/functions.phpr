@@ -1,12 +1,17 @@
 
-function join(delimiter, sequenceable) {
+function join(delimiter, sequenceable, lambda) {
   seq = sequenceable to sequence
   if (seq == null)
     return ""
   s = seq.value
   seq = seq.next
   foreach(seq as item) {
-    s = s + delimiter + item.value
+    value = null
+    if (lambda == null)
+      value = item.value
+    else
+      value = lambda(item.value)
+    s = s + delimiter + value
   }
   return s
 }

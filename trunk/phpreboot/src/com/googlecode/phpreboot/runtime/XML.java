@@ -64,7 +64,7 @@ public class XML implements Sequenceable {
     }
     builder.append('>');
     for(; seq != null; seq = seq.next()) {
-      builder.append(seq.getValue());
+      RT.escapeXML(builder, seq.getValue());
     }
     builder.append("</").append(name).append(">");
     return builder.toString();

@@ -1,0 +1,14 @@
+a = "<foo>"
+
+<html>
+  <body>
+   <p>
+    {
+      echo a
+    }
+   </p>
+   <p>
+    $a
+   </p>
+  </body>
+</html>

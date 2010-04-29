@@ -12,16 +12,12 @@ persons = [
 ]
  
 array = [] 
-i = 0
-
 foreach(persons as person) {
   user = {}
   user["lastname"] = person.name
   user["color"] = person.color
   
-  // array_push(array, user)
-  array[i] = user
-  i = i + 1  
+  add(array, user)
 }
 
 echo array

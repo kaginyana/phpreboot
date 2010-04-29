@@ -1,0 +1,6 @@
+
+  <bar x="3" y='4' z=$(2+3) z2=$("foo")>
+    <foobar/>
+    This is a text
+  </bar>
+  

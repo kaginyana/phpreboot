@@ -3,13 +3,15 @@
 	
   <property name="tatoo-build.dir" location="build-lib"/>
   <property name="tatoo.jar" location="${tatoo-build.dir}/tatoo.jar"/>
-  <property name="tatoo-runtime.dir" location="lib"/>
-  <property name="tatoo-runtime.jar" location="${tatoo-runtime.dir}/tatoo-runtime.jar"/>
+  <property name="lib" location="lib"/>
+  <property name="libs" value="${lib}/derby.jar:${lib}/grizzly-servlet-webserver-1.9.18-k.jar:${lib}/tatoo-runtime.jar:${lib}/asm-all-3.2.jar"/>
+  <property name="phpreboot.jar" value="${lib}/phpreboot.jar"/>
 	
   <property name="src" value="src"/>
   <property name="classes" value="classes"/>
   <property name="gen-src" value="gen-src"/>
   <property name="ebnf.file" value="${ant.project.name}.ebnf"/>
+  
   
   <target name="tasks">
     <taskdef name="ebnf" classname="fr.umlv.tatoo.cc.ebnf.main.EBNFTask" classpath="${tatoo.jar}"/>
@@ -33,33 +35,34 @@
 	</ebnf>
   </target>
 	
-  <target name="all" depends="ebnf">
-  </target>
-	
-	<target name="compile">
+  <target name="compile" depends="ebnf">
 	  <mkdir dir="${classes}"/>
 
 	  <javac srcdir="${src}:${gen-src}" destdir="${classes}">
-		  <classpath path="${tatoo-runtime.jar}"/>
+		  <classpath path="${libs}"/>
 		  <compilerarg value="-Xlint:deprecation"/>
 	  </javac>
-	</target>
-	
-  <target name="run" depends="compile">
-  	<java fork="true"
-  	      classname="fr.umlv.compil.${ant.project.name}.Main">
-  	  <classpath>
-  	    <pathelement location="${classes}"/>
-  	  	<pathelement location="${tatoo-runtime.jar}"/>
-  	  </classpath>
-  	</java>
   </target>
 	
-	<target name="clean">
-		<delete dir="${classes}"/>
-		<delete dir="${gen-src}"/>
-		<!-- not to break eclipse source folders -->
-		<mkdir dir="${gen-src}"/>
-	</target>
+  <target name="jar-nocompile">
+    <jar destfile="${phpreboot.jar}">
+	  <fileset dir="${classes}"/>
+	  <manifest>
+	    <attribute name="Class-Path" value="derby.jar grizzly-servlet-webserver-1.9.18-k.jar tatoo-runtime.jar asm-all-3.2.jar"/>   
+	    <attribute name="Main-Class" value="com.googlecode.phpreboot.Main"/>   
+	  </manifest>
+	</jar>
+  </target>
+	
+  <target name="jar" depends="compile, jar-nocompile"/>
+  
+  <target name="all" depends="jar"/>  
+	
+  <target name="clean">
+	<delete dir="${classes}"/>
+	<delete dir="${gen-src}"/>
+	<!-- not to break eclipse source folders -->
+	<mkdir dir="${gen-src}"/>
+  </target>
 
 </project>

@@ -1,5 +1,14 @@
 
 sqr = function(x) { return x * x; }
-
 echo sqr(2)
+
+fib = function(x) {
+  if (x<2)
+    return 1
+  else
+    return it(x - 2) + it(x - 1)
+}
+
+echo fib(7)
+
  

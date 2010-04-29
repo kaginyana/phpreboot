@@ -11,7 +11,6 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 
-import com.googlecode.phpreboot.ast.Funcall;
 import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.interpreter.Interpreter;
 import com.googlecode.phpreboot.runtime.Array.Entry;
@@ -218,6 +217,36 @@ public class RT {
   }
   public static double div(double left, double right) {
     return left / right;
+  }
+  
+  public static Object mod(Object left, Object right) {
+    if (left instanceof Integer) {
+      int l = (Integer)left;
+      if (right instanceof Integer) {
+        return mod(l, (int)(Integer)right);
+      }
+      if (right instanceof Double) {
+        return mod(l, (double)(Double)right);
+      }
+      throw error("invalid value for operation % "+right);
+    }
+    if (left instanceof Double) {
+      double l = (Double)left;
+      if (right instanceof Integer) {
+        return mod(l, (int)(Integer)right);
+      }
+      if (right instanceof Double) {
+        return mod(l, (double)(Double)right);
+      }
+      throw error("invalid value for operation % "+right);
+    }
+    throw error("invalid value for operation % "+left);
+  }
+  public static int mod(int left, int right) {
+    return left % right;
+  }
+  public static double mod(double left, double right) {
+    return left % right;
   }
   
   public static boolean eq(Object left, Object right) {

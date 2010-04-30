@@ -92,13 +92,11 @@ tokens:
   into = 'into'
   values = 'values'
   
-  _any = 'any'
-  _boolean = 'boolean'
-  _int = 'int'
-  _double = 'double'
-  string = 'string'
-  array = 'array'
-  sequence = 'sequence'
+  // regex
+  match_regex = 'm\/'    [plus]
+  replace_regex = 's\/'  [plus]
+  end_regex = '\/'
+  regex_anycharacter = '([!#$%&*+,:;<=>?@_`~]|\u0022|\u0027|\(|\)|-|\.|\[|\]|\^|\{|\}|\\\/|[0-9]|[A-Z]|[a-z])+'
   
   null_literal = 'null'
   bool_literal = 'true|false'

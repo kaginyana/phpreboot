@@ -25,6 +25,7 @@ import com.googlecode.phpreboot.ast.NullLiteralToken;
 import com.googlecode.phpreboot.ast.Parameter;
 import com.googlecode.phpreboot.ast.Parameters;
 import com.googlecode.phpreboot.ast.RcurlToken;
+import com.googlecode.phpreboot.ast.RegexAnycharacterToken;
 import com.googlecode.phpreboot.ast.Script;
 import com.googlecode.phpreboot.ast.Sql;
 import com.googlecode.phpreboot.ast.StringLiteralToken;
@@ -82,6 +83,11 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
   @Override
   public TextToken text(CharSequence data) {
     return new TextToken(data.toString());
+  }
+  
+  @Override
+  public RegexAnycharacterToken regex_anycharacter(CharSequence data) {
+    return new RegexAnycharacterToken(data.toString());
   }
 
   @Override

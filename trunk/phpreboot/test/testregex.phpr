@@ -1,0 +1,6 @@
+
+let text = "hello I'm bob"
+echo text m/.*hello.*/
+echo text s/bob/alice/
+
+

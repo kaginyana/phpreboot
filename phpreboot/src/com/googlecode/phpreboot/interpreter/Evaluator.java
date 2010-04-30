@@ -7,8 +7,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import com.googlecode.phpreboot.ast.ArrayEntry;
 import com.googlecode.phpreboot.ast.ArrayValue;
@@ -102,6 +100,7 @@ import com.googlecode.phpreboot.model.Function;
 import com.googlecode.phpreboot.model.Parameter;
 import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.parser.ProductionEnum;
+import com.googlecode.phpreboot.regex.RegexEvaluator;
 import com.googlecode.phpreboot.runtime.Array;
 import com.googlecode.phpreboot.runtime.RT;
 import com.googlecode.phpreboot.runtime.Sequence;
@@ -169,6 +168,9 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   }
   
   public static final Evaluator INSTANCE = new Evaluator();
+  
+  
+  // ---
   
   private Evaluator() {
     // enforce singleton
@@ -1120,22 +1122,11 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   @Override
   public Object visit(ExprRegexMatch expr_regex_match, EvalEnv env) {
-    Object value = eval(expr_regex_match.getExpr(), env);
-    
-    String regex = expr_regex_match.getRegexAnycharacter().getValue();
-    Pattern pattern = Pattern.compile(regex);
-    Matcher matcher = pattern.matcher(value.toString()); // nullcheck
-    return matcher.matches();
+    return RegexEvaluator.visit(expr_regex_match, env);
   }
   
   @Override
   public Object visit(ExprRegexReplace expr_regex_replace, EvalEnv env) {
-    Object value = eval(expr_regex_replace.getExpr(), env);
-    
-    String regex = expr_regex_replace.getRegexAnycharacter().getValue();
-    String replace = expr_regex_replace.getRegexAnycharacter2().getValue();
-    Pattern pattern = Pattern.compile(regex);
-    Matcher matcher = pattern.matcher(value.toString()); // nullcheck
-    return matcher.replaceAll(replace);
+    return RegexEvaluator.visit(expr_regex_replace, env);
   }
 }

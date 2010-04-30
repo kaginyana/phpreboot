@@ -171,7 +171,7 @@ public class Main {
       if (verbose)
         t.printStackTrace(System.err);
       else
-        System.err.println(t.getMessage());
+        System.err.println("error: " + t.getMessage());
     } finally {
       sqlConnection.close();
     }

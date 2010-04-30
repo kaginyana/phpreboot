@@ -26,6 +26,7 @@
 		<inputfiles>
 			<inputfile unit="ebnf" file="${ebnf.file}"/>
 			<inputfile unit="ebnf" file="sql.ebnf"/>
+			<inputfile unit="ebnf" file="regex.ebnf"/>
 	    </inputfiles>
 		
 		<package lexer="com.googlecode.${ant.project.name}.lexer"/>
@@ -38,7 +39,7 @@
   <target name="compile" depends="ebnf">
 	  <mkdir dir="${classes}"/>
 
-	  <javac srcdir="${src}:${gen-src}" destdir="${classes}">
+	  <javac srcdir="${src}:${gen-src}" destdir="${classes}" debug="true">
 		  <classpath path="${libs}"/>
 		  <compilerarg value="-Xlint:deprecation"/>
 	  </javac>

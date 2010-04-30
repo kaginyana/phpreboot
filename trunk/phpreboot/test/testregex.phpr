@@ -3,4 +3,16 @@ let text = "hello I'm bob"
 echo text m/.*hello.*/
 echo text s/bob/alice/
 
+// groups
+array = text m/.*(h.*l).*(b.?b).*/
+if (!isEmpty(array)) {  // if it matches
+  echo "group 1: " + array[1]
+  echo "group 2: " + array[2]
+}
+
+// pattern mode
+echo text m/.*Hello.*/i
+
+
+
 

@@ -4,9 +4,19 @@ import java.dyn.MethodHandle;
 import java.dyn.MethodHandles;
 import java.dyn.MethodType;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.jaxen.Context;
+import org.jaxen.ContextSupport;
+import org.jaxen.JaxenException;
+import org.jaxen.SimpleNamespaceContext;
+import org.jaxen.SimpleVariableContext;
+import org.jaxen.XPathFunctionContext;
+import org.jaxen.expr.DefaultXPathFactory;
+import org.jaxen.expr.XPathExpr;
 
 import com.googlecode.phpreboot.ast.ArrayEntry;
 import com.googlecode.phpreboot.ast.ArrayValue;
@@ -67,6 +77,7 @@ import com.googlecode.phpreboot.ast.InstrLabeled;
 import com.googlecode.phpreboot.ast.InstrReturn;
 import com.googlecode.phpreboot.ast.InstrSql;
 import com.googlecode.phpreboot.ast.InstrXmls;
+import com.googlecode.phpreboot.ast.InstrXpath;
 import com.googlecode.phpreboot.ast.Label;
 import com.googlecode.phpreboot.ast.LabelId;
 import com.googlecode.phpreboot.ast.LabeledInstrDoWhile;
@@ -105,6 +116,8 @@ import com.googlecode.phpreboot.runtime.Array;
 import com.googlecode.phpreboot.runtime.RT;
 import com.googlecode.phpreboot.runtime.Sequence;
 import com.googlecode.phpreboot.runtime.XML;
+import com.googlecode.phpreboot.runtime.XPathNavigator;
+import com.googlecode.phpreboot.xpath.XPathExprVisitor;
 
 public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   @SuppressWarnings("serial")
@@ -191,7 +204,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     }
     
     Block block = function.getBlock();
-    EvalEnv evalEnv = new EvalEnv(scope, env.getEchoer(), null);
+    EvalEnv evalEnv = new EvalEnv(scope, env.getInterpreter(), env.getEchoer(), null);
     try {
       Evaluator.INSTANCE.eval(block, evalEnv);
     } catch(ReturnError e) {
@@ -359,7 +372,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Label label = instr_labeled.getLabel();
     if (label instanceof LabelId) {
       String labelText = ((LabelId)label).getId().getValue();
-      env = new EvalEnv(env.getScope(), env.getEchoer(), labelText);
+      env = new EvalEnv(env.getScope(), env.getInterpreter(), env.getEchoer(), labelText);
     }
     eval(instr_labeled.getLabeledInstr(), env);
     return null;
@@ -387,7 +400,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   @Override
   public Object visit(Block block, EvalEnv env) {
-    EvalEnv newEnv = new EvalEnv(new Scope(env.getScope()), env.getEchoer(), env.getLabel());
+    EvalEnv newEnv = new EvalEnv(new Scope(env.getScope()), env.getInterpreter(), env.getEchoer(), env.getLabel());
     for(Instr instr: block.getInstrStar()) {
       eval(instr, newEnv);
     }
@@ -396,7 +409,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   @Override
   public Object visit(InstrXmls instr_xmls, EvalEnv env) {
-    env.getEchoer().echo(eval(instr_xmls.getXmls(), env));
+    env.getInterpreter().getEchoer().echo(eval(instr_xmls.getXmls(), env));
     return null;
   }
   
@@ -561,7 +574,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     try {
       while(sequence != null) {
         Scope foreachScope = new Scope(env.getScope());
-        EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getEchoer(), env.getLabel());
+        EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getInterpreter(), env.getEchoer(), env.getLabel());
         foreachScope.register(new Var(name, true, sequence.getValue()));
         
         try {
@@ -592,7 +605,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     try {
       while(sequence != null) {
         Scope foreachScope = new Scope(env.getScope());
-        EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getEchoer(), env.getLabel());
+        EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getInterpreter(), env.getEchoer(), env.getLabel());
         foreachScope.register(new Var(keyName, true, sequence.getKey()));
         foreachScope.register(new Var(valueName, true, sequence.getValue()));
         
@@ -720,7 +733,54 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   public Object visit(InstrSql instr_sql, EvalEnv env) {
     Scope scope = env.getScope();
     SQLConnection sqlConnection = (SQLConnection)lookupVarValue("SQL_CONNECTION", scope);
-    sqlConnection.executeStatement(instr_sql.getSql(), scope);
+    sqlConnection.executeStatement(instr_sql.getSql(), env);
+    return null;
+  }
+  
+  @Override
+  public Object visit(InstrXpath instr_xpath, EvalEnv evalEnv) {
+    Scope scope = evalEnv.getScope();
+    String newVarName = instr_xpath.getId().getValue();
+    checkVar(newVarName, scope);
+    
+    String rootvarName = instr_xpath.getId3().getValue();
+    Object node = lookupVarValue(rootvarName, scope);
+    if (!(node instanceof XML)) {
+      throw RT.error("variable %s value must be a XML tree: %s", rootvarName, node);
+    }
+    
+    //XPathEnv xpathEnv = new XPathEnv(evalEnv);
+    //String xpathExpr = XPathVisitor.INSTANCE.xpath(instr_xpath.getLocationPath(), xpathEnv).toString();
+    //System.err.println("xpath eval "+xpathExpr);
+    
+    ContextSupport support = new ContextSupport( 
+        new SimpleNamespaceContext(),
+        XPathFunctionContext.getInstance(),
+        new SimpleVariableContext(),
+        new XPathNavigator());
+    Context context = new Context( support );
+    context.setNodeSet(Collections.singletonList(node));
+    
+    Array array = new Array();
+    try {
+      XPathExpr xpathExpr = XPathExprVisitor.INSTANCE.xpathExpr(new DefaultXPathFactory(), instr_xpath.getLocationPath(), evalEnv);
+      System.out.println("xpath expr: "+xpathExpr);
+      
+      for(Object matchNode: xpathExpr.asList(context)) {
+        if (matchNode instanceof Array.Entry) {
+          Array.Entry entry = (Array.Entry)matchNode;
+          array.set(entry.getKey(), entry.getValue());
+        } else {
+          array.add(matchNode);
+        }
+      }
+    } catch (JaxenException e) {
+      //throw RT.error("xpath evaluation error %s", xpathExpr);  
+      throw RT.error(e);
+    }
+    
+    Var var = new Var(newVarName, true, array);
+    scope.register(var);
     return null;
   }
   
@@ -1094,7 +1154,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   @Override
   public Object visit(ContentText content_text, EvalEnv env) {
     Array array = (Array)eval(content_text.getContent(), env);
-    array.add(content_text.getText().getValue());
+    array.add(content_text.getXmlText().getValue());
     return array;
   }
   @Override
@@ -1106,7 +1166,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   @Override
   public Object visit(ContentBlock content_block, EvalEnv env) {
     Array array = (Array)eval(content_block.getContent(), env);
-    EvalEnv xmlEnv = new EvalEnv(env.getScope(), Echoer.xmlEchoer(array), env.getLabel());
+    EvalEnv xmlEnv = new EvalEnv(env.getScope(), env.getInterpreter(), Echoer.xmlEchoer(array), env.getLabel());
     eval(content_block.getBlock(), xmlEnv);
     return array;
   }

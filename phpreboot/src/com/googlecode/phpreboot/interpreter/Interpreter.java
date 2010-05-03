@@ -6,10 +6,13 @@ import java.util.List;
 import com.googlecode.phpreboot.ast.ASTGrammarEvaluator;
 import com.googlecode.phpreboot.ast.Action;
 import com.googlecode.phpreboot.ast.Assignment;
+import com.googlecode.phpreboot.ast.AxisNameToken;
 import com.googlecode.phpreboot.ast.Block;
 import com.googlecode.phpreboot.ast.BoolLiteralToken;
 import com.googlecode.phpreboot.ast.Declaration;
+import com.googlecode.phpreboot.ast.DisableLineComment;
 import com.googlecode.phpreboot.ast.ElseIf;
+import com.googlecode.phpreboot.ast.EnableLineComment;
 import com.googlecode.phpreboot.ast.Eoi;
 import com.googlecode.phpreboot.ast.Expr;
 import com.googlecode.phpreboot.ast.Fun;
@@ -19,8 +22,10 @@ import com.googlecode.phpreboot.ast.Instr;
 import com.googlecode.phpreboot.ast.Label;
 import com.googlecode.phpreboot.ast.LabeledInstr;
 import com.googlecode.phpreboot.ast.LcurlToken;
+import com.googlecode.phpreboot.ast.LocationPath;
 import com.googlecode.phpreboot.ast.Member;
 import com.googlecode.phpreboot.ast.Node;
+import com.googlecode.phpreboot.ast.NodeTypeToken;
 import com.googlecode.phpreboot.ast.NullLiteralToken;
 import com.googlecode.phpreboot.ast.Parameter;
 import com.googlecode.phpreboot.ast.Parameters;
@@ -29,9 +34,9 @@ import com.googlecode.phpreboot.ast.RegexAnycharacterToken;
 import com.googlecode.phpreboot.ast.Script;
 import com.googlecode.phpreboot.ast.Sql;
 import com.googlecode.phpreboot.ast.StringLiteralToken;
-import com.googlecode.phpreboot.ast.TextToken;
 import com.googlecode.phpreboot.ast.Type;
 import com.googlecode.phpreboot.ast.ValueLiteralToken;
+import com.googlecode.phpreboot.ast.XmlTextToken;
 import com.googlecode.phpreboot.ast.Xmls;
 import com.googlecode.phpreboot.tools.TerminalEvaluator;
 
@@ -39,16 +44,21 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
   private final Echoer echoer;
   private Scope currentScope;
   private int interpreter = 0;
-
+  boolean enableLineComment = true; //comments that starts with '//' clashes with xquery-like syntax
+  
   public Interpreter(PrintWriter writer, Scope scope) {
     this.echoer = Echoer.writerEchoer(writer);
     this.currentScope = scope;
   }
   
+  public Echoer getEchoer() {
+    return echoer;
+  }
+  
   // --- helper methods
   
   private void eval(Node node) {
-    Evaluator.INSTANCE.eval(node, new EvalEnv(currentScope, echoer, null));
+    Evaluator.INSTANCE.eval(node, new EvalEnv(currentScope, this, echoer, null));
   }
 
   // --- terminal evaluator
@@ -81,13 +91,22 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     return new StringLiteralToken(data.subSequence(1, data.length() - 1).toString());
   }
   @Override
-  public TextToken text(CharSequence data) {
-    return new TextToken(data.toString());
+  public XmlTextToken xml_text(CharSequence data) {
+    return new XmlTextToken(data.toString());
   }
   
   @Override
   public RegexAnycharacterToken regex_anycharacter(CharSequence data) {
     return new RegexAnycharacterToken(data.toString());
+  }
+  
+  @Override
+  public AxisNameToken axis_name(CharSequence data) {
+    return new AxisNameToken(data.toString());
+  }
+  @Override
+  public NodeTypeToken node_type(CharSequence data) {
+    return new NodeTypeToken(data.toString());
   }
 
   @Override
@@ -272,6 +291,28 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
       return instr_sql;
     
     eval(instr_sql);
+    return null;
+  }
+  
+  @Override
+  public DisableLineComment disable_line_comment() {
+    enableLineComment = false;
+    return null;
+  }
+  @Override
+  public EnableLineComment enable_line_comment() {
+    enableLineComment = true;
+    return null;
+  }
+  @Override
+  public Instr instr_xpath(IdToken id, Action action, IdToken id2, DisableLineComment disable_line_comment, IdToken id3, LocationPath location_path, EnableLineComment enable_line_comment, Eoi eoi) {
+    Instr instr_xpath = super.instr_xpath(id, action, id2, disable_line_comment, id3,
+        location_path, enable_line_comment, eoi);
+    interpreter--;   // match with action()
+    if (interpreter != 0)
+      return instr_xpath;
+    
+    eval(instr_xpath);
     return null;
   }
   

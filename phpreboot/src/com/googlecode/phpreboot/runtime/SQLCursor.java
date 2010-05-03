@@ -57,15 +57,6 @@ public class SQLCursor implements Sequence, ArrayAccess {
   }
   
   @Override
-  public Object get(int index) {
-    try {
-      return resultSet.getObject(index);
-    } catch (SQLException e) {
-      throw new RuntimeException(e);
-    }
-  }
-  
-  @Override
   public String toString() {
     StringBuilder builder = new StringBuilder();
     builder.append('{');

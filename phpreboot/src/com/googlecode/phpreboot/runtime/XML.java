@@ -2,13 +2,15 @@ package com.googlecode.phpreboot.runtime;
 
 import java.util.ArrayDeque;
 
+/* TODO add a parent
+ */
 public class XML implements Sequenceable {
   private String name;
-  private final Array attributes;
-  final Array elements;
+  /*lazy*/ Array attributes;
+  /*lazy*/ Array elements;
   
   public XML(String name) {
-    this(name, new Array(), new Array());
+    this(name, null, null);
   }
   
   public XML(String name, Array attributes, Array elements) {
@@ -32,6 +34,7 @@ public class XML implements Sequenceable {
    * @param name the new name of the current XML markup
    */
   public void setName(String name) {
+    name.getClass();  //nullcheck
     this.name = name;
   }
   
@@ -39,6 +42,8 @@ public class XML implements Sequenceable {
    * @return the attributs of the XML markups as an array
    */
   public Array attributes() {
+    if (attributes == null)
+      return attributes = new Array();
     return attributes;
   }
   
@@ -47,6 +52,8 @@ public class XML implements Sequenceable {
    * @return the elements of the current XML markups.
    */
   public Array elements() {
+    if (elements == null)
+      return elements = new Array();
     return elements;
   }
   
@@ -54,10 +61,10 @@ public class XML implements Sequenceable {
   public String toString() {
     StringBuilder builder = new StringBuilder();
     builder.append('<').append(name);
-    for(Sequence seq = attributes.entries(); seq != null; seq = seq.next()) {
+    for(Sequence seq = (attributes == null)?null:attributes.entries(); seq != null; seq = seq.next()) {
       builder.append(' ').append(seq.getKey()).append("=\"").append(seq.getValue()).append('\"');
     }
-    Sequence seq = elements.entries();
+    Sequence seq = (elements==null)?null:elements.entries();
     if (seq == null) {
       builder.append("/>");
       return builder.toString();
@@ -72,12 +79,14 @@ public class XML implements Sequenceable {
   
   @Override
   public Sequence entries() {
+    if (elements == null)
+      return (elements = new Array()).entries();
     return elements.entries();
   }
   
   @Override
   public Sequence sequence() {
-    if (elements.size() == 0)
+    if (elements == null || elements.isEmpty())
       return null;
     
     return new Sequence() {
@@ -101,8 +110,6 @@ public class XML implements Sequenceable {
         if (value instanceof Sequenceable) {
           Sequence seq = ((Sequenceable)value).entries();
           if (seq != null) {
-            System.out.println("push "+current);
-            
             stack.push(current);
             this.current = seq;
             return this;

@@ -24,7 +24,7 @@ public final class Array implements Sequenceable, ArrayAccess {
     }
 
     @Override
-    public Sequence next() {
+    public Entry next() {
       Entry after = this.after;
       return (after == header) ? null: after;
     }
@@ -37,6 +37,11 @@ public final class Array implements Sequenceable, ArrayAccess {
     @Override
     public Object getValue() {
       return value;
+    }
+    
+    @Override
+    public String toString() {
+      return "["+key+": "+value+']';
     }
   }
 
@@ -80,11 +85,6 @@ public final class Array implements Sequenceable, ArrayAccess {
       }
     }
     return null;
-  }
-
-  @Override
-  public Object get(int key) {
-    return get((Integer)key);
   }
   
   public void set(Object key, Object value) {
@@ -172,6 +172,10 @@ public final class Array implements Sequenceable, ArrayAccess {
     return new IllegalArgumentException("entry already stored in another array");
   }
   
+  private static IllegalStateException arrayIsEmpty() {
+    return new IllegalStateException("array is empty");
+  }
+  
   /*
   public void set(int key, Object value) {
     set((Object)key, value);
@@ -179,6 +183,21 @@ public final class Array implements Sequenceable, ArrayAccess {
   
   public void add(Object value) {
     set(nextIndex, value);
+  }
+  
+  public void push(Object value) {
+    set(nextIndex, value);
+  }
+  
+  public Entry pop() {
+    if (size == 0) {
+      throw arrayIsEmpty();
+    }
+    return remove(header.before.key);
+  }
+  
+  public Entry peek() {
+    return header.before;
   }
 
   private void resize(Entry[] table) {
@@ -195,7 +214,7 @@ public final class Array implements Sequenceable, ArrayAccess {
     threshold = newCapacity + newCapacity >> 1;
   }
 
-  public void remove(Object key) {
+  public Entry remove(Object key) {
     Entry[] table = this.table;
     int i = hashIndex(key, table.length);
     Entry prev = table[i];
@@ -212,13 +231,13 @@ public final class Array implements Sequenceable, ArrayAccess {
         
         e.before.after = e.after;
         e.after.before = e.before;
-        return;
+        return e;
       }
       prev = e;
       e = next;
     }
 
-    return ;
+    return null;
   }
   
   /*
@@ -317,12 +336,12 @@ public final class Array implements Sequenceable, ArrayAccess {
   }
   
   @Override
-  public Sequence entries() {
+  public Entry entries() {
     return sequence();
   }
   
   @Override
-  public Sequence sequence() {
+  public Entry sequence() {
     if (size == 0)
       return null;
     return header.after;

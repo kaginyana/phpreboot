@@ -4,23 +4,23 @@ import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.googlecode.phpreboot.interpreter.Scope;
+import com.googlecode.phpreboot.interpreter.EvalEnv;
 
 public class SQLEnv {
-  private final Scope scope;
+  private final EvalEnv evalEnv;
   private final Connection connection;
   private final ArrayList<Object> parameters =
     new ArrayList<Object>();
   private final StringBuilder builder =
     new StringBuilder();
   
-  public SQLEnv(Scope scope, Connection connection) {
-    this.scope = scope;
+  public SQLEnv(Connection connection, EvalEnv evalEnv) {
     this.connection = connection;
+    this.evalEnv = evalEnv;
   }
   
-  public Scope getScope() {
-    return scope;
+  public EvalEnv getEvalEnv() {
+    return evalEnv;
   }
   public Connection getConnection() {
     return connection;

@@ -10,6 +10,7 @@ priorities:
   unary = 5 left
   xml = 6 left
   ifelse = 7 right
+  xpath = 8 left
 
 tokens:
   let = 'let'
@@ -30,15 +31,19 @@ tokens:
   _break = 'break'
   _continue = 'continue'
   echo = 'echo'
+  
+  //xpath slash, must be before numeric slash
+  xpath_slash = '\/'  [xpath]
+  
   dot = '\.'
   comma = ','
   colon = ':'
-  assign = '='
+  assign = '='  [eq]    // needed for xpath
   plus = '\+'   [plus]
   minus = '-'   [plus]
   mult = '\*'   [mult]
-  div = '\/'    [mult]
-  mod = '%'     [mult]
+  slash = '\/'  [mult]
+  rem = '%'     [mult]
   eq = '=='     [eq]
   ne = '!='     [eq]
   lt = '<'  [eq]
@@ -98,12 +103,23 @@ tokens:
   end_regex = '\/'
   regex_anycharacter = '([!#$%&*+,:;<=>?@_`~]|\u0022|\u0027|\(|\)|-|\.|\[|\]|\^|\{|\}|\\\/|[0-9]|[A-Z]|[a-z])+'
   
+  // xpath
+  double_slash = '\/\/'  [xpath]
+  dotdot = '\.\.'
+  double_colon = '::'
+  div = 'div'   [mult]
+  mod = 'mod'   [mult]
+  at = '@'
+  in = 'in'
+  node_type = 'text|node'
+  axis_name = 'ancestor|ancestor-or-self|attribute|child|descendant|descendant-or-self|following|following-sibling|namespace|parent|preceding|preceding-sibling|self'
+  
   null_literal = 'null'
   bool_literal = 'true|false'
   value_literal = '([0-9]+(\.([0-9])+)?)|(0[xX][0-9a-fA-F]+)'
   string_literal = '(\u0022([^\u0022])*\u0022)|(\u0027([^\u0027])*\u0027)'
   id = '[A-Za-z_][A-Za-z0-9_]*'
-  text = '[^<${]+'          [xml]
+  xml_text = '[^<${]+'          [xml]
   eoln = '(\r)?\n'
   
 blanks:
@@ -121,7 +137,7 @@ types:
   'string_literal': String
   'lcurl': void
   'rcurl': void
-  'text': String
+  'xml_text': String
   
 attributes:
   symbol: com.googlecode.phpreboot.model.Symbol
@@ -285,7 +301,7 @@ productions:
         ;
        
    content = content xmls                     { content_xmls }
-           | content 'text'                   { content_text }
+           | content 'xml_text'               { content_text }
            | content block                    { content_block }
            | content dollar_access            { content_dollar_access }
            |                                  { content_empty }

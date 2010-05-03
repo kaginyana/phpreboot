@@ -1,0 +1,35 @@
+  
+tokens:
+//  select = 'select'
+
+productions:
+  expr +=  scheme? authority? path query? fragment?        { expr_uri }
+         ;
+         
+  scheme = 'id' ':'
+         ;
+         
+  authority = '//' user_info? host port?
+            ;
+  
+  user_info = 'id' '@'
+            | 'id' ':' 'id' '@'
+            ;
+         
+  host = qualified_name
+       | IPV4_address
+       | IPV6_address
+       ;       
+            
+  port = ':' [0-9]+
+       ;
+       
+  path = '/' 'id'/'/'*
+       ;
+       
+  query = '?' 'id'
+        ;
+        
+  fragment = '#' 'id'
+           ;
+  

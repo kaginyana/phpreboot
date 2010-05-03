@@ -16,10 +16,10 @@ import java.util.Map;
 import java.util.Set;
 
 public class JavaBridge {
-  /*
   public static Iterator<Object> iterator(final Sequence sequence) {
     if (sequence == null)
       return Collections.emptyIterator();
+    
     return new Iterator<Object>() {
       private Sequence seq = sequence;
       
@@ -30,8 +30,9 @@ public class JavaBridge {
       
       @Override
       public Object next() {
+        Object value = seq.getValue();
         seq = seq.next();
-        return seq.getValue();
+        return value;
       }
       
       @Override
@@ -41,6 +42,35 @@ public class JavaBridge {
     };
   }
   
+  public static Iterator<Array.Entry> entryIterator(final Array.Entry sequence) {
+    if (sequence == null) {
+      return Collections.emptyIterator();
+    }
+    return new Iterator<Array.Entry >() {
+      private Array.Entry seq = sequence;
+      
+      @Override
+      public boolean hasNext() {
+        return seq != null;
+      }
+      
+      @Override
+      public Array.Entry next() {
+        // Warning: copy is not needed because array sequence doesn't mutate
+        //          the sequence object,
+        Array.Entry entry = seq; 
+        seq = seq.next();
+        return entry;
+      }
+      
+      @Override
+      public void remove() {
+        throw new UnsupportedOperationException();
+      }
+    };
+  }
+ 
+  /*
   public static Iterable<Object> iterable(final Sequenceable sequenceable) {
     return new Iterable<Object>() {
       @Override

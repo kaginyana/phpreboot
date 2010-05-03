@@ -1,0 +1,18 @@
+xml = <root>
+      <foo>
+        Text1
+        <bar attr="1"><baz/>Text2</bar>
+        <bar/>
+      </foo>
+    </root>
+    
+echo xml    
+    
+nodes1 = for unused in xml/foo/bar[2]
+echo nodes1
+nodes2 = for unused in xml/*/text()
+echo nodes2
+nodes3 = for unused in xml//@attr
+echo nodes3
+
+

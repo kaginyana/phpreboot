@@ -62,8 +62,8 @@ import com.googlecode.phpreboot.parser.ProductionEnum;
 import com.googlecode.phpreboot.runtime.SQLCursor;
 
 public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException> {
-  public void executeQuery(Connection connection, Sql sql, Scope scope) {
-    SQLEnv env = new SQLEnv(scope, connection);
+  public void executeQuery(Sql sql, Connection connection, EvalEnv evalEnv) {
+    SQLEnv env = new SQLEnv(connection, evalEnv);
     tree(sql, env);
   }
   
@@ -143,7 +143,7 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException> {
     
     SQLCursor cursor = (resultSet == null)? null: new SQLCursor(resultSet);
     
-    Scope scope = env.getScope();
+    Scope scope = env.getEvalEnv().getScope();
     Var scriptVar = scope.lookup(name);
     if (scriptVar == null) {
       scriptVar = new Var(name, false, cursor);
@@ -199,7 +199,7 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException> {
     
     StringBuilder builder = env.getBuilder();
     for(Expr expr: insert_statement.getExprPlus()) {
-      Object exprValue = Evaluator.INSTANCE.eval(expr, new EvalEnv(env.getScope(), null, null));
+      Object exprValue = Evaluator.INSTANCE.eval(expr, env.getEvalEnv());
       env.getParameters().add(exprValue);
       builder.append("?, ");
     }
@@ -476,7 +476,7 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException> {
   
   @Override
   public Void visit(ConditionValueLiteral condition_value_literal, SQLEnv env) {
-    Object value = Evaluator.INSTANCE.eval(condition_value_literal.getSingleLiteral(), new EvalEnv(env.getScope(), null, null));
+    Object value = Evaluator.INSTANCE.eval(condition_value_literal.getSingleLiteral(), env.getEvalEnv());
     env.getParameters().add(value);
     env.append("?");
     return null;
@@ -494,7 +494,7 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException> {
   }
   @Override
   public Void visit(ConditionValueDollarAccess condition_value_dollar_access,SQLEnv env) {
-    Object value = Evaluator.INSTANCE.eval(condition_value_dollar_access.getDollarAccess(), new EvalEnv(env.getScope(), null, null));
+    Object value = Evaluator.INSTANCE.eval(condition_value_dollar_access.getDollarAccess(), env.getEvalEnv());
     env.getParameters().add(value);
     env.append("?");
     return null;

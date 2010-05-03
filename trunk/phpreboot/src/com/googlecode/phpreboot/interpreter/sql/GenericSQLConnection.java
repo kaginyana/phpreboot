@@ -5,7 +5,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 import com.googlecode.phpreboot.ast.Sql;
-import com.googlecode.phpreboot.interpreter.Scope;
+import com.googlecode.phpreboot.interpreter.EvalEnv;
 
 public class GenericSQLConnection implements SQLConnection {
   private final String connectionURL;
@@ -18,7 +18,7 @@ public class GenericSQLConnection implements SQLConnection {
   }
   
   @Override
-  public void executeStatement(Sql sql, Scope scope) {
+  public void executeStatement(Sql sql, EvalEnv evalEnv) {
     if (connection == null) {
       try {
         connection = DriverManager.getConnection(connectionURL);
@@ -26,7 +26,7 @@ public class GenericSQLConnection implements SQLConnection {
         throw new RuntimeException(e);
       }
     }
-    sqlTreeVisitor.executeQuery(connection, sql, scope);
+    sqlTreeVisitor.executeQuery(sql, connection, evalEnv);
   }
 
   public void close() {

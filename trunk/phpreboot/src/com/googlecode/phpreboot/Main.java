@@ -13,11 +13,10 @@ import java.util.EnumMap;
 import java.util.Iterator;
 
 import com.googlecode.phpreboot.doc.Doclet;
-import com.googlecode.phpreboot.interpreter.Interpreter;
+import com.googlecode.phpreboot.interpreter.Analyzer;
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.interpreter.sql.GenericSQLConnection;
 import com.googlecode.phpreboot.model.Var;
-import com.googlecode.phpreboot.tools.Analyzers;
 import com.googlecode.phpreboot.webserver.WebScriptDispatcher;
 import com.sun.grizzly.http.embed.GrizzlyWebServer;
 
@@ -164,9 +163,8 @@ public class Main {
     Scope rootScope = new Scope(null);
     rootScope.register(new Var("SQL_CONNECTION", true, sqlConnection));
 
-    Interpreter interpreter = new Interpreter(writer, rootScope);
     try {
-      Analyzers.run(reader, interpreter, interpreter, null, null);
+      Analyzer.analyze(reader, writer, rootScope);
     } catch(Throwable t) {
       if (verbose)
         t.printStackTrace(System.err);

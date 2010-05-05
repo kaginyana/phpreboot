@@ -15,6 +15,7 @@ import com.googlecode.phpreboot.ast.ElseIf;
 import com.googlecode.phpreboot.ast.EnableLineComment;
 import com.googlecode.phpreboot.ast.Eoi;
 import com.googlecode.phpreboot.ast.Expr;
+import com.googlecode.phpreboot.ast.Flwor;
 import com.googlecode.phpreboot.ast.Fun;
 import com.googlecode.phpreboot.ast.Funcall;
 import com.googlecode.phpreboot.ast.IdToken;
@@ -22,7 +23,6 @@ import com.googlecode.phpreboot.ast.Instr;
 import com.googlecode.phpreboot.ast.Label;
 import com.googlecode.phpreboot.ast.LabeledInstr;
 import com.googlecode.phpreboot.ast.LcurlToken;
-import com.googlecode.phpreboot.ast.LocationPath;
 import com.googlecode.phpreboot.ast.Member;
 import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.ast.NodeTypeToken;
@@ -58,7 +58,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
   // --- helper methods
   
   private void eval(Node node) {
-    Evaluator.INSTANCE.eval(node, new EvalEnv(currentScope, this, echoer, null));
+    Evaluator.INSTANCE.eval(node, new EvalEnv(currentScope, echoer, null));
   }
 
   // --- terminal evaluator
@@ -304,18 +304,17 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     enableLineComment = true;
     return null;
   }
+  
   @Override
-  public Instr instr_xpath(IdToken id, Action action, IdToken id2, DisableLineComment disable_line_comment, IdToken id3, LocationPath location_path, EnableLineComment enable_line_comment, Eoi eoi) {
-    Instr instr_xpath = super.instr_xpath(id, action, id2, disable_line_comment, id3,
-        location_path, enable_line_comment, eoi);
+  public Instr instr_flwor(Flwor flwor, Eoi eoi) {
+    Instr instr_flwor = super.instr_flwor(flwor, eoi);
     interpreter--;   // match with action()
     if (interpreter != 0)
-      return instr_xpath;
+      return instr_flwor;
     
-    eval(instr_xpath);
+    eval(instr_flwor);
     return null;
   }
-  
   
   // --- function declaration & lambda
   

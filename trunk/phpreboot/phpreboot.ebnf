@@ -202,8 +202,11 @@ productions:
              
   declaration = type 'id'              { declaration_type_empty }
               | type 'id' '=' expr     { declaration_type_init }
-              | 'let' 'id' '=' expr    { declaration_let }
-              ;           
+              | let_declaration        { declaration_let }
+              ;
+              
+  let_declaration = 'let' 'id' '=' expr    { let_declaration }
+                  ;                      
      
   funcall = 'id' '(' expr/'comma'* ')'     { funcall_call }
           | primary '(' expr/'comma'* ')'  { funcall_apply }  

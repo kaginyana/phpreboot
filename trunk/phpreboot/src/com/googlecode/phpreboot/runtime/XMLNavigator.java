@@ -10,7 +10,7 @@ import org.jaxen.XPath;
 
 
 @SuppressWarnings("serial")
-public class XPathNavigator extends DefaultNavigator {
+public class XMLNavigator extends DefaultNavigator {
   @Override
   public boolean isDocument(Object node) {
     return false;

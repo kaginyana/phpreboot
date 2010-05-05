@@ -1,9 +1,18 @@
 package com.googlecode.phpreboot.xpath;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 
+import org.jaxen.Context;
+import org.jaxen.ContextSupport;
 import org.jaxen.JaxenException;
+import org.jaxen.SimpleNamespaceContext;
+import org.jaxen.SimpleVariableContext;
+import org.jaxen.XPathFunctionContext;
+import org.jaxen.expr.DefaultXPathFactory;
 import org.jaxen.expr.Expr;
 import org.jaxen.expr.LocationPath;
 import org.jaxen.expr.Step;
@@ -17,6 +26,11 @@ import com.googlecode.phpreboot.ast.AbsoluteLocationPathRelative;
 import com.googlecode.phpreboot.ast.AbsoluteLocationPathSlash;
 import com.googlecode.phpreboot.ast.AxisSpecifierAbbreviated;
 import com.googlecode.phpreboot.ast.AxisSpecifierName;
+import com.googlecode.phpreboot.ast.Flwor;
+import com.googlecode.phpreboot.ast.ForClause;
+import com.googlecode.phpreboot.ast.ForOrLet;
+import com.googlecode.phpreboot.ast.ForOrLetFor;
+import com.googlecode.phpreboot.ast.ForOrLetLet;
 import com.googlecode.phpreboot.ast.IdToken;
 import com.googlecode.phpreboot.ast.LocationPathAbsolute;
 import com.googlecode.phpreboot.ast.LocationPathRelative;
@@ -35,14 +49,21 @@ import com.googlecode.phpreboot.ast.StepDoubleDot;
 import com.googlecode.phpreboot.ast.StepNodeTest;
 import com.googlecode.phpreboot.ast.StepNodeTestAxis;
 import com.googlecode.phpreboot.ast.Visitor;
+import com.googlecode.phpreboot.ast.Xorderby;
 import com.googlecode.phpreboot.ast.XpathExpr;
 import com.googlecode.phpreboot.ast.XpathExprDollarAccess;
 import com.googlecode.phpreboot.ast.XpathExprLocationPath;
 import com.googlecode.phpreboot.ast.XpathLiteral;
+import com.googlecode.phpreboot.ast.Xwhere;
 import com.googlecode.phpreboot.interpreter.EvalEnv;
 import com.googlecode.phpreboot.interpreter.Evaluator;
+import com.googlecode.phpreboot.interpreter.Scope;
+import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.parser.ProductionEnum;
+import com.googlecode.phpreboot.runtime.Array;
 import com.googlecode.phpreboot.runtime.RT;
+import com.googlecode.phpreboot.runtime.XML;
+import com.googlecode.phpreboot.runtime.XMLNavigator;
 
 public class XPathExprVisitor extends Visitor<Object, XPathExprEnv, JaxenException> {
   private XPathExprVisitor() {
@@ -63,8 +84,139 @@ public class XPathExprVisitor extends Visitor<Object, XPathExprEnv, JaxenExcepti
   
   // ---
   
+  public Object flwor(Flwor flwor, EvalEnv evalEnv) {
+    Scope scope = evalEnv.getScope();
+    String newVarName = flwor.getId().getValue();
+    if (scope.localExists(newVarName)) {
+      throw RT.error("variable %s already exists", newVarName);
+    }
+    
+    EvalEnv newEnv = new EvalEnv(new Scope(evalEnv.getScope()), evalEnv.getEchoer(), evalEnv.getLabel());
+    
+    Iterator<ForOrLet> it = flwor.getForOrLetPlus().iterator();
+    ArrayList<Object> arrayList = new ArrayList<Object>();
+    forOrLets(it, flwor.getXwhereOptional(), flwor.getExpr(), arrayList, newEnv);
+    
+    Xorderby xorderby = flwor.getXorderbyOptional();
+    if (xorderby != null) {
+      //orderBy(arrayList, name, xorderby, newEnv);
+      throw RT.error("xquery 'order by' is not supported yet");
+    }
+    
+    Var var = new Var(newVarName, true, toArray(arrayList));
+    scope.register(var);
+    return null;
+  }
   
-  public XPathExpr xpathExpr(XPathFactory factory, Node node, EvalEnv evalEnv) throws JaxenException {
+  private void forOrLets(Iterator<ForOrLet> forOrLets, Xwhere xwhere, com.googlecode.phpreboot.ast.Expr returnExpr, ArrayList<Object> list, EvalEnv env) {
+    if (!forOrLets.hasNext()) {
+      if (xwhere != null && !filter(xwhere, env)) {
+        return;
+      }
+      list.add(Evaluator.INSTANCE.eval(returnExpr, env));
+      return;
+    }
+    
+    ForOrLet forOrLet = forOrLets.next();
+    if (forOrLet instanceof ForOrLetLet) { // it's a let
+      Evaluator.INSTANCE.eval(forOrLet, env);
+      forOrLets(forOrLets, xwhere, returnExpr, list, env);
+    } else {
+      ForClause forClause = ((ForOrLetFor)forOrLet).getForClause();
+      String name = forClause.getId().getValue();
+      Scope scope = env.getScope();
+      if (scope.localExists(name)) {
+        throw RT.error("variable %s already defined", name);
+      }
+      
+      Var varLoop = new Var(name, false/*FIXME*/, null); 
+      scope.register(varLoop);
+      for(Object o: forClause(forClause, env)) {
+        varLoop.setValue(o);
+        forOrLets(forOrLets, xwhere, returnExpr, list, env);
+      }
+    }
+  }
+  
+  private List<Object> forClause(ForClause forClause, EvalEnv evalEnv) {
+    String rootvarName = forClause.getId2().getValue();
+    Var rootVar = evalEnv.getScope().lookup(rootvarName);
+    Object node = rootVar.getValue();
+    if (!(node instanceof XML)) {
+      throw RT.error("variable %s value must be a XML tree: %s", rootvarName, node);
+    }
+    
+    //XPathEnv xpathEnv = new XPathEnv(evalEnv);
+    //String xpathExpr = XPathVisitor.INSTANCE.xpath(instr_xpath.getLocationPath(), xpathEnv).toString();
+    //System.err.println("xpath eval "+xpathExpr);
+    
+    ContextSupport support = new ContextSupport( 
+        new SimpleNamespaceContext(),
+        XPathFunctionContext.getInstance(),
+        new SimpleVariableContext(),
+        new XMLNavigator());
+    Context context = new Context( support );
+    context.setNodeSet(Collections.singletonList(node));
+    
+    try {
+      XPathExpr xpathExpr = xpathExpr(new DefaultXPathFactory(), forClause.getLocationPath(), evalEnv);
+      //System.out.println("xpath expr: "+xpathExpr);
+      return xpathExpr.asList(context);
+    } catch (JaxenException e) {
+      //throw RT.error("xpath evaluation error %s", xpathExpr);  
+      throw RT.error(e);
+    }
+  }
+  
+  private boolean filter(Xwhere xwhere, EvalEnv env) {
+    Object condition = Evaluator.INSTANCE.eval(xwhere.getExpr(), env);
+    if (!(condition instanceof Boolean)) {
+      throw RT.error("where condition must be a boolean: %s", condition);
+    }
+    return (Boolean)condition;
+  }
+  
+  private void orderBy(List<Object> list, String name, Xorderby xorderby, final EvalEnv env) {
+    final List<com.googlecode.phpreboot.ast.Expr> exprs = xorderby.getExprPlus();
+    Scope scope = new Scope(env.getScope());
+    final Var var = new Var(name, false, null);
+    scope.register(var);
+    final EvalEnv newEnv = new EvalEnv(scope, env.getEchoer(), env.getLabel());
+    
+    Comparator<Object> comparator = new Comparator<Object>() {
+      @Override
+      public int compare(Object o1, Object o2) {
+        for(com.googlecode.phpreboot.ast.Expr expr: exprs) {
+          Object key1 = Evaluator.INSTANCE.eval(expr, newEnv);
+          var.setValue(o2);
+          Object key2 = Evaluator.INSTANCE.eval(expr, newEnv);
+          
+          int compare;
+          if (key1.getClass() == key2.getClass() && key1 instanceof Comparable<?>) {  // nullcheck
+            compare = ((Comparable)key1).compareTo(key1);
+          } else {
+            compare = key1.toString().compareTo(key2.toString());
+          }
+          if (compare != 0)
+            return compare;
+        }
+        return 0;
+      }
+    };
+    
+    Collections.sort(list, comparator);
+  }
+  
+  private Array toArray(List<?> list) {
+    Array array = new Array();
+    for(Object o: list) {
+      array.add(o);
+    }
+    return array;
+  }
+  
+  
+  private XPathExpr xpathExpr(XPathFactory factory, Node node, EvalEnv evalEnv) throws JaxenException {
     Expr expr = (Expr)xpath(node, new XPathExprEnv(factory, Axis.INVALID_AXIS, evalEnv));
     return factory.createXPath(expr);
   }

@@ -8,11 +8,12 @@ xml = <root>
     
 echo xml    
     
-nodes1 = for unused in xml/foo/bar[2]
+nodes1 = for i in xml/foo/bar[2] return i
 echo nodes1
-nodes2 = for unused in xml/*/text()
+nodes2 = for i in xml/*/text() return i
 echo nodes2
-nodes3 = for unused in xml//@attr
+nodes3 = for i in xml//@attr return i
 echo nodes3
+
 
 

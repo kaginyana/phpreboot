@@ -16,6 +16,7 @@ import com.googlecode.phpreboot.tools.TerminalEvaluator;
 import fr.umlv.tatoo.runtime.buffer.impl.LocationTracker;
 import fr.umlv.tatoo.runtime.buffer.impl.ReaderWrapper;
 import fr.umlv.tatoo.runtime.lexer.RuleActivator;
+import fr.umlv.tatoo.runtime.tools.Debug;
 import fr.umlv.tatoo.runtime.tools.SemanticStack;
 import fr.umlv.tatoo.runtime.tools.builder.Builder.AnalyzerParserBuilder;
 
@@ -62,8 +63,10 @@ public class Analyzer {
     Interpreter interpreter = new Interpreter(writer, rootScope);
     ReaderWrapper buffer = new ReaderWrapper(reader, new LocationTracker());
     
-    TerminalEvaluator<CharSequence> terminalEvaluator = /*Debug.createTraceProxy(TerminalEvaluator.class,*/interpreter/*)*/;
-    GrammarEvaluator grammarEvaluator = /*Debug.createTraceProxy(GrammarEvaluator.class,*/interpreter/*)*/;
+    //TerminalEvaluator<CharSequence> terminalEvaluator = Debug.createTraceProxy(TerminalEvaluator.class, interpreter);
+    //GrammarEvaluator grammarEvaluator = Debug.createTraceProxy(GrammarEvaluator.class, interpreter);
+    TerminalEvaluator<CharSequence> terminalEvaluator = interpreter;
+    GrammarEvaluator grammarEvaluator = interpreter;
     AnalyzerParserBuilder<RuleEnum, ReaderWrapper, TerminalEnum, NonTerminalEnum, ProductionEnum, VersionEnum> builder =
       Analyzers.analyzerTokenBufferBuilder(buffer,
           terminalEvaluator,

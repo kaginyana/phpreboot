@@ -1,19 +1,7 @@
 package com.googlecode.phpreboot.runtime;
 
-import java.dyn.MethodHandle;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.util.AbstractList;
-import java.util.AbstractMap;
-import java.util.AbstractSequentialList;
-import java.util.AbstractSet;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
-import java.util.List;
-import java.util.ListIterator;
-import java.util.Map;
-import java.util.Set;
 
 public class JavaBridge {
   public static Iterator<Object> iterator(final Sequence sequence) {
@@ -56,8 +44,7 @@ public class JavaBridge {
       
       @Override
       public Array.Entry next() {
-        // Warning: copy is not needed because array sequence doesn't mutate
-        //          the sequence object,
+        // no defensive copy here
         Array.Entry entry = seq; 
         seq = seq.next();
         return entry;

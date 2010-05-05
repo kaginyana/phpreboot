@@ -377,18 +377,6 @@ public class RT {
     return left >= right;
   }
   
-  public static Sequence foreach_expression(Object value) {
-    if (value == null)
-      return null;
-    if (value instanceof Array) {
-      return ((Array)value).sequence();
-    }
-    if (value instanceof Sequence) {
-      return (Sequence)value; 
-    }
-    throw RT.error("foreach needs a sequence or an array: %s", value);
-  }
-  
   
   // --- conversions
   
@@ -497,6 +485,11 @@ public class RT {
       return sequenceToArray((Sequence)o);
     }
     
+    // entry to array
+    if (o instanceof Array.Entry) {
+      return entryToArray((Array.Entry)o);
+    }
+    
     //Java conversions
     if (o instanceof Object[]) {
       return objectArrayToArray((Object[])o);
@@ -521,6 +514,11 @@ public class RT {
     for(;sequence!=null; sequence = sequence.next()) {
       array.set(sequence.getKey(), sequence.getValue());
     }
+    return array;
+  }
+  private static Array entryToArray(Array.Entry entry) {
+    Array array = new Array();
+    array.set(entry.getKey(), entry.getValue());
     return array;
   }
   private static Array objectArrayToArray(Object[] objects) {
@@ -560,9 +558,13 @@ public class RT {
     return array;
   }
   
-  public static Object toSequence(Object o) {
+  public static Sequence toSequence(Object o) {
     Class<?> clazz = o.getClass(); // nullcheck
     
+    if (o instanceof XML) {
+      Array array= ((XML)o).elements;
+      return (array == null)?null:filterValue(array.sequence(), Filter.AS_XML);
+    }
     if (o instanceof Sequenceable) {
       return ((Sequenceable)o).sequence();
     }
@@ -677,6 +679,56 @@ public class RT {
     };
   }
   
+  // ---
+  
+  static abstract class Filter {
+    abstract boolean filter(Object o);
+    
+    static final Filter AS_XML = new Filter() {
+      @Override
+      boolean filter(Object o) {
+        return o instanceof XML;
+      }
+    };
+  }
+  
+  private static Sequence filterValue(final Sequence sequence, final Filter filter) {
+    if (sequence == null)
+      return null;
+    
+    return new Sequence() {
+      private Sequence seq = sequence;
+      
+      @Override
+      public Sequence next() {
+        seq = seq.next();
+        return search();
+      }
+      
+      Sequence search() {
+        do {
+          Object value = seq.getValue();
+          if (filter.filter(value)) {
+            return this;
+          }
+          seq = seq.next();
+        } while(seq != null);
+        return null;
+      }
+      
+      @Override
+      public Object getValue() {
+        return seq.getValue();
+      }
+      
+      @Override
+      public Object getKey() {
+        return seq.getKey();
+      }
+    }.search();
+  }
+  
+  
   // --- escape ---
   
   
@@ -716,6 +768,7 @@ public class RT {
   private final static MethodHandle array_set;
   private final static MethodHandle array_access_get;
   private final static MethodHandle test_receiver_asArray;
+  private final static MethodHandle test_receiver_asArrayAccess;
   private final static MethodHandle test_receiver_and_key;
   private final static MethodHandle slowPathArraySet;
   private final static MethodHandle slowPathArrayGet;
@@ -733,6 +786,8 @@ public class RT {
     
     test_receiver_asArray = lookup.findStatic(RT.class, "test_receiver_asArray",
         MethodType.methodType(boolean.class, Object.class));
+    test_receiver_asArrayAccess = lookup.findStatic(RT.class, "test_receiver_asArrayAccess",
+        MethodType.methodType(boolean.class, Object.class));
     test_receiver_and_key = lookup.findStatic(RT.class, "test_receiver_and_key",
         MethodType.methodType(boolean.class, Class.class, Object.class, Object.class));
     
@@ -747,6 +802,10 @@ public class RT {
     return refValue instanceof Array;
   }
   
+  public static boolean test_receiver_asArrayAccess(Object refValue) {
+    return refValue instanceof ArrayAccess;
+  }
+  
   public static boolean test_receiver_and_key(Class<?> receiverClass, Object refValue, Object key) {
     return key instanceof String && receiverClass.isInstance(refValue);
   }
@@ -754,11 +813,9 @@ public class RT {
   public static void slowPathArraySet(CallSite callsite, boolean keyMustExist, Object refValue, Object key, Object value) {
     Class<?> refClass = refValue.getClass(); // also nullcheck
     
-    MethodHandle mh;
-    MethodHandle test;
     String name;
     if (key instanceof String && (!(name = (String)key).isEmpty())) {
-      mh = MethodResolver.findSetter(refClass, name);
+      MethodHandle mh = MethodResolver.findSetter(refClass, name);
       if (mh != null) {
         mh = MethodHandles.convertArguments(mh,  
             MethodType.methodType(void.class, Object.class, Object.class));
@@ -769,7 +826,7 @@ public class RT {
           throw RT.error(e);
         }
         mh = MethodHandles.dropArguments(mh, 1, Object.class);
-        test = MethodHandles.insertArguments(test_receiver_and_key, 0, refClass);
+        MethodHandle test = MethodHandles.insertArguments(test_receiver_and_key, 0, refClass);
         mh = MethodHandles.guardWithTest(test, mh, callsite.getTarget());
         callsite.setTarget(mh);
         return;
@@ -785,11 +842,7 @@ public class RT {
         throw RT.error("member %s doesn't exist for array: %s", key, array);
       }
       entry.value = value; 
-
-      mh = array_set;
-      test = test_receiver_asArray;
-
-      mh = MethodHandles.guardWithTest(test, mh, callsite.getTarget());
+      MethodHandle mh = MethodHandles.guardWithTest(test_receiver_asArray, array_set, callsite.getTarget());
       callsite.setTarget(mh);
       return;
     } 
@@ -828,11 +881,9 @@ public class RT {
   public static Object slowPathArrayGet(CallSite callsite, boolean keyMustExist, Object refValue, Object key) {
     Class<?> refClass = refValue.getClass(); // also nullcheck
     
-    MethodHandle mh;
-    MethodHandle test;
     String name;
     if (key instanceof String && (!(name = (String)key).isEmpty())) {
-      mh = MethodResolver.findGetter(refClass, name);
+      MethodHandle mh = MethodResolver.findGetter(refClass, name);
       if (mh == null) {
         mh = MethodResolver.findMethodHandle(refClass, name, 0);
       }
@@ -847,7 +898,7 @@ public class RT {
           throw RT.error(e);
         }
         mh = MethodHandles.dropArguments(mh, 1, Object.class);
-        test = MethodHandles.insertArguments(test_receiver_and_key, 0, refClass);
+        MethodHandle test = MethodHandles.insertArguments(test_receiver_and_key, 0, refClass);
         mh = MethodHandles.guardWithTest(test, mh, callsite.getTarget());
         callsite.setTarget(mh);
         return result;
@@ -861,10 +912,7 @@ public class RT {
         throw RT.error("member %s doesn't exist for array: %s", key, arrayAccess);
       }
       
-      mh = array_access_get;
-      test = test_receiver_asArray;
-
-      mh = MethodHandles.guardWithTest(test, mh, callsite.getTarget());
+      MethodHandle mh = MethodHandles.guardWithTest(test_receiver_asArrayAccess, array_access_get, callsite.getTarget());
       callsite.setTarget(mh);
       return result;
     } 

@@ -1,6 +1,7 @@
 package com.googlecode.phpreboot.test;
 
 import com.googlecode.phpreboot.runtime.Array;
+import com.googlecode.phpreboot.runtime.RT;
 import com.googlecode.phpreboot.runtime.Sequence;
 import com.googlecode.phpreboot.runtime.XML;
 
@@ -26,7 +27,7 @@ public class XMLTest {
     user2.elements().add(description);
     
     
-    Sequence seq = root.sequence();
+    Sequence seq = RT.toSequence(root);
     for(;seq != null; seq = seq.next()) {
       System.out.println("key= "+seq.getKey()+" value= "+seq.getValue());
     }

@@ -4,19 +4,9 @@ import java.dyn.MethodHandle;
 import java.dyn.MethodHandles;
 import java.dyn.MethodType;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import org.jaxen.Context;
-import org.jaxen.ContextSupport;
-import org.jaxen.JaxenException;
-import org.jaxen.SimpleNamespaceContext;
-import org.jaxen.SimpleVariableContext;
-import org.jaxen.XPathFunctionContext;
-import org.jaxen.expr.DefaultXPathFactory;
-import org.jaxen.expr.XPathExpr;
 
 import com.googlecode.phpreboot.ast.ArrayEntry;
 import com.googlecode.phpreboot.ast.ArrayValue;
@@ -72,12 +62,12 @@ import com.googlecode.phpreboot.ast.Instr;
 import com.googlecode.phpreboot.ast.InstrBreak;
 import com.googlecode.phpreboot.ast.InstrContinue;
 import com.googlecode.phpreboot.ast.InstrEcho;
+import com.googlecode.phpreboot.ast.InstrFlwor;
 import com.googlecode.phpreboot.ast.InstrIf;
 import com.googlecode.phpreboot.ast.InstrLabeled;
 import com.googlecode.phpreboot.ast.InstrReturn;
 import com.googlecode.phpreboot.ast.InstrSql;
 import com.googlecode.phpreboot.ast.InstrXmls;
-import com.googlecode.phpreboot.ast.InstrXpath;
 import com.googlecode.phpreboot.ast.Label;
 import com.googlecode.phpreboot.ast.LabelId;
 import com.googlecode.phpreboot.ast.LabeledInstrDoWhile;
@@ -85,6 +75,7 @@ import com.googlecode.phpreboot.ast.LabeledInstrFor;
 import com.googlecode.phpreboot.ast.LabeledInstrForeach;
 import com.googlecode.phpreboot.ast.LabeledInstrForeachEntry;
 import com.googlecode.phpreboot.ast.LabeledInstrWhile;
+import com.googlecode.phpreboot.ast.LetDeclaration;
 import com.googlecode.phpreboot.ast.LiteralArray;
 import com.googlecode.phpreboot.ast.LiteralArrayEntry;
 import com.googlecode.phpreboot.ast.LiteralBool;
@@ -116,7 +107,6 @@ import com.googlecode.phpreboot.runtime.Array;
 import com.googlecode.phpreboot.runtime.RT;
 import com.googlecode.phpreboot.runtime.Sequence;
 import com.googlecode.phpreboot.runtime.XML;
-import com.googlecode.phpreboot.runtime.XPathNavigator;
 import com.googlecode.phpreboot.xpath.XPathExprVisitor;
 
 public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
@@ -204,7 +194,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     }
     
     Block block = function.getBlock();
-    EvalEnv evalEnv = new EvalEnv(scope, env.getInterpreter(), env.getEchoer(), null);
+    EvalEnv evalEnv = new EvalEnv(scope, env.getEchoer(), null);
     try {
       Evaluator.INSTANCE.eval(block, evalEnv);
     } catch(ReturnError e) {
@@ -372,7 +362,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Label label = instr_labeled.getLabel();
     if (label instanceof LabelId) {
       String labelText = ((LabelId)label).getId().getValue();
-      env = new EvalEnv(env.getScope(), env.getInterpreter(), env.getEchoer(), labelText);
+      env = new EvalEnv(env.getScope(), env.getEchoer(), labelText);
     }
     eval(instr_labeled.getLabeledInstr(), env);
     return null;
@@ -400,7 +390,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   @Override
   public Object visit(Block block, EvalEnv env) {
-    EvalEnv newEnv = new EvalEnv(new Scope(env.getScope()), env.getInterpreter(), env.getEchoer(), env.getLabel());
+    EvalEnv newEnv = new EvalEnv(new Scope(env.getScope()), env.getEchoer(), env.getLabel());
     for(Instr instr: block.getInstrStar()) {
       eval(instr, newEnv);
     }
@@ -409,7 +399,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   @Override
   public Object visit(InstrXmls instr_xmls, EvalEnv env) {
-    env.getInterpreter().getEchoer().echo(eval(instr_xmls.getXmls(), env));
+    env.getEchoer().echo(eval(instr_xmls.getXmls(), env));
     return null;
   }
   
@@ -564,7 +554,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   public Object visit(LabeledInstrForeach labeled_instr_foreach, EvalEnv env) {
     Expr expr = labeled_instr_foreach.getExpr();
     Object expression = eval(expr, env);
-    Sequence sequence = RT.foreach_expression(expression);
+    Sequence sequence = RT.toSequence(expression);
     if (sequence == null)
       return null;
     
@@ -574,7 +564,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     try {
       while(sequence != null) {
         Scope foreachScope = new Scope(env.getScope());
-        EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getInterpreter(), env.getEchoer(), env.getLabel());
+        EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getEchoer(), env.getLabel());
         foreachScope.register(new Var(name, true, sequence.getValue()));
         
         try {
@@ -594,7 +584,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   public Object visit(LabeledInstrForeachEntry labeled_instr_foreach_entry, EvalEnv env) {
     Expr expr = labeled_instr_foreach_entry.getExpr();
     Object expression = eval(expr, env);
-    Sequence sequence = RT.foreach_expression(expression);
+    Sequence sequence = RT.toSequence(expression);
     if (sequence == null)
       return null;
     
@@ -605,7 +595,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     try {
       while(sequence != null) {
         Scope foreachScope = new Scope(env.getScope());
-        EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getInterpreter(), env.getEchoer(), env.getLabel());
+        EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getEchoer(), env.getLabel());
         foreachScope.register(new Var(keyName, true, sequence.getKey()));
         foreachScope.register(new Var(valueName, true, sequence.getValue()));
         
@@ -624,15 +614,20 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   // --- declaration & assignment
   
+  
   @Override
-  public Object visit(DeclarationLet declaration_let, EvalEnv env) {
-    String name = declaration_let.getId().getValue();
+  public Object visit(LetDeclaration let_declaration, EvalEnv env) {
+    String name = let_declaration.getId().getValue();
     Scope scope = env.getScope();
     checkVar(name, scope);
-    Object value = eval(declaration_let.getExpr(), env);
+    Object value = eval(let_declaration.getExpr(), env);
     Var var = new Var(name, true, value);
     scope.register(var);
     return null;
+  }
+  @Override
+  public Object visit(DeclarationLet declaration_let, EvalEnv env) {
+    return eval(declaration_let.getLetDeclaration(), env);
   }
   @Override
   public Object visit(DeclarationTypeEmpty declaration_type_empty, EvalEnv env) {
@@ -738,6 +733,12 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   }
   
   @Override
+  public Object visit(InstrFlwor instr_flwor, EvalEnv evalEnv) {
+    return XPathExprVisitor.INSTANCE.flwor(instr_flwor.getFlwor(), evalEnv);
+  }
+  
+  /*
+  @Override
   public Object visit(InstrXpath instr_xpath, EvalEnv evalEnv) {
     Scope scope = evalEnv.getScope();
     String newVarName = instr_xpath.getId().getValue();
@@ -757,22 +758,17 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
         new SimpleNamespaceContext(),
         XPathFunctionContext.getInstance(),
         new SimpleVariableContext(),
-        new XPathNavigator());
+        new XMLNavigator());
     Context context = new Context( support );
     context.setNodeSet(Collections.singletonList(node));
     
     Array array = new Array();
     try {
       XPathExpr xpathExpr = XPathExprVisitor.INSTANCE.xpathExpr(new DefaultXPathFactory(), instr_xpath.getLocationPath(), evalEnv);
-      System.out.println("xpath expr: "+xpathExpr);
+      //System.out.println("xpath expr: "+xpathExpr);
       
       for(Object matchNode: xpathExpr.asList(context)) {
-        if (matchNode instanceof Array.Entry) {
-          Array.Entry entry = (Array.Entry)matchNode;
-          array.set(entry.getKey(), entry.getValue());
-        } else {
-          array.add(matchNode);
-        }
+        array.add(matchNode);
       }
     } catch (JaxenException e) {
       //throw RT.error("xpath evaluation error %s", xpathExpr);  
@@ -782,7 +778,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Var var = new Var(newVarName, true, array);
     scope.register(var);
     return null;
-  }
+  }*/
   
   // --- function call
   
@@ -1166,7 +1162,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   @Override
   public Object visit(ContentBlock content_block, EvalEnv env) {
     Array array = (Array)eval(content_block.getContent(), env);
-    EvalEnv xmlEnv = new EvalEnv(env.getScope(), env.getInterpreter(), Echoer.xmlEchoer(array), env.getLabel());
+    EvalEnv xmlEnv = new EvalEnv(env.getScope(), Echoer.xmlEchoer(array), env.getLabel());
     eval(content_block.getBlock(), xmlEnv);
     return array;
   }

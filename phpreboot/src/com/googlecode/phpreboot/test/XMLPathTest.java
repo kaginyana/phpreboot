@@ -4,7 +4,7 @@ import org.jaxen.BaseXPath;
 import org.jaxen.JaxenException;
 
 import com.googlecode.phpreboot.runtime.XML;
-import com.googlecode.phpreboot.runtime.XPathNavigator;
+import com.googlecode.phpreboot.runtime.XMLNavigator;
 
 public class XMLPathTest {
   public static void main(String[] args) throws JaxenException {
@@ -19,7 +19,7 @@ public class XMLPathTest {
     bar1.elements().add(barz);
     
     System.out.println(root);
-    BaseXPath xpath = new BaseXPath("*/bar", new XPathNavigator());
+    BaseXPath xpath = new BaseXPath("*/bar", new XMLNavigator());
     System.out.println(xpath.selectNodes(root));
   }
 }

@@ -4,7 +4,7 @@ import java.util.ArrayDeque;
 
 /* TODO add a parent
  */
-public class XML implements Sequenceable {
+public class XML implements /*Sequenceable,*/ ArrayAccess {
   private String name;
   /*lazy*/ Array attributes;
   /*lazy*/ Array elements;
@@ -36,6 +36,50 @@ public class XML implements Sequenceable {
   public void setName(String name) {
     name.getClass();  //nullcheck
     this.name = name;
+  }
+  
+  @Override
+  public Object get(Object key) {
+    if (!(key instanceof String)) {
+      return null;
+    }
+    Array elements = this.elements;
+    if (elements == null)
+      return null;
+    
+    for(Sequence seq = elements.sequence(); seq!=null; seq = seq.next()) {
+      Object value = seq.getValue();
+      if (value instanceof XML) {
+        XML xml = (XML)value;
+        if (xml.name.equals(key)) {
+          return contentAsValue(xml);
+        }
+      }
+    }
+    return null;
+  }
+  
+  // this method should never returns null
+  // because it will considered as a non existing content
+  private static Object contentAsValue(XML xml) {
+    Array elements = xml.elements;
+    int size;
+    if (elements == null || ((size = elements.size())==0))
+      return "";
+    
+    Sequence sequence = elements.sequence();
+    if (size == 1) {
+      return sequence.getValue();
+    }
+    
+    StringBuilder builder = new StringBuilder();
+    for(;sequence != null; sequence = sequence.next()) {
+      Object value = sequence.getValue();
+      if (value instanceof String) {
+        builder.append((String)value);
+      }
+    }
+    return builder.toString();
   }
   
   /** Returns the attributs of the XML markups
@@ -77,7 +121,7 @@ public class XML implements Sequenceable {
     return builder.toString();
   }
   
-  @Override
+  /*@Override
   public Sequence entries() {
     if (elements == null)
       return (elements = new Array()).entries();
@@ -126,5 +170,5 @@ public class XML implements Sequenceable {
         return this;
       }
     };
-  }
+  }*/
 }

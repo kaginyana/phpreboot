@@ -186,7 +186,7 @@ public final class Array implements Sequenceable, ArrayAccess {
   }
   
   public void push(Object value) {
-    set(nextIndex, value);
+    add(value);
   }
   
   public Entry pop() {

@@ -114,6 +114,17 @@ tokens:
   node_type = 'text|node'
   axis_name = 'ancestor|ancestor-or-self|attribute|child|descendant|descendant-or-self|following|following-sibling|namespace|parent|preceding|preceding-sibling|self'
   
+  // uri
+  root_dir = '[a-zA-Z]:\/'
+  http_scheme = 'http:\/\/'
+  ftp_scheme = 'ftp:\/\/'
+  file_scheme = 'file:\/\/' 
+  port_number = '[0-9]+'
+  path_literal = '[a-zA-Z0-9_]+\/[a-zA-Z0-9_]*'
+  path_id = '[^/ \t\r\n]+'
+  question_mark = '\?'
+  sharp = '#'
+  
   null_literal = 'null'
   bool_literal = 'true|false'
   value_literal = '([0-9]+(\.([0-9])+)?)|(0[xX][0-9a-fA-F]+)'
@@ -280,7 +291,7 @@ productions:
        | expr '+' expr                     [plus]     { expr_plus }
        | expr '-' expr                     [plus]     { expr_minus }
        | expr '*' expr                     [mult]     { expr_mult }
-       | expr '/' expr                     [mult]     { expr_div }
+       | expr 'slash' expr                 [mult]     { expr_div }
        | expr '%' expr                     [mult]     { expr_mod } 
        | expr '==' expr                    [eq]       { expr_eq }
        | expr '!=' expr                    [eq]       { expr_ne }

@@ -44,6 +44,7 @@ import com.googlecode.phpreboot.ast.ExprPrimary;
 import com.googlecode.phpreboot.ast.ExprRegexMatch;
 import com.googlecode.phpreboot.ast.ExprRegexReplace;
 import com.googlecode.phpreboot.ast.ExprToType;
+import com.googlecode.phpreboot.ast.ExprUri;
 import com.googlecode.phpreboot.ast.ExprXmls;
 import com.googlecode.phpreboot.ast.ForInit;
 import com.googlecode.phpreboot.ast.ForInitAssignment;
@@ -97,6 +98,7 @@ import com.googlecode.phpreboot.ast.Type;
 import com.googlecode.phpreboot.ast.Visitor;
 import com.googlecode.phpreboot.ast.XmlsEmptyTag;
 import com.googlecode.phpreboot.ast.XmlsStartEndTag;
+import com.googlecode.phpreboot.flwor.XPathExprVisitor;
 import com.googlecode.phpreboot.interpreter.sql.SQLConnection;
 import com.googlecode.phpreboot.model.Function;
 import com.googlecode.phpreboot.model.Parameter;
@@ -107,7 +109,7 @@ import com.googlecode.phpreboot.runtime.Array;
 import com.googlecode.phpreboot.runtime.RT;
 import com.googlecode.phpreboot.runtime.Sequence;
 import com.googlecode.phpreboot.runtime.XML;
-import com.googlecode.phpreboot.xpath.XPathExprVisitor;
+import com.googlecode.phpreboot.uri.URIVisitor;
 
 public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   @SuppressWarnings("serial")
@@ -900,6 +902,11 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   @Override
   public Object visit(ExprXmls expr_xmls, EvalEnv env) {
     return eval(expr_xmls.getXmls(), env);
+  }
+  
+  @Override
+  public Object visit(ExprUri expr_uri, EvalEnv env) {
+    return URIVisitor.INSTANCE.eval(expr_uri.getUri(), env);
   }
   
   @Override

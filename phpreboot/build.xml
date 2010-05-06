@@ -28,6 +28,7 @@
 			<inputfile unit="ebnf" file="sql.ebnf"/>
 			<inputfile unit="ebnf" file="regex.ebnf"/>
 			<inputfile unit="ebnf" file="xpath.ebnf"/>
+  	        <inputfile unit="ebnf" file="uri.ebnf"/>
 	    </inputfiles>
 		
 		<package lexer="com.googlecode.${ant.project.name}.lexer"/>

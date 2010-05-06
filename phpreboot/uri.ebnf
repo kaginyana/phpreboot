@@ -1,35 +1,78 @@
   
 tokens:
-//  select = 'select'
+//  root_dir = '[a-zA-Z]:\/'
+//  http_scheme = 'http:\/\/'
+//  ftp_scheme = 'ftp:\/\/'
+//  file_scheme = 'file:\/\/'
+//  file_scheme_slash = 'file:\/\/' 
+//  port_number = '[0-9]+'
+//  path_literal = '[a-zA-Z0-9_]+\/[a-zA-Z0-9_]*'
+//  path_id = '[^/ \t\r\n?#]+'
+//  question_mark = '\?'
+//  sharp = '#'
+  
+types:
+  'root_dir': char  
+  'path_literal': String
+  'path_id': String
+  'port_number': int
 
 productions:
-  expr +=  scheme? authority? path query? fragment?        { expr_uri }
-         ;
-         
-  scheme = 'id' ':'
-         ;
-         
-  authority = '//' user_info? host port?
-            ;
-  
-  user_info = 'id' '@'
-            | 'id' ':' 'id' '@'
-            ;
-         
-  host = qualified_name
-       | IPV4_address
-       | IPV6_address
-       ;       
-            
-  port = ':' [0-9]+
-       ;
-       
-  path = '/' 'id'/'/'*
-       ;
-       
-  query = '?' 'id'
+  expr +=  uri   { expr_uri } 
         ;
+       
+  uri = absolute_uri   { uri_absolute }
+      | path           { uri_path }
+      ;
+      
+  absolute_uri = scheme host port? absolute_path uri_query? fragment?   { absolute_uri }
+               ;
+  
+  absolute_path = 'xpath_slash' path_step path_rest?  { absolute_path_rest }
+                | 'xpath_slash'                       { absolute_path_slash }
+                ;
+  
+  scheme = 'http_scheme'    { scheme_http }
+         | 'ftp_scheme'     { scheme_ftp }
+         ;
+  
+  host = 'id' '@' hostname             { host_info_login }
+       | 'id' ':' 'id' '@' hostname    { host_info_login_password }
+       | hostname                      { host_info }
+       ;
+       
+  hostname = 'id' 'dot' 'id'/'dot'+                          { hostname_name }
+           | 'value_literal' 'dot' 'value_literal'/'dot'+    { hostname_ip }
+           ;
+                
+  port = ':' 'port_number'   { port }
+       ;
+       
+  path = '.'                              { path_dot }
+       | '.' path_rest                    { path_dot_rest }
+       | '..'                             { path_dotdot }
+       | '..' path_rest                   { path_dotdot_rest }
+       | 'root_dir' path_step path_rest?  { path_rootdir }
+       | 'file://' path_step path_rest?   { path_relative_uri }
+       | 'file://' path_rest              { path_absolute_uri }
+       | 'path_literal'                   { path_path_literal }
+       | 'path_literal' path_rest         { path_path_literal_rest }
+       | path_rest                        { path_path_rest }
+       ;
+            
+  path_rest = 'xpath_slash' path_step path_rest   { path_rest_path }
+            | 'xpath_slash' path_step             { path_rest_step }
+            | 'xpath_slash'                       { path_rest_trailing_slash }
+            ;     
+       
+  path_step = '.'                       { path_step_dot }
+            | '..'                      { path_step_dotdot }
+            | 'path_id'                 { path_step_id }
+            ;
+       
+  uri_query = '?' 'id'    { uri_query }
+            ;
         
-  fragment = '#' 'id'
+  fragment = '#' 'id'     { fragment }
            ;
   

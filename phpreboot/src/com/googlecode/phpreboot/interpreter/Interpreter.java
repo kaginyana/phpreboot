@@ -29,8 +29,12 @@ import com.googlecode.phpreboot.ast.NodeTypeToken;
 import com.googlecode.phpreboot.ast.NullLiteralToken;
 import com.googlecode.phpreboot.ast.Parameter;
 import com.googlecode.phpreboot.ast.Parameters;
+import com.googlecode.phpreboot.ast.PathIdToken;
+import com.googlecode.phpreboot.ast.PathLiteralToken;
+import com.googlecode.phpreboot.ast.PortNumberToken;
 import com.googlecode.phpreboot.ast.RcurlToken;
 import com.googlecode.phpreboot.ast.RegexAnycharacterToken;
+import com.googlecode.phpreboot.ast.RootDirToken;
 import com.googlecode.phpreboot.ast.Script;
 import com.googlecode.phpreboot.ast.Sql;
 import com.googlecode.phpreboot.ast.StringLiteralToken;
@@ -100,6 +104,9 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     return new RegexAnycharacterToken(data.toString());
   }
   
+  
+  // --- xpath
+  
   @Override
   public AxisNameToken axis_name(CharSequence data) {
     return new AxisNameToken(data.toString());
@@ -107,6 +114,27 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
   @Override
   public NodeTypeToken node_type(CharSequence data) {
     return new NodeTypeToken(data.toString());
+  }
+  
+  
+  // --- uri
+  
+  @Override
+  public RootDirToken root_dir(CharSequence data) {
+    return new RootDirToken(data.charAt(0)); 
+  }
+  @Override
+  public PathLiteralToken path_literal(CharSequence data) {
+    return new PathLiteralToken(data.toString());
+  }
+  @Override
+  public PathIdToken path_id(CharSequence data) {
+    return new PathIdToken(data.toString());
+  }
+  @Override
+  public PortNumberToken port_number(CharSequence data) {
+    int port = Integer.parseInt(data.toString());
+    return new PortNumberToken(port);
   }
 
   @Override

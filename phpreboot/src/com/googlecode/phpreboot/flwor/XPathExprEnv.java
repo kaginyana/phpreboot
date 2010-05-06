@@ -1,4 +1,4 @@
-package com.googlecode.phpreboot.xpath;
+package com.googlecode.phpreboot.flwor;
 
 import org.jaxen.expr.XPathFactory;
 

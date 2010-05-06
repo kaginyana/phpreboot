@@ -1,4 +1,4 @@
-package com.googlecode.phpreboot.xpath;
+package com.googlecode.phpreboot.flwor;
 
 import java.util.ArrayList;
 import java.util.Collections;

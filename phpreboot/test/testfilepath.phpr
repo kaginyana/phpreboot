@@ -1,0 +1,28 @@
+path = .
+echo path
+path2 = ..
+echo path2
+path3 = ./foo
+echo path3
+path4 = /bar
+echo path4
+
+foo = 3
+bar = 2
+path5 = foo/bar
+echo path5
+echo foo / bar
+
+//echo toAbsolutePath(..)
+
+uri = http://www.google.fr/
+echo uri
+uri2 = ftp://www.google.fr/
+echo uri2
+
+echo resolve(./foo.xml, "bar")
+
+
+
+
+

@@ -12,6 +12,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 import com.googlecode.phpreboot.ast.Node;
+import com.googlecode.phpreboot.interpreter.Analyzer;
 import com.googlecode.phpreboot.interpreter.Interpreter;
 import com.googlecode.phpreboot.runtime.Array.Entry;
 import com.googlecode.phpreboot.tools.Analyzers;
@@ -39,10 +40,10 @@ public class RT {
   }
   
   
-  public static void includeDefaultFunctions(Interpreter interpreter) {
+  /*public static void includeDefaultFunctions(Interpreter interpreter) {
     Reader reader = new InputStreamReader(RT.class.getResourceAsStream("functions.phpr"));
-    Analyzers.run(reader, interpreter, interpreter, null, null);
-  }
+    Analyzer.analyze(reader, writer, rootScope);
+  }*/
   
   public static Object unary_plus(Object value) {
     if (value instanceof Integer) {

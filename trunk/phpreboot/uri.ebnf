@@ -6,14 +6,13 @@ tokens:
 //  file_scheme = 'file:\/\/'
 //  file_scheme_slash = 'file:\/\/' 
 //  port_number = '[0-9]+'
-//  path_literal = '[a-zA-Z0-9_]+\/[a-zA-Z0-9_]*'
-//  path_id = '[^/ \t\r\n?#]+'
+//  path_id = '[^/ \t\r\n?#,$)]+'
 //  question_mark = '\?'
 //  sharp = '#'
+//  amp = '&'
   
 types:
   'root_dir': char  
-  'path_literal': String
   'path_id': String
   'port_number': int
 
@@ -22,15 +21,11 @@ productions:
         ;
        
   uri = absolute_uri   { uri_absolute }
-      | path           { uri_path }
+      | relative_uri   { uri_relative }
       ;
       
   absolute_uri = scheme host port? absolute_path uri_query? fragment?   { absolute_uri }
                ;
-  
-  absolute_path = 'xpath_slash' path_step path_rest?  { absolute_path_rest }
-                | 'xpath_slash'                       { absolute_path_slash }
-                ;
   
   scheme = 'http_scheme'    { scheme_http }
          | 'ftp_scheme'     { scheme_ftp }
@@ -48,17 +43,14 @@ productions:
   port = ':' 'port_number'   { port }
        ;
        
-  path = '.'                              { path_dot }
-       | '.' path_rest                    { path_dot_rest }
-       | '..'                             { path_dotdot }
-       | '..' path_rest                   { path_dotdot_rest }
-       | 'root_dir' path_step path_rest?  { path_rootdir }
-       | 'file://' path_step path_rest?   { path_relative_uri }
-       | 'file://' path_rest              { path_absolute_uri }
-       | 'path_literal'                   { path_path_literal }
-       | 'path_literal' path_rest         { path_path_literal_rest }
-       | path_rest                        { path_path_rest }
-       ;
+  absolute_path = 'xpath_slash' path_step path_rest?  { absolute_path_rest }
+                | 'xpath_slash'                       { absolute_path_slash }
+                ;
+                
+  relative_uri = 'file://' path_step path_rest?             { relative_uri_step_rest }
+               | 'file://' path_rest                        { relative_uri_rest }
+               | 'file://' 'root_dir' path_step path_rest?  { relative_uri_rootdir }
+               ;
             
   path_rest = 'xpath_slash' path_step path_rest   { path_rest_path }
             | 'xpath_slash' path_step             { path_rest_step }
@@ -68,10 +60,14 @@ productions:
   path_step = '.'                       { path_step_dot }
             | '..'                      { path_step_dotdot }
             | 'path_id'                 { path_step_id }
+            | dollar_access             { path_step_dollar_access }
             ;
        
-  uri_query = '?' 'id'    { uri_query }
-            ;
+  uri_query = '?' uri_query_pair/'amp'+    { uri_query }
+            ;      
+            
+  uri_query_pair = 'id' '=' 'id'  { uri_query_pair }
+                 ;                         
         
   fragment = '#' 'id'     { fragment }
            ;

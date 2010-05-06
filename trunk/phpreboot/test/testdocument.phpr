@@ -1,0 +1,20 @@
+
+result = document(http://search.twitter.com/search.atom?lang=en&q=Java)
+
+titles = for node in result//entry/title
+           return node  
+           
+<news>
+ {
+   foreach(titles as title) {
+     title.name = "description"
+     echo title
+   }
+ }
+</news>           
+
+
+
+  
+  
+

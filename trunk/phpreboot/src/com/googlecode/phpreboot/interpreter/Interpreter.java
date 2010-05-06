@@ -30,7 +30,6 @@ import com.googlecode.phpreboot.ast.NullLiteralToken;
 import com.googlecode.phpreboot.ast.Parameter;
 import com.googlecode.phpreboot.ast.Parameters;
 import com.googlecode.phpreboot.ast.PathIdToken;
-import com.googlecode.phpreboot.ast.PathLiteralToken;
 import com.googlecode.phpreboot.ast.PortNumberToken;
 import com.googlecode.phpreboot.ast.RcurlToken;
 import com.googlecode.phpreboot.ast.RegexAnycharacterToken;
@@ -122,10 +121,6 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
   @Override
   public RootDirToken root_dir(CharSequence data) {
     return new RootDirToken(data.charAt(0)); 
-  }
-  @Override
-  public PathLiteralToken path_literal(CharSequence data) {
-    return new PathLiteralToken(data.toString());
   }
   @Override
   public PathIdToken path_id(CharSequence data) {

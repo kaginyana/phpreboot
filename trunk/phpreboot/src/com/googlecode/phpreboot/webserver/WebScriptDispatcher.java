@@ -15,7 +15,6 @@ import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.interpreter.sql.GenericSQLConnection;
 import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.runtime.Array;
-import com.googlecode.phpreboot.runtime.RT;
 import com.googlecode.phpreboot.tools.Analyzers;
 import com.sun.grizzly.tcp.http11.GrizzlyAdapter;
 import com.sun.grizzly.tcp.http11.GrizzlyRequest;
@@ -33,8 +32,8 @@ public class WebScriptDispatcher extends GrizzlyAdapter {
     
     Scope rootScope = new Scope(null);
     PrintWriter writer = new PrintWriter(System.out);
-    Interpreter interpreter = new Interpreter(writer, rootScope);
-    RT.includeDefaultFunctions(interpreter);
+    //Interpreter interpreter = new Interpreter(writer, rootScope);
+    //RT.includeDefaultFunctions(interpreter);
     writer.flush();
     this.rootScope = rootScope;
   }

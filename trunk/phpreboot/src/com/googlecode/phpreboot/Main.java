@@ -14,9 +14,11 @@ import java.util.Iterator;
 
 import com.googlecode.phpreboot.doc.Doclet;
 import com.googlecode.phpreboot.interpreter.Analyzer;
+import com.googlecode.phpreboot.interpreter.Interpreter;
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.interpreter.sql.GenericSQLConnection;
 import com.googlecode.phpreboot.model.Var;
+import com.googlecode.phpreboot.module.LangModule;
 import com.googlecode.phpreboot.webserver.WebScriptDispatcher;
 import com.sun.grizzly.http.embed.GrizzlyWebServer;
 
@@ -163,8 +165,12 @@ public class Main {
     Scope rootScope = new Scope(null);
     rootScope.register(new Var("SQL_CONNECTION", true, sqlConnection));
 
+    // register modules
+    new LangModule().registerModule(rootScope);
+    
+    Interpreter interpreter = new Interpreter(writer, rootScope);
     try {
-      Analyzer.analyze(reader, writer, rootScope);
+      Analyzer.analyze(reader, interpreter);
     } catch(Throwable t) {
       if (verbose)
         t.printStackTrace(System.err);

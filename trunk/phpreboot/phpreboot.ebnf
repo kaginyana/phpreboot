@@ -120,10 +120,10 @@ tokens:
   ftp_scheme = 'ftp:\/\/'
   file_scheme = 'file:\/\/' 
   port_number = '[0-9]+'
-  path_literal = '[a-zA-Z0-9_]+\/[a-zA-Z0-9_]*'
-  path_id = '[^/ \t\r\n]+'
+  path_id = '[^/ \t\r\n?#,$)]+'
   question_mark = '\?'
   sharp = '#'
+  amp = '&'
   
   null_literal = 'null'
   bool_literal = 'true|false'

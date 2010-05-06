@@ -1,5 +1,7 @@
 package com.googlecode.phpreboot.runtime;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.Iterator;
 
 import javax.xml.stream.XMLEventReader;
@@ -9,7 +11,7 @@ import javax.xml.stream.events.Attribute;
 import javax.xml.stream.events.StartElement;
 import javax.xml.stream.events.XMLEvent;
 
-public class XMLCursor implements Sequence, ArrayAccess {
+public class XMLCursor implements Sequence, ArrayAccess, Closeable {
   private static final boolean[] ALLOWED_EVENTS;
   static {
     boolean[] events = new boolean[255];
@@ -61,7 +63,7 @@ public class XMLCursor implements Sequence, ArrayAccess {
   }
   
   @Override
-  public Sequence next() {
+  public XMLCursor next() {
     if (key == XML_KIND_NODE) {
       stack.add(value);
     }
@@ -78,6 +80,7 @@ public class XMLCursor implements Sequence, ArrayAccess {
       case XMLStreamConstants.END_ELEMENT:
         stack.pop();
         if (stack.isEmpty()) {
+          close();
           return null;
         }
         break;
@@ -115,5 +118,18 @@ public class XMLCursor implements Sequence, ArrayAccess {
   }
   public XML getParent() {
     return (stack.isEmpty())?null:(XML)stack.peek().getValue();
+  }
+  
+  @Override
+  public void close() {
+    try {
+      eventReader.close();
+    } catch (XMLStreamException e) {
+      Throwable cause = e.getCause();
+      if (cause == null) {
+        cause = e;
+      }
+      throw RT.error(cause);
+    }
   }
 }

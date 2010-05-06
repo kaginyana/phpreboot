@@ -1,9 +1,9 @@
 package com.googlecode.phpreboot.uri;
 
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 
 import com.googlecode.phpreboot.ast.AbsolutePathRest;
 import com.googlecode.phpreboot.ast.AbsolutePathSlash;
@@ -16,33 +16,30 @@ import com.googlecode.phpreboot.ast.HostnameIp;
 import com.googlecode.phpreboot.ast.HostnameName;
 import com.googlecode.phpreboot.ast.IdToken;
 import com.googlecode.phpreboot.ast.Node;
-import com.googlecode.phpreboot.ast.PathAbsoluteUri;
-import com.googlecode.phpreboot.ast.PathDot;
-import com.googlecode.phpreboot.ast.PathDotRest;
-import com.googlecode.phpreboot.ast.PathDotdot;
-import com.googlecode.phpreboot.ast.PathDotdotRest;
-import com.googlecode.phpreboot.ast.PathPathLiteral;
-import com.googlecode.phpreboot.ast.PathPathLiteralRest;
-import com.googlecode.phpreboot.ast.PathPathRest;
-import com.googlecode.phpreboot.ast.PathRelativeUri;
 import com.googlecode.phpreboot.ast.PathRest;
 import com.googlecode.phpreboot.ast.PathRestPath;
 import com.googlecode.phpreboot.ast.PathRestStep;
 import com.googlecode.phpreboot.ast.PathRestTrailingSlash;
-import com.googlecode.phpreboot.ast.PathRootdir;
+import com.googlecode.phpreboot.ast.PathStepDollarAccess;
 import com.googlecode.phpreboot.ast.PathStepDot;
 import com.googlecode.phpreboot.ast.PathStepDotdot;
 import com.googlecode.phpreboot.ast.PathStepId;
 import com.googlecode.phpreboot.ast.Port;
+import com.googlecode.phpreboot.ast.RelativeUriRest;
+import com.googlecode.phpreboot.ast.RelativeUriRootdir;
+import com.googlecode.phpreboot.ast.RelativeUriStepRest;
 import com.googlecode.phpreboot.ast.SchemeFtp;
 import com.googlecode.phpreboot.ast.SchemeHttp;
 import com.googlecode.phpreboot.ast.UriAbsolute;
-import com.googlecode.phpreboot.ast.UriPath;
 import com.googlecode.phpreboot.ast.UriQuery;
+import com.googlecode.phpreboot.ast.UriQueryPair;
+import com.googlecode.phpreboot.ast.UriRelative;
 import com.googlecode.phpreboot.ast.ValueLiteralToken;
 import com.googlecode.phpreboot.ast.Visitor;
 import com.googlecode.phpreboot.interpreter.EvalEnv;
+import com.googlecode.phpreboot.interpreter.Evaluator;
 import com.googlecode.phpreboot.runtime.RT;
+import com.googlecode.phpreboot.runtime.URI;
 import com.googlecode.phpreboot.uri.PathBuilder.FilePathBuilder;
 import com.googlecode.phpreboot.uri.PathBuilder.StringPathBuilder;
 
@@ -54,10 +51,10 @@ public class URIVisitor extends Visitor<Object, URIEnv, URISyntaxException> {
   public static final URIVisitor INSTANCE = new URIVisitor();
   
   
-  public Object eval(Node node, EvalEnv env) {
+  public URI eval(Node node, EvalEnv env) {
     URIEnv uriEnv = new URIEnv(env, null);
     try {
-      return eval(node, uriEnv);
+      return (URI)eval(node, uriEnv);
     } catch (URISyntaxException e) {
       throw RT.error(e);
     }
@@ -69,32 +66,45 @@ public class URIVisitor extends Visitor<Object, URIEnv, URISyntaxException> {
   
   @Override
   public Object visit(UriAbsolute uri__absolute_uri, URIEnv env) throws URISyntaxException {
-    return eval(uri__absolute_uri.getAbsoluteUri(), env);
+    return new URI((java.net.URI)eval(uri__absolute_uri.getAbsoluteUri(), env));
   }
   @Override
-  public Object visit(UriPath uri__path, URIEnv env) throws URISyntaxException {
-    return eval(uri__path.getPath(), env);
+  public Object visit(UriRelative uri_relative, URIEnv env) throws URISyntaxException {
+    return new URI((Path)eval(uri_relative.getRelativeUri(), env));
   }
+  
   
   @Override
   public Object visit(AbsoluteUri absolute_uri, URIEnv env) throws URISyntaxException {
     String scheme = (String)eval(absolute_uri.getScheme(), env);
-    URI userInfoAndHost = (URI)eval(absolute_uri.getHost(), env);
+    java.net.URI userInfoAndHost = (java.net.URI)eval(absolute_uri.getHost(), env);
     Port port = absolute_uri.getPortOptional();
     int portNumber = (port == null)?-1:port.getPortNumber().getValue();
     String path = (String)eval(absolute_uri.getAbsolutePath(), env);
     UriQuery uriQuery = absolute_uri.getUriQueryOptional();
-    String query = uriQuery == null? null: uriQuery.getId().getValue();
+    String query = uriQuery == null? null: (String)eval(uriQuery, env);
     Fragment uriFragment = absolute_uri.getFragmentOptional();
     String fragment = (uriFragment == null)? null: uriFragment.getId().getValue();
     
-    return new URI(scheme,
-        userInfoAndHost.getUserInfo(),
+    return new java.net.URI(scheme,
+        userInfoAndHost.getRawUserInfo(),
         userInfoAndHost.getHost(),
         portNumber,
         path,
         query,
         fragment);
+  }
+  
+  @Override
+  public Object visit(UriQuery uriQuery, URIEnv env) {
+    StringBuilder builder = new StringBuilder();
+    List<UriQueryPair> uriQueryPairPlus = uriQuery.getUriQueryPairPlus();
+    for(UriQueryPair uriQueryPair: uriQueryPairPlus) {
+      builder.append(uriQueryPair.getId().getValue()).
+        append('=').append(uriQueryPair.getId2().getValue()).append('&');
+    }
+    builder.setLength(builder.length() - 1);
+    return builder.toString();
   }
   
   @Override
@@ -109,19 +119,19 @@ public class URIVisitor extends Visitor<Object, URIEnv, URISyntaxException> {
   @Override
   public Object visit(HostInfo host_info, URIEnv env) throws URISyntaxException {
     String host = (String)eval(host_info.getHostname(), env);
-    return new URI(null, null, host,-1, null, null, null);
+    return new java.net.URI(null, null, host,-1, null, null, null);
   }
   @Override
   public Object visit(HostInfoLogin host_info_login, URIEnv env) throws URISyntaxException {
     String host = (String)eval(host_info_login.getHostname(), env);
-    return new URI(null, host_info_login.getId().getValue(), host,-1, null, null, null);
+    return new java.net.URI(null, host_info_login.getId().getValue(), host,-1, null, null, null);
   }
   @Override
   public Object visit(HostInfoLoginPassword host_info_login_password, URIEnv env) throws URISyntaxException {
     String host = (String)eval(host_info_login_password.getHostname(), env);
     String userInfo = host_info_login_password.getId().getValue() + ':' +
       host_info_login_password.getId2().getValue();
-    return new URI(null, userInfo, host,-1, null, null, null);
+    return new java.net.URI(null, userInfo, host,-1, null, null, null);
   }
   
   @Override
@@ -163,35 +173,32 @@ public class URIVisitor extends Visitor<Object, URIEnv, URISyntaxException> {
     return pathBuilder.toPath();
   }
   
+  @Override
+  public Object visit(RelativeUriStepRest relative_uri_step_rest, URIEnv env) throws URISyntaxException {
+    String path = (String)eval(relative_uri_step_rest.getPathStep(), env);
+    PathRest pathRest = relative_uri_step_rest.getPathRestOptional();
+    if (pathRest == null) {
+      return Paths.get(path);
+    }
+    FilePathBuilder builder = new FilePathBuilder(path);
+    URIEnv newEnv = new URIEnv(env.getEvalEnv(), builder);
+    eval(pathRest, newEnv);
+    return builder.toPath();
+  }
+  @Override
+  public Object visit(RelativeUriRest relative_uri_rest, URIEnv env) throws URISyntaxException {
+    FilePathBuilder builder = new FilePathBuilder("/");
+    URIEnv newEnv = new URIEnv(env.getEvalEnv(), builder);
+    eval(relative_uri_rest.getPathRest(), newEnv);
+    return builder.toPath();
+  }
   
   @Override
-  public Object visit(PathDot path_dot, URIEnv env) {
-    return Paths.get(".");
-  }
-  @Override
-  public Object visit(PathDotRest path_dot_rest, URIEnv env) throws URISyntaxException {
-    FilePathBuilder pathBuilder = new FilePathBuilder(".");
-    URIEnv newEnv = new URIEnv(env.getEvalEnv(), pathBuilder);
-    eval(path_dot_rest.getPathRest(), newEnv);
-    return pathBuilder.toPath();
-  }
-  @Override
-  public Object visit(PathDotdot path_dotdot, URIEnv env) {
-    return Paths.get("..");
-  }
-  @Override
-  public Object visit(PathDotdotRest path_dotdot_rest, URIEnv env) throws URISyntaxException {
-    FilePathBuilder pathBuilder = new FilePathBuilder("..");
-    URIEnv newEnv = new URIEnv(env.getEvalEnv(), pathBuilder);
-    eval(path_dotdot_rest.getPathRest(), newEnv);
-    return pathBuilder.toPath();
-  }
-  @Override
-  public Object visit(PathRootdir path_rootdir, URIEnv env) throws URISyntaxException {
-    char rootName = path_rootdir.getRootDir().getValue();
+  public Object visit(RelativeUriRootdir relative_uri_rootdir, URIEnv env) throws URISyntaxException {
+    char rootName = relative_uri_rootdir.getRootDir().getValue();
     Path path = Paths.get(rootName+":\\");
-    path = path.resolve((String)eval(path_rootdir.getPathStep(), env));
-    PathRest pathRest = path_rootdir.getPathRestOptional();
+    path = path.resolve((String)eval(relative_uri_rootdir.getPathStep(), env));
+    PathRest pathRest = relative_uri_rootdir.getPathRestOptional();
     if(pathRest == null) {
       return path;
     }
@@ -199,45 +206,6 @@ public class URIVisitor extends Visitor<Object, URIEnv, URISyntaxException> {
     URIEnv newEnv = new URIEnv(env.getEvalEnv(), pathBuilder);
     eval(pathRest, newEnv);
     return pathBuilder.toPath();
-  }
-  @Override
-  public Object visit(PathRelativeUri path_relative_uri, URIEnv env) throws URISyntaxException {
-    String path = (String)eval(path_relative_uri.getPathStep(), env);
-    PathRest pathRest = path_relative_uri.getPathRestOptional();
-    if (pathRest == null) {
-      return new URI("file:", null, path, null);   
-    }
-    StringPathBuilder builder = new StringPathBuilder(path);
-    URIEnv newEnv = new URIEnv(env.getEvalEnv(), builder);
-    eval(pathRest, newEnv);
-    return new URI("file:", null, builder.toPath(), null);
-  }
-  @Override
-  public Object visit(PathAbsoluteUri path_absolute_uri, URIEnv env) throws URISyntaxException {
-    StringPathBuilder builder = new StringPathBuilder("/");
-    URIEnv newEnv = new URIEnv(env.getEvalEnv(), builder);
-    eval(path_absolute_uri.getPathRest(), newEnv);
-    return new URI("file:", null, builder.toPath(), null);
-  }
-  @Override
-  public Object visit(PathPathLiteral path_path_literal, URIEnv env) {
-    return Paths.get(path_path_literal.getPathLiteral().getValue());
-  }
-  @Override
-  public Object visit(PathPathLiteralRest path_path_literal_rest, URIEnv env) throws URISyntaxException {
-    Path path = Paths.get(path_path_literal_rest.getPathLiteral().getValue());
-    FilePathBuilder builder = new FilePathBuilder(path);
-    URIEnv newEnv = new URIEnv(env.getEvalEnv(), builder);
-    eval(path_path_literal_rest.getPathRest(), newEnv);
-    return builder.toPath();
-  }
-  @Override
-  public Object visit(PathPathRest path_path_rest, URIEnv env) throws URISyntaxException {
-    Path path = Paths.get("/");
-    FilePathBuilder builder = new FilePathBuilder(path);
-    URIEnv newEnv = new URIEnv(env.getEvalEnv(), builder);
-    eval(path_path_rest.getPathRest(), newEnv);
-    return builder.toPath();
   }
   
   @Override
@@ -267,5 +235,9 @@ public class URIVisitor extends Visitor<Object, URIEnv, URISyntaxException> {
   @Override
   public Object visit(PathStepId path_step_id, URIEnv env) {
     return path_step_id.getPathId().getValue();
+  }
+  @Override
+  public Object visit(PathStepDollarAccess path_step_dollar_access, URIEnv env) throws URISyntaxException {
+    return Evaluator.INSTANCE.eval(path_step_dollar_access.getDollarAccess(), env.getEvalEnv()).toString(); //nullcheck
   }
 }

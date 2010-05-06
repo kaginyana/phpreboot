@@ -1,6 +1,5 @@
 package com.googlecode.phpreboot.interpreter;
 
-import java.io.PrintWriter;
 import java.io.Reader;
 import java.util.IdentityHashMap;
 
@@ -16,7 +15,6 @@ import com.googlecode.phpreboot.tools.TerminalEvaluator;
 import fr.umlv.tatoo.runtime.buffer.impl.LocationTracker;
 import fr.umlv.tatoo.runtime.buffer.impl.ReaderWrapper;
 import fr.umlv.tatoo.runtime.lexer.RuleActivator;
-import fr.umlv.tatoo.runtime.tools.Debug;
 import fr.umlv.tatoo.runtime.tools.SemanticStack;
 import fr.umlv.tatoo.runtime.tools.builder.Builder.AnalyzerParserBuilder;
 
@@ -59,8 +57,7 @@ public class Analyzer {
     }
   }
   
-  public static void analyze(Reader reader, PrintWriter writer, Scope rootScope) {
-    Interpreter interpreter = new Interpreter(writer, rootScope);
+  public static void analyze(Reader reader, Interpreter interpreter) {
     ReaderWrapper buffer = new ReaderWrapper(reader, new LocationTracker());
     
     //TerminalEvaluator<CharSequence> terminalEvaluator = Debug.createTraceProxy(TerminalEvaluator.class, interpreter);

@@ -1,26 +1,51 @@
-path = .
+path = file://.
 echo path
-path2 = ..
+path2 = file://..
 echo path2
-path3 = ./foo
+path3 = file://./foo
 echo path3
-path4 = /bar
+path4 = file:///bar
 echo path4
-
-foo = 3
-bar = 2
-path5 = foo/bar
-echo path5
-echo foo / bar
-
-//echo toAbsolutePath(..)
 
 uri = http://www.google.fr/
 echo uri
 uri2 = ftp://www.google.fr/
 echo uri2
 
-echo resolve(./foo.xml, "bar")
+file = file://dir1/dir2/foo.xml  
+echo file.name
+echo file.extension
+echo file.parent
+echo file.query
+echo file.fragment
+echo file.host
+echo file.port
+
+url = http://www.google.com/dir1/dir2/foo.xml  
+echo url.name
+echo url.extension
+echo url.parent
+echo url.query
+echo url.fragment
+echo url.host
+echo url.port
+
+file2 = file://foo/../bar
+echo file2
+file3 = normalize(file2)
+echo file3
+
+file4 = file:///foo
+echo isAbsolute(file4)
+
+file5 = file://foo
+echo isAbsolute(file5)
+
+p = "a/b"
+echo file://$(p)/c
+
+
+
 
 
 

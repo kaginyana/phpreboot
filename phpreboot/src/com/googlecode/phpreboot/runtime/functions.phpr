@@ -15,3 +15,7 @@ function join(delimiter, sequenceable, lambda) {
   }
   return s
 }
+
+function document(uri) {
+  return native.documentAsXML(uri)
+}

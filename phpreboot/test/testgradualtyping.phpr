@@ -1,0 +1,8 @@
+
+function fibo(int n):int {
+  if (n<2)
+    return 1
+  return fibo(n - 1) + fibo(n - 2)
+}
+
+echo "fibo(7)= " + fibo(7)

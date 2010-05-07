@@ -12,13 +12,15 @@ import com.googlecode.phpreboot.interpreter.Scope;
 public class Function {
   private final String name;
   private final List<Parameter> parameters;
+  private final /*maybenull*/TypeToken returnType;
   private final Scope scope;
   private final Block block;
   private MethodHandle methodHandle;
   
-  public Function(String name, List<Parameter> parameters, Scope scope, Block block) {
+  public Function(String name, List<Parameter> parameters, /*maybenull*/TypeToken returnType, Scope scope, Block block) {
     this.name = name;
     this.parameters = parameters;
+    this.returnType = returnType;
     this.scope = scope;
     this.block = block;
   }
@@ -28,6 +30,9 @@ public class Function {
   }
   public List<Parameter> getParameters() {
     return parameters;
+  }
+  public /*maybenull*/TypeToken getReturnType() {
+    return returnType;
   }
   public Scope getScope() {
     return scope;

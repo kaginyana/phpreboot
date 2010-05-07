@@ -33,6 +33,7 @@ import com.googlecode.phpreboot.ast.PathIdToken;
 import com.googlecode.phpreboot.ast.PortNumberToken;
 import com.googlecode.phpreboot.ast.RcurlToken;
 import com.googlecode.phpreboot.ast.RegexAnycharacterToken;
+import com.googlecode.phpreboot.ast.ReturnType;
 import com.googlecode.phpreboot.ast.RootDirToken;
 import com.googlecode.phpreboot.ast.Script;
 import com.googlecode.phpreboot.ast.Sql;
@@ -342,8 +343,8 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
   // --- function declaration & lambda
   
   @Override
-  public Parameters parameters(List<Parameter> parameter_star_1) {
-    Parameters parameters = super.parameters(parameter_star_1);
+  public Parameters parameters(List<Parameter> parameter_star, ReturnType return_type_optional) {
+    Parameters parameters = super.parameters(parameter_star, return_type_optional);
     interpreter++;
     return parameters;
   }

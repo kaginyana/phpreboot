@@ -94,6 +94,7 @@ import com.googlecode.phpreboot.ast.PrimaryFuncall;
 import com.googlecode.phpreboot.ast.PrimaryParens;
 import com.googlecode.phpreboot.ast.PrimaryPrimaryArrayAccess;
 import com.googlecode.phpreboot.ast.PrimaryPrimaryFieldAccess;
+import com.googlecode.phpreboot.ast.ReturnType;
 import com.googlecode.phpreboot.ast.Type;
 import com.googlecode.phpreboot.ast.Visitor;
 import com.googlecode.phpreboot.ast.XmlsEmptyTag;
@@ -102,6 +103,8 @@ import com.googlecode.phpreboot.flwor.XPathExprVisitor;
 import com.googlecode.phpreboot.interpreter.sql.SQLConnection;
 import com.googlecode.phpreboot.model.Function;
 import com.googlecode.phpreboot.model.Parameter;
+import com.googlecode.phpreboot.model.TypeToken;
+import com.googlecode.phpreboot.model.TypedVar;
 import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.parser.ProductionEnum;
 import com.googlecode.phpreboot.regex.RegexEvaluator;
@@ -186,13 +189,20 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   }
   
   public Object evalFunction(Function function, Object[] arguments, EvalEnv env) {
-    Scope scope = new Scope(function.getScope()/*.duplicate()*/);
+    Scope scope = new Scope(function.getScope());
     scope.register(new Var(function.getName(), true, function.getMethodHandle()));
     
     List<Parameter> parameters = function.getParameters();
     for(int i = 0; i<parameters.size(); i++) {
       Parameter parameter = parameters.get(i);
-      scope.register(new Var(parameter.getName(), true, arguments[i]));
+      TypeToken type = parameter.getType();
+      Var var;
+      if (type != null) {
+        var = new TypedVar(parameter.getName(), true, type.getRuntimeClass(), arguments[i]);
+      } else {
+        var = new Var(parameter.getName(), true, arguments[i]);
+      }
+      scope.register(var);
     }
     
     Block block = function.getBlock();
@@ -200,7 +210,12 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     try {
       Evaluator.INSTANCE.eval(block, evalEnv);
     } catch(ReturnError e) {
-      return e.value;
+      Object returnValue = e.value;
+      TypeToken returnType = function.getReturnType();
+      if (returnType != null) {
+        return returnType.getRuntimeClass().cast(returnValue);
+      }
+      return returnValue;
     }
     return null;
   }
@@ -221,41 +236,6 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       throw RT.error("variable %s already exists", name);
     }
   }
-  
-  /*private static Type asType(Object value) {
-    if (value instanceof Integer) {
-      return PrimitiveType.INT;
-    }
-    if (value instanceof Boolean) {
-      return PrimitiveType.BOOLEAN;
-    }
-    if (value instanceof String) {
-      return PrimitiveType.STRING;
-    }
-    if (value instanceof Double) {
-      return PrimitiveType.DOUBLE;
-    }
-    return PrimitiveType.ANY;
-  }*/
-  
-  /*private static Object defaultValue(Type type) {
-    if (!(type instanceof PrimitiveType)) {
-      return null;
-    }
-    
-    switch((PrimitiveType)type) {
-    case BOOLEAN:
-      return false;
-    case INT:
-      return 0;
-    case DOUBLE:
-      return 0.0;
-    case STRING:
-      return "";
-    default:
-      return null;
-    }
-  }*/
   
   // --- function definition
   
@@ -281,19 +261,28 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     return newScope;
   }
   
-  private static MethodHandle createFunction(String name, Parameters parametersNode, Block block, Scope scope) {
+  private MethodHandle createFunction(String name, Parameters parametersNode, Block block, EvalEnv env) {
     ArrayList<Parameter> parameters = new ArrayList<Parameter>();
     for(com.googlecode.phpreboot.ast.Parameter parameter: parametersNode.getParameterStar()) {
       String parameterName;
+      TypeToken type;
       if (parameter instanceof ParameterAny) {
         parameterName = ((ParameterAny)parameter).getId().getValue();
+        type = null;
       } else {
-        parameterName = ((ParameterTyped)parameter).getId().getValue();
+        ParameterTyped parameterType = (ParameterTyped)parameter;
+        parameterName = parameterType.getId().getValue();
+        type = (TypeToken)eval(parameterType.getType(), env);
       }
-      parameters.add(new Parameter(parameterName));
+      parameters.add(new Parameter(parameterName, type));
     }
     
-    Function function = new Function(name, parameters, filterReadOnlyVars(scope), block);
+    ReturnType returnTypeNode = parametersNode.getReturnTypeOptional();
+    TypeToken returnType = (returnTypeNode == null)? null: (TypeToken)eval(returnTypeNode.getType(), env);
+    
+    
+    Scope scope = env.getScope();
+    Function function = new Function(name, parameters, returnType, filterReadOnlyVars(scope), block);
     
     MethodHandle mh = MethodHandles.lookup().findVirtual(Function.class, "call",
         MethodType.methodType(Object.class, /*EvalEnv.class*/ Object.class, Object[].class));
@@ -307,7 +296,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Scope scope = env.getScope();
     checkVar(name, scope);
     
-    MethodHandle mh = createFunction(name, parameters, block, scope);
+    MethodHandle mh = createFunction(name, parameters, block, env);
     Var var = new Var(name, true, mh);
     scope.register(var);
   }
@@ -633,33 +622,26 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   }
   @Override
   public Object visit(DeclarationTypeEmpty declaration_type_empty, EvalEnv env) {
-    /*
     String name = declaration_type_empty.getId().getValue();
     Scope scope = env.getScope();
     checkVar(name, scope);
-    Type type = TypeChecker.asType(declaration_type_empty.getType());
-    ScriptVar var = new ScriptVar(name, type, defaultValue(type));
+    TypeToken type = (TypeToken)eval(declaration_type_empty.getType(), env);
+    TypedVar var = new TypedVar(name, false, type.getRuntimeClass(), type.getDefaultValue());
     scope.register(var);
     return null;
-    */
-    throw new UnsupportedOperationException("NYI");
   }
   @Override
   public Object visit(DeclarationTypeInit declaration_type_init, EvalEnv env) {
-    /*
     String name = declaration_type_init.getId().getValue();
     Scope scope = env.getScope();
     checkVar(name, scope);
     Object value = eval(declaration_type_init.getExpr(), env);
-    Type type = TypeChecker.asType(declaration_type_init.getType());
+    TypeToken type = (TypeToken)eval(declaration_type_init.getType(), env);
     
-    TypeChecker.isCompatible(type, asType(value));
-    
-    ScriptVar var = new ScriptVar(name, type, value);
+    TypedVar var = new TypedVar(name, false, type.getRuntimeClass(), value);
     scope.register(var);
     return null;
-    */
-    throw new UnsupportedOperationException("NYI");
+    
   }
   
   @Override
@@ -739,48 +721,6 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     return XPathExprVisitor.INSTANCE.flwor(instr_flwor.getFlwor(), evalEnv);
   }
   
-  /*
-  @Override
-  public Object visit(InstrXpath instr_xpath, EvalEnv evalEnv) {
-    Scope scope = evalEnv.getScope();
-    String newVarName = instr_xpath.getId().getValue();
-    checkVar(newVarName, scope);
-    
-    String rootvarName = instr_xpath.getId3().getValue();
-    Object node = lookupVarValue(rootvarName, scope);
-    if (!(node instanceof XML)) {
-      throw RT.error("variable %s value must be a XML tree: %s", rootvarName, node);
-    }
-    
-    //XPathEnv xpathEnv = new XPathEnv(evalEnv);
-    //String xpathExpr = XPathVisitor.INSTANCE.xpath(instr_xpath.getLocationPath(), xpathEnv).toString();
-    //System.err.println("xpath eval "+xpathExpr);
-    
-    ContextSupport support = new ContextSupport( 
-        new SimpleNamespaceContext(),
-        XPathFunctionContext.getInstance(),
-        new SimpleVariableContext(),
-        new XMLNavigator());
-    Context context = new Context( support );
-    context.setNodeSet(Collections.singletonList(node));
-    
-    Array array = new Array();
-    try {
-      XPathExpr xpathExpr = XPathExprVisitor.INSTANCE.xpathExpr(new DefaultXPathFactory(), instr_xpath.getLocationPath(), evalEnv);
-      //System.out.println("xpath expr: "+xpathExpr);
-      
-      for(Object matchNode: xpathExpr.asList(context)) {
-        array.add(matchNode);
-      }
-    } catch (JaxenException e) {
-      //throw RT.error("xpath evaluation error %s", xpathExpr);  
-      throw RT.error(e);
-    }
-    
-    Var var = new Var(newVarName, true, array);
-    scope.register(var);
-    return null;
-  }*/
   
   // --- function call
   
@@ -911,7 +851,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   @Override
   public Object visit(ExprFun expr_fun, EvalEnv env) {
-    return createFunction("it", expr_fun.getParameters(), expr_fun.getBlock(), env.getScope());
+    return createFunction("it", expr_fun.getParameters(), expr_fun.getBlock(), env);
   }
 
   @Override
@@ -968,45 +908,10 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
  
   // --- type conversions
   
-  enum TypeToken {
-    ANY,
-    BOOLEAN,
-    INT,
-    DOUBLE,
-    STRING,
-    ARRAY,
-    SEQUENCE
-    ;
-    
-    private String type;
-    private TypeToken() {
-      type = name().toLowerCase();
-    }
-    
-    @Override
-    public String toString() {
-      return type;
-    }
-    
-    static final HashMap<String, TypeToken> tokenMap;
-    static {
-      HashMap<String, TypeToken> map =
-        new HashMap<String, Evaluator.TypeToken>();
-      for(TypeToken token: TypeToken.values()) {
-        map.put(token.type, token);
-      }
-      tokenMap = map;
-    }
-  }
-  
   @Override
   public Object visit(Type type, EvalEnv env) {
     String name = type.getId().getValue();
-    TypeToken token = TypeToken.tokenMap.get(name);
-    if (token == null) {
-      throw RT.error("Unknown type %s", name);
-    }
-    return token;
+    return TypeToken.lookup(name);
   }
   
   @Override

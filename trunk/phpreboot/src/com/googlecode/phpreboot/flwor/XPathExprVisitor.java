@@ -138,6 +138,7 @@ public class XPathExprVisitor extends Visitor<Object, XPathExprEnv, JaxenExcepti
     }
   }
   
+  @SuppressWarnings("unchecked")
   private List<Object> forClause(ForClause forClause, EvalEnv evalEnv) {
     String rootvarName = forClause.getId2().getValue();
     Var rootVar = evalEnv.getScope().lookup(rootvarName);
@@ -184,6 +185,7 @@ public class XPathExprVisitor extends Visitor<Object, XPathExprEnv, JaxenExcepti
     final EvalEnv newEnv = new EvalEnv(scope, env.getEchoer(), env.getLabel());
     
     Comparator<Object> comparator = new Comparator<Object>() {
+      @SuppressWarnings({ "unchecked", "rawtypes" })
       @Override
       public int compare(Object o1, Object o2) {
         for(com.googlecode.phpreboot.ast.Expr expr: exprs) {

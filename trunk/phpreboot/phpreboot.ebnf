@@ -178,8 +178,11 @@ productions:
             | 'id'       { parameter_any }
             ;    
             
-  parameters = '(' parameter/'comma'* ')'   { parameters }
+  parameters = '(' parameter/'comma'* ')' return_type?  { parameters }
              ;
+             
+  return_type = ':' type     { return_type }
+              ;
          
   block = '{' instr* '}'            { block }
         ;

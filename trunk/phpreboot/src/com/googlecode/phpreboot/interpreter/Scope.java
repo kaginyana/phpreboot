@@ -44,8 +44,4 @@ public final class Scope {
   public Collection<Var> varMap() {
     return varMap.values();
   }
-  
-  public Scope duplicate() {
-    return new Scope(new HashMap<String,Var>(varMap), (parent==null)? null: parent.duplicate());
-  }
 }

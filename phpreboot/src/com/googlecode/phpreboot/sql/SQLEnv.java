@@ -1,4 +1,4 @@
-package com.googlecode.phpreboot.interpreter.sql;
+package com.googlecode.phpreboot.sql;
 
 import java.sql.Connection;
 import java.util.ArrayList;

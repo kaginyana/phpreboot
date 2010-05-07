@@ -1,4 +1,4 @@
-package com.googlecode.phpreboot.interpreter.sql;
+package com.googlecode.phpreboot.sql;
 
 import com.googlecode.phpreboot.ast.Sql;
 import com.googlecode.phpreboot.interpreter.EvalEnv;

@@ -16,9 +16,9 @@ import com.googlecode.phpreboot.doc.Doclet;
 import com.googlecode.phpreboot.interpreter.Analyzer;
 import com.googlecode.phpreboot.interpreter.Interpreter;
 import com.googlecode.phpreboot.interpreter.Scope;
-import com.googlecode.phpreboot.interpreter.sql.GenericSQLConnection;
 import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.module.LangModule;
+import com.googlecode.phpreboot.sql.GenericSQLConnection;
 import com.googlecode.phpreboot.webserver.WebScriptDispatcher;
 import com.sun.grizzly.http.embed.GrizzlyWebServer;
 

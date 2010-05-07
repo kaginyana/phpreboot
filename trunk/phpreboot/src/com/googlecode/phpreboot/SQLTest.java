@@ -7,8 +7,8 @@ import com.googlecode.phpreboot.compiler.PrimitiveType;
 import com.googlecode.phpreboot.interpreter.Evaluator;
 import com.googlecode.phpreboot.interpreter.Interpreter;
 import com.googlecode.phpreboot.interpreter.Scope;
-import com.googlecode.phpreboot.interpreter.sql.GenericSQLConnection;
 import com.googlecode.phpreboot.model.Var;
+import com.googlecode.phpreboot.sql.GenericSQLConnection;
 import com.googlecode.phpreboot.tools.Analyzers;
 
 public class SQLTest {

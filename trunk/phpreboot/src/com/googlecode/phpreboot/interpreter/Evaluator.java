@@ -100,7 +100,6 @@ import com.googlecode.phpreboot.ast.Visitor;
 import com.googlecode.phpreboot.ast.XmlsEmptyTag;
 import com.googlecode.phpreboot.ast.XmlsStartEndTag;
 import com.googlecode.phpreboot.flwor.XPathExprVisitor;
-import com.googlecode.phpreboot.interpreter.sql.SQLConnection;
 import com.googlecode.phpreboot.model.Function;
 import com.googlecode.phpreboot.model.Parameter;
 import com.googlecode.phpreboot.model.TypeToken;
@@ -112,6 +111,7 @@ import com.googlecode.phpreboot.runtime.Array;
 import com.googlecode.phpreboot.runtime.RT;
 import com.googlecode.phpreboot.runtime.Sequence;
 import com.googlecode.phpreboot.runtime.XML;
+import com.googlecode.phpreboot.sql.SQLConnection;
 import com.googlecode.phpreboot.uri.URIVisitor;
 
 public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {

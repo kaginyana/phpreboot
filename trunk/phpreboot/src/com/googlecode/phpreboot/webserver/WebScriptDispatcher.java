@@ -12,9 +12,9 @@ import java.util.Map;
 
 import com.googlecode.phpreboot.interpreter.Interpreter;
 import com.googlecode.phpreboot.interpreter.Scope;
-import com.googlecode.phpreboot.interpreter.sql.GenericSQLConnection;
 import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.runtime.Array;
+import com.googlecode.phpreboot.sql.GenericSQLConnection;
 import com.googlecode.phpreboot.tools.Analyzers;
 import com.sun.grizzly.tcp.http11.GrizzlyAdapter;
 import com.sun.grizzly.tcp.http11.GrizzlyRequest;

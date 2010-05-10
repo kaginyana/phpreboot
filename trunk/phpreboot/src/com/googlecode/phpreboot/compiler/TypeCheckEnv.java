@@ -1,21 +1,25 @@
 package com.googlecode.phpreboot.compiler;
 
-import com.googlecode.phpreboot.interpreter.Scope;
-
+import com.googlecode.phpreboot.model.Type;
 
 public class TypeCheckEnv {
-  private final Scope scope;
-  private final Type declaredReturntype;
+  private final LocalScope scope;
+  private final Type functionReturnType;
+  private final BindMap bindMap;
   
-  public TypeCheckEnv(Scope scope, Type declaredReturntype) {
+  public TypeCheckEnv(LocalScope scope, Type functionReturnType, BindMap bindMap) {
     this.scope = scope;
-    this.declaredReturntype = declaredReturntype;
+    this.functionReturnType = functionReturnType;
+    this.bindMap = bindMap;
   }
  
-  public Scope getScope() {
+  public LocalScope getScope() {
     return scope;
   }
-  public Type getDeclaredReturnType() {
-    return declaredReturntype;
+  public Type getFunctionReturnType() {
+    return functionReturnType;
+  }
+  public BindMap getBindMap() {
+    return bindMap;
   }
 }

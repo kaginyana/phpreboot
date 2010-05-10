@@ -5,7 +5,7 @@ import java.util.HashMap;
 
 import com.googlecode.phpreboot.model.Var;
 
-public final class Scope {
+public class Scope {
   private final HashMap<String,Var> varMap;
   private final Scope parent;
   

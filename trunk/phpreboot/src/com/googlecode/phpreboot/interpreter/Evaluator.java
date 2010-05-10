@@ -6,7 +6,6 @@ import java.dyn.MethodType;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import com.googlecode.phpreboot.ast.ArrayEntry;
 import com.googlecode.phpreboot.ast.ArrayValue;
@@ -53,7 +52,6 @@ import com.googlecode.phpreboot.ast.ForInitFuncall;
 import com.googlecode.phpreboot.ast.ForStep;
 import com.googlecode.phpreboot.ast.ForStepAssignment;
 import com.googlecode.phpreboot.ast.ForStepFuncall;
-import com.googlecode.phpreboot.ast.Fun;
 import com.googlecode.phpreboot.ast.FunNoReturnType;
 import com.googlecode.phpreboot.ast.FunReturnType;
 import com.googlecode.phpreboot.ast.FuncallApply;
@@ -95,15 +93,15 @@ import com.googlecode.phpreboot.ast.PrimaryParens;
 import com.googlecode.phpreboot.ast.PrimaryPrimaryArrayAccess;
 import com.googlecode.phpreboot.ast.PrimaryPrimaryFieldAccess;
 import com.googlecode.phpreboot.ast.ReturnType;
-import com.googlecode.phpreboot.ast.Type;
 import com.googlecode.phpreboot.ast.Visitor;
 import com.googlecode.phpreboot.ast.XmlsEmptyTag;
 import com.googlecode.phpreboot.ast.XmlsStartEndTag;
+import com.googlecode.phpreboot.compiler.Compiler;
 import com.googlecode.phpreboot.flwor.XPathExprVisitor;
 import com.googlecode.phpreboot.model.Function;
 import com.googlecode.phpreboot.model.Parameter;
-import com.googlecode.phpreboot.model.TypeToken;
-import com.googlecode.phpreboot.model.TypedVar;
+import com.googlecode.phpreboot.model.PrimitiveType;
+import com.googlecode.phpreboot.model.Type;
 import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.parser.ProductionEnum;
 import com.googlecode.phpreboot.regex.RegexEvaluator;
@@ -190,18 +188,12 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   public Object evalFunction(Function function, Object[] arguments, EvalEnv env) {
     Scope scope = new Scope(function.getScope());
-    scope.register(new Var(function.getName(), true, function.getMethodHandle()));
+    scope.register(new Var(function.getName(), true, PrimitiveType.ANY, function));
     
     List<Parameter> parameters = function.getParameters();
     for(int i = 0; i<parameters.size(); i++) {
       Parameter parameter = parameters.get(i);
-      TypeToken type = parameter.getType();
-      Var var;
-      if (type != null) {
-        var = new TypedVar(parameter.getName(), true, type.getRuntimeClass(), arguments[i]);
-      } else {
-        var = new Var(parameter.getName(), true, arguments[i]);
-      }
+      Var var = new Var(parameter.getName(), true, parameter.getType(), arguments[i]);
       scope.register(var);
     }
     
@@ -210,12 +202,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     try {
       Evaluator.INSTANCE.eval(block, evalEnv);
     } catch(ReturnError e) {
-      Object returnValue = e.value;
-      TypeToken returnType = function.getReturnType();
-      if (returnType != null) {
-        return returnType.getRuntimeClass().cast(returnValue);
-      }
-      return returnValue;
+      return function.getReturnType().getRuntimeClass().cast(e.value);
     }
     return null;
   }
@@ -239,65 +226,84 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   // --- function definition
   
-  private static void filterReadOnlyVars(HashMap<String,Object> map, Scope scope) {
+  private static void filterReadOnlyVars(HashMap<String,Var> map, Scope scope) {
     if (scope == null)
       return;
     filterReadOnlyVars(map, scope.getParent());
     for(Var var: scope.varMap()) {
       if (var.isReadOnly()) {
-        map.put(var.getName(), var.getValue());
+        String name = var.getName();
+        map.put(name, new Var(name, true, var.getType(), var.getValue()));
       }
     }
   }
   
   private static Scope filterReadOnlyVars(Scope scope) {
-    HashMap<String,Object> map = new HashMap<String, Object>();
+    HashMap<String,Var> map = new HashMap<String, Var>();
     filterReadOnlyVars(map, scope);
     
     Scope newScope = new Scope(null);
-    for(Map.Entry<String, Object> entry: map.entrySet()) {
-      newScope.register(new Var(entry.getKey(), true, entry.getValue()));
+    for(Var var: map.values()) {
+      newScope.register(var);
     }
     return newScope;
   }
   
-  private MethodHandle createFunction(String name, Parameters parametersNode, Block block, EvalEnv env) {
-    ArrayList<Parameter> parameters = new ArrayList<Parameter>();
-    for(com.googlecode.phpreboot.ast.Parameter parameter: parametersNode.getParameterStar()) {
+  private Function createFunction(boolean lambda, String name, Parameters parametersNode, Block block, EvalEnv env) {
+    List<com.googlecode.phpreboot.ast.Parameter> parameterStar = parametersNode.getParameterStar();
+    int size = parameterStar.size();
+    ArrayList<Parameter> parameters = new ArrayList<Parameter>(size);
+    Class<?>[] signature = new Class<?>[1 + size];
+    signature[0] = /*EvalEnv.class*/Object.class;
+    
+    for(int i=0; i<size; i++) {
       String parameterName;
-      TypeToken type;
+      Type type;
+      com.googlecode.phpreboot.ast.Parameter parameter = parameterStar.get(i);
       if (parameter instanceof ParameterAny) {
         parameterName = ((ParameterAny)parameter).getId().getValue();
-        type = null;
+        type = PrimitiveType.ANY;
       } else {
         ParameterTyped parameterType = (ParameterTyped)parameter;
         parameterName = parameterType.getId().getValue();
-        type = (TypeToken)eval(parameterType.getType(), env);
+        type = (Type)eval(parameterType.getType(), env);
       }
+      signature[i + 1] = type.getUnboxedRuntimeClass();
       parameters.add(new Parameter(parameterName, type));
     }
     
     ReturnType returnTypeNode = parametersNode.getReturnTypeOptional();
-    TypeToken returnType = (returnTypeNode == null)? null: (TypeToken)eval(returnTypeNode.getType(), env);
+    Type returnType = (returnTypeNode == null)? PrimitiveType.ANY: (Type)eval(returnTypeNode.getType(), env);
     
+    Function function = new Function(name, parameters, returnType, filterReadOnlyVars(env.getScope()), block);
     
-    Scope scope = env.getScope();
-    Function function = new Function(name, parameters, returnType, filterReadOnlyVars(scope), block);
+    // try to compile it
+    MethodHandle compileMH = Compiler.compile(function);
+    if (compileMH != null) {
+      function.setMethodHandle(compileMH);
+      return function;
+    }
     
     MethodHandle mh = MethodHandles.lookup().findVirtual(Function.class, "call",
         MethodType.methodType(Object.class, /*EvalEnv.class*/ Object.class, Object[].class));
     mh = MethodHandles.insertArguments(mh, 0, function);
-    mh = MethodHandles.collectArguments(mh, function.asMethodType());
+    mh = MethodHandles.collectArguments(mh, MethodType.genericMethodType(1 + size));
+    
+    MethodType functionType = MethodType.methodType(returnType.getUnboxedRuntimeClass(), signature);
+    mh = MethodHandles.convertArguments(mh, functionType);
+    
+    //System.err.println("create function handle "+name+" "+functionType);
+    
     function.setMethodHandle(mh);
-    return mh;
+    return function;
   }
   
   private void visitFun(String name, Parameters parameters, Block block, EvalEnv env) {
     Scope scope = env.getScope();
     checkVar(name, scope);
     
-    MethodHandle mh = createFunction(name, parameters, block, env);
-    Var var = new Var(name, true, mh);
+    Function function = createFunction(false, name, parameters, block, env);
+    Var var = new Var(name, true, PrimitiveType.ANY, function);
     scope.register(var);
   }
   @Override
@@ -314,12 +320,6 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
         fun_return_type.getParameters(),
         fun_return_type.getBlock(),
         env);
-    return null;
-  }
-  
-  @Override
-  public Object visit(Fun fun, EvalEnv env) {
-    
     return null;
   }
   
@@ -556,7 +556,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       while(sequence != null) {
         Scope foreachScope = new Scope(env.getScope());
         EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getEchoer(), env.getLabel());
-        foreachScope.register(new Var(name, true, sequence.getValue()));
+        foreachScope.register(new Var(name, true, PrimitiveType.ANY, sequence.getValue()));
         
         try {
           eval(instr, foreachEnv);
@@ -587,8 +587,8 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       while(sequence != null) {
         Scope foreachScope = new Scope(env.getScope());
         EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getEchoer(), env.getLabel());
-        foreachScope.register(new Var(keyName, true, sequence.getKey()));
-        foreachScope.register(new Var(valueName, true, sequence.getValue()));
+        foreachScope.register(new Var(keyName, true, PrimitiveType.ANY, sequence.getKey()));
+        foreachScope.register(new Var(valueName, true, PrimitiveType.ANY, sequence.getValue()));
         
         try {
           eval(instr, foreachEnv);
@@ -612,7 +612,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Scope scope = env.getScope();
     checkVar(name, scope);
     Object value = eval(let_declaration.getExpr(), env);
-    Var var = new Var(name, true, value);
+    Var var = new Var(name, true, PrimitiveType.ANY, value);
     scope.register(var);
     return null;
   }
@@ -625,8 +625,8 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     String name = declaration_type_empty.getId().getValue();
     Scope scope = env.getScope();
     checkVar(name, scope);
-    TypeToken type = (TypeToken)eval(declaration_type_empty.getType(), env);
-    TypedVar var = new TypedVar(name, false, type.getRuntimeClass(), type.getDefaultValue());
+    PrimitiveType type = (PrimitiveType)eval(declaration_type_empty.getType(), env);
+    Var var = new Var(name, false, type, type.getDefaultValue());
     scope.register(var);
     return null;
   }
@@ -636,9 +636,9 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Scope scope = env.getScope();
     checkVar(name, scope);
     Object value = eval(declaration_type_init.getExpr(), env);
-    TypeToken type = (TypeToken)eval(declaration_type_init.getType(), env);
+    PrimitiveType type = (PrimitiveType)eval(declaration_type_init.getType(), env);
     
-    TypedVar var = new TypedVar(name, false, type.getRuntimeClass(), value);
+    Var var = new Var(name, false, type, value);
     scope.register(var);
     return null;
     
@@ -653,7 +653,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Object value = eval(assignment_id.getExpr(), env);
     if (var == null) {
       // auto declaration
-      var = new Var(name, false, value);
+      var = new Var(name, false, PrimitiveType.ANY, value);
       scope.register(var);
     } else {
       var.setValue(value);
@@ -730,7 +730,11 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     List<Expr> exprStar = funcall_call.getExprStar();
     Var var = env.getScope().lookup(name);
     if (var != null) {
-      return methodHandleCall(var.getValue(), exprStar, env);
+      Object value = var.getValue();
+      if (!(value instanceof Function)) {
+        throw RT.error("variable %s doesn't reference a function: %s", name, value);
+      }
+      return methodHandleCall(value, exprStar, env);
     }
     
     int size = exprStar.size();
@@ -750,6 +754,9 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   @Override
   public Object visit(FuncallApply funcall_apply, EvalEnv env) {
     Object primary = eval(funcall_apply.getPrimary(), env);
+    if (!(primary instanceof Function)) {
+      throw RT.error("expression is not a function: %s", primary);
+    }
     return methodHandleCall(primary, funcall_apply.getExprStar(), env);
   }
   
@@ -761,12 +768,9 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       Expr expr = exprStar.get(i);
       values[i + 1] = eval(expr, env);
     }
-
-    if (!(value instanceof MethodHandle)) {
-      throw RT.error("value is not a function: %s", value);
-    }
+    
     try {
-      return ((MethodHandle)value).invokeVarargs(values);
+      return ((Function)value).getMethodHandle().invokeVarargs(values);
     } catch (Throwable e) {
       throw RT.error(e);
     }
@@ -851,7 +855,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   @Override
   public Object visit(ExprFun expr_fun, EvalEnv env) {
-    return createFunction("it", expr_fun.getParameters(), expr_fun.getBlock(), env);
+    return createFunction(true, "it", expr_fun.getParameters(), expr_fun.getBlock(), env);
   }
 
   @Override
@@ -909,16 +913,16 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   // --- type conversions
   
   @Override
-  public Object visit(Type type, EvalEnv env) {
+  public Object visit(com.googlecode.phpreboot.ast.Type type, EvalEnv env) {
     String name = type.getId().getValue();
-    return TypeToken.lookup(name);
+    return PrimitiveType.lookup(name);
   }
   
   @Override
   public Object visit(ExprToType expr_to_type, EvalEnv env) {
     Object value = eval(expr_to_type.getExpr(), env);
-    TypeToken typeToken = (TypeToken)eval(expr_to_type.getType(), env);
-    switch(typeToken) {
+    PrimitiveType type = (PrimitiveType)eval(expr_to_type.getType(), env);
+    switch(type) {
     case ANY:
       return value;
     case BOOLEAN:
@@ -934,7 +938,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     case SEQUENCE:
       return RT.toSequence(value);
     default:
-      throw new AssertionError("conversion to an unknown type "+typeToken);
+      throw new AssertionError("conversion to an unknown type "+type);
     }
   }
   

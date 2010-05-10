@@ -16,6 +16,7 @@ import com.googlecode.phpreboot.doc.Doclet;
 import com.googlecode.phpreboot.interpreter.Analyzer;
 import com.googlecode.phpreboot.interpreter.Interpreter;
 import com.googlecode.phpreboot.interpreter.Scope;
+import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.module.LangModule;
 import com.googlecode.phpreboot.sql.GenericSQLConnection;
@@ -163,7 +164,7 @@ public class Main {
 
     GenericSQLConnection sqlConnection = new GenericSQLConnection(jdbcURL);
     Scope rootScope = new Scope(null);
-    rootScope.register(new Var("SQL_CONNECTION", true, sqlConnection));
+    rootScope.register(new Var("SQL_CONNECTION", true, PrimitiveType.ANY, sqlConnection));
 
     // register modules
     new LangModule().registerModule(rootScope);

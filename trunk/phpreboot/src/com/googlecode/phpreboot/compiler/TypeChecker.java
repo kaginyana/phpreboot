@@ -1,86 +1,38 @@
 package com.googlecode.phpreboot.compiler;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import com.googlecode.phpreboot.ast.AssignmentId;
 import com.googlecode.phpreboot.ast.Block;
 import com.googlecode.phpreboot.ast.Expr;
 import com.googlecode.phpreboot.ast.ExprId;
+import com.googlecode.phpreboot.ast.ExprLiteral;
 import com.googlecode.phpreboot.ast.ExprPrimary;
-import com.googlecode.phpreboot.ast.Fun;
+import com.googlecode.phpreboot.ast.FuncallCall;
 import com.googlecode.phpreboot.ast.Instr;
 import com.googlecode.phpreboot.ast.InstrBlock;
 import com.googlecode.phpreboot.ast.InstrEcho;
+import com.googlecode.phpreboot.ast.InstrReturn;
 import com.googlecode.phpreboot.ast.LiteralBool;
 import com.googlecode.phpreboot.ast.LiteralNull;
+import com.googlecode.phpreboot.ast.LiteralSingle;
 import com.googlecode.phpreboot.ast.LiteralString;
 import com.googlecode.phpreboot.ast.LiteralValue;
 import com.googlecode.phpreboot.ast.Node;
-import com.googlecode.phpreboot.ast.Parameter;
-import com.googlecode.phpreboot.ast.ParameterTyped;
-import com.googlecode.phpreboot.ast.ExprLiteral;
+import com.googlecode.phpreboot.ast.PrimaryFuncall;
 import com.googlecode.phpreboot.ast.Visitor;
-import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.Function;
-import com.googlecode.phpreboot.model.LocalVar;
-import com.googlecode.phpreboot.model.Symbol;
+import com.googlecode.phpreboot.model.Parameter;
+import com.googlecode.phpreboot.model.PrimitiveType;
+import com.googlecode.phpreboot.model.Type;
+import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.parser.ProductionEnum;
 import com.googlecode.phpreboot.runtime.RT;
 
 public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
-  /*
-  public void typeCheck(Fun functionNode, Scope scope) {
-    Signature signature = functionNode.getSignature();
-    
-    com.googlecode.phpreboot.ast.Type typeOptional = signature.getTypeOptional();
-    Type returnType = (typeOptional !=null)? asType(typeOptional): PrimitiveType.VOID;
-    
-    TypeCheckEnv env = new TypeCheckEnv(new Scope(scope), returnType);
-    
-    ArrayList<Type> parametertypes = new ArrayList<Type>();
-    for(Parameter parameter: signature.getParameterStar()) {
-      Type type = (parameter instanceof ParameterTyped)?
-          asType(((ParameterTyped)parameter).getType()):
-          PrimitiveType.ANY;
-      parametertypes.add(type);
-    }
-    
-    typeCheck(functionNode.getBlock(), env);
-  }
-  
-  
-  // --- ast type node to type conversions
-  
-  public static Type asType(com.googlecode.phpreboot.ast.Type typeNode) {
-    return typeNode.accept(TYPE_VISITOR, null);
-  }
-  private static Visitor<Type, Void, RuntimeException> TYPE_VISITOR =
-    new Visitor<Type, Void, RuntimeException>() {
-    
-    @Override
-    public Type visit(TypeAny type_any, Void unused) {
-      return PrimitiveType.ANY; 
-    }
-    @Override
-    public Type visit(TypeBoolean type_boolean, Void unused) {
-      return PrimitiveType.BOOLEAN; 
-    }
-    @Override
-    public Type visit(TypeInt type_int, Void unused) {
-      return PrimitiveType.INT; 
-    }
-    @Override
-    public Type visit(TypeDouble type_double, Void unused) {
-      return PrimitiveType.DOUBLE; 
-    }
-  };
-  
-  
-  
   // ---
   
-  private Type typeCheck(Node node, TypeCheckEnv env) {
+  public Type typeCheck(Node node, TypeCheckEnv env) {
     Type type = node.accept(this, env);
     node.setTypeAttribute(type);
     return type;
@@ -89,21 +41,13 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   
   // --- helpers
   
-  private void checksIn(Type type, Type expectedType) {
-    if (type == PrimitiveType.ANY || type == expectedType)
-      return;
-    throw RT.error("illegal type %s for expression", type);
-  }
-  
-  private void checksIn(Type type, Type expectedType1, Type expectedType2) {
-    if (type == PrimitiveType.ANY || type == expectedType1 || type == expectedType2)
-      return;
-    throw RT.error("illegal type %s for expression", type);
+  private Type typeCheckUnaryOp(Type type) {
+    if (type == PrimitiveType.ANY ||  type == PrimitiveType.INT ||  type == PrimitiveType.DOUBLE)
+      return type;
+    throw RT.error("illegal type %s for unary expression", type);
   }
   
   private Type typeCheckBinaryOp(Type left, Type right) {
-    checksIn(left, PrimitiveType.INT, PrimitiveType.DOUBLE);
-    checksIn(right, PrimitiveType.INT, PrimitiveType.DOUBLE);
     if (left == PrimitiveType.ANY || right == PrimitiveType.ANY )
       return PrimitiveType.ANY;
     if (left == PrimitiveType.INT) {
@@ -134,13 +78,20 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   }
   
   
-  // --- visit instruction
+  // --- default visit
+  
+  @Override
+  protected Type visit(Node node, TypeCheckEnv env) {
+    System.err.println("code is not compilable: "+node.getKind());
+    throw CodeNotCompilableException.INSTANCE;
+  }
   
   
+  // --- visit instructions
   
   @Override
   public Type visit(Block block, TypeCheckEnv env) {
-    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(new Scope(env.getScope()), env.getDeclaredReturnType());
+    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(new LocalScope(env.getScope()), env.getFunctionReturnType(), env.getBindMap());
     for(Instr instr: block.getInstrStar()) {
       typeCheck(instr, typeCheckEnv);
     }
@@ -159,23 +110,79 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   }
   
   @Override
+  public Type visit(InstrReturn instr_return, TypeCheckEnv env) {
+    Expr expr = instr_return.getExprOptional();
+    Type type = (expr == null)? PrimitiveType.VOID: typeCheck(expr, env);
+    
+    isCompatible(env.getFunctionReturnType(), type);
+    return env.getFunctionReturnType();
+  }
+  
+  
+  @Override
   public Type visit(AssignmentId assignment_id, TypeCheckEnv env) {
+    Type exprType = typeCheck(assignment_id.getExpr(), env);
+    
     String name = assignment_id.getId().getValue();
-    Scope scope = env.getScope();
-    Symbol symbol = scope.lookup(name);
-    Type varType;
-    if (symbol == null) {
+    LocalScope scope = env.getScope();
+    Var var = scope.lookup(name);
+    if (var == null) {
       // auto-declaration
-      LocalVar var = new LocalVar(name, PrimitiveType.ANY);
+      var = new LocalVar(name, false, PrimitiveType.ANY, scope.nextSlot(PrimitiveType.ANY));
       scope.register(var);
-      varType = PrimitiveType.ANY;
     } else {
-      varType = symbol.getType();
+      
+      if (var.isReadOnly())
+        throw RT.error("try to assign a read only variable %s", name);
+      
+      isCompatible(var.getType(), exprType);
     }
     
-    Type type = typeCheck(assignment_id.getExpr(), env);
-    isCompatible(varType, type);
-    return null;
+    assignment_id.setSymbolAttribute((LocalVar)var);
+    return var.getType();
+  }
+  
+  
+  // --- visit fun call
+  
+  @Override
+  public Type visit(FuncallCall funcall_call, TypeCheckEnv env) {
+    String name = funcall_call.getId().getValue();
+    List<Expr> exprStar = funcall_call.getExprStar();
+    Var var = env.getScope().lookup(name);
+    if (var != null) {
+      Object value = var.getValue();
+      if (!(value instanceof Function)) {
+        throw RT.error("variable %s doesn't reference a function: %s", name, value);
+      }
+      
+      Function function = (Function)value;
+      int size = exprStar.size();
+      List<Parameter> parameters = function.getParameters();
+      
+      if (size != parameters.size()) {
+        throw RT.error("argument number mismath with function %s", name);
+      }
+      
+      for(int i=0; i<size; i++) {
+        Type exprType = typeCheck(exprStar.get(i), env);
+        isCompatible(parameters.get(i).getType(), exprType);
+      }
+      
+      LocalVar localVar = env.getBindMap().bind(function, PrimitiveType.FUNCTION);
+      funcall_call.setSymbolAttribute(localVar);
+      return function.getReturnType();
+    }
+    
+    throw CodeNotCompilableException.INSTANCE;
+  }
+  
+  
+  // --- visit primary
+  
+  @Override
+  public Type visit(PrimaryFuncall primary_funcall, TypeCheckEnv env) {
+    return typeCheck(primary_funcall.getFuncall(), env);
   }
   
   
@@ -184,10 +191,40 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   @Override
   public Type visit(ExprId expr_id, TypeCheckEnv env) {
     String name = expr_id.getId().getValue();
-    Symbol var = env.getScope().lookup(name);
-    if (var != null)
-      return var.getType();
-    throw RT.error("unknown variable %s", name);
+    Var var = env.getScope().lookup(name);
+    if (var == null) {
+      throw RT.error("unknown variable %s", name);
+    }
+      
+    Type type = var.getType();
+    if (var instanceof LocalVar) {
+      expr_id.setSymbolAttribute((LocalVar)var);
+      return type;
+    }
+    
+    // constants
+    Object value = var.getValue();
+    if (value instanceof Boolean) {
+      expr_id.setSymbolAttribute(LocalVar.createConstantFoldable(value));
+      return PrimitiveType.BOOLEAN;
+    }
+    if (value instanceof Integer) {
+      expr_id.setSymbolAttribute(LocalVar.createConstantFoldable(value));
+      return PrimitiveType.INT;
+    }
+    if (value instanceof Double) {
+      expr_id.setSymbolAttribute(LocalVar.createConstantFoldable(value));
+      return PrimitiveType.DOUBLE;
+    }
+    if (value instanceof String) {
+      expr_id.setSymbolAttribute(LocalVar.createConstantFoldable(value));
+      return PrimitiveType.STRING;
+    }
+    
+    // bound constant
+    LocalVar bindVar = env.getBindMap().bind(value, type);
+    expr_id.setSymbolAttribute(bindVar);
+    return type;
   }
   
   @Override
@@ -203,13 +240,12 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     ProductionEnum kind = expr.getKind();
     switch(kind) {
     case expr_unary_plus:
-      checksIn(type, PrimitiveType.INT, PrimitiveType.DOUBLE);
-      return type;
+      return typeCheckUnaryOp(type);
     case expr_unary_minus:
-      checksIn(type, PrimitiveType.INT, PrimitiveType.DOUBLE);
-      return type;
+      return typeCheckUnaryOp(type);
     case expr_unary_not:
-      checksIn(type, PrimitiveType.BOOLEAN);
+      if (type != PrimitiveType.BOOLEAN && type != PrimitiveType.ANY)
+        throw RT.error("incompatible type, unary not require a boolean or any");
       return PrimitiveType.BOOLEAN;
     default:
     }
@@ -219,6 +255,8 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     Type right = typeCheck(node2, env);
     switch(kind) {
     case expr_plus:
+      if (left == PrimitiveType.STRING || right == PrimitiveType.STRING)
+        return PrimitiveType.STRING;
       return typeCheckBinaryOp(left, right);
     case expr_minus:
       return typeCheckBinaryOp(left, right);
@@ -255,13 +293,18 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   }
   
   @Override
+  public Type visit(LiteralSingle literal_single, TypeCheckEnv env) {
+    return typeCheck(literal_single.getSingleLiteral(), env);
+  }
+  
+  @Override
   public Type visit(LiteralBool literal_bool, TypeCheckEnv env) {
     return PrimitiveType.BOOLEAN;
   }
   
   @Override
   public Type visit(LiteralNull literal_null, TypeCheckEnv env) {
-    return PrimitiveType.NULL;
+    return PrimitiveType.ANY;
   }
   
   @Override
@@ -273,5 +316,5 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   @Override
   public Type visit(LiteralString literal_string, TypeCheckEnv env) {
     return PrimitiveType.STRING;
-  }*/
+  }
 }

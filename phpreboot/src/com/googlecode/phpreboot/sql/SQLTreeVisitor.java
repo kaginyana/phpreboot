@@ -57,6 +57,7 @@ import com.googlecode.phpreboot.ast.WhereClause;
 import com.googlecode.phpreboot.interpreter.EvalEnv;
 import com.googlecode.phpreboot.interpreter.Evaluator;
 import com.googlecode.phpreboot.interpreter.Scope;
+import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.parser.ProductionEnum;
 import com.googlecode.phpreboot.runtime.SQLCursor;
@@ -146,7 +147,7 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException> {
     Scope scope = env.getEvalEnv().getScope();
     Var scriptVar = scope.lookup(name);
     if (scriptVar == null) {
-      scriptVar = new Var(name, false, cursor);
+      scriptVar = new Var(name, false, PrimitiveType.ANY, cursor);
       scope.register(scriptVar);
     } else {
       scriptVar.setValue(cursor);

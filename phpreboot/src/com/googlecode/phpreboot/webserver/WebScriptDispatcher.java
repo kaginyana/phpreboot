@@ -12,6 +12,7 @@ import java.util.Map;
 
 import com.googlecode.phpreboot.interpreter.Interpreter;
 import com.googlecode.phpreboot.interpreter.Scope;
+import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.runtime.Array;
 import com.googlecode.phpreboot.sql.GenericSQLConnection;
@@ -114,7 +115,7 @@ public class WebScriptDispatcher extends GrizzlyAdapter {
     server.set("DOCUMENT_ROOT", rootPath.toString());
     //server.__set__("AUTH_TYPE", request.getAuthType());
     
-    scope.register(new Var("_SERVER", false, server));
+    scope.register(new Var("_SERVER", false, PrimitiveType.ARRAY, server));
   }
   
   private void fillGetOrPost(GrizzlyRequest request, Scope scope) {
@@ -141,8 +142,8 @@ public class WebScriptDispatcher extends GrizzlyAdapter {
         get = new Array();
       }
     
-    scope.register(new Var("_GET", false, get));
-    scope.register(new Var("_POST", false, post));
+    scope.register(new Var("_GET", false, PrimitiveType.ARRAY, get));
+    scope.register(new Var("_POST", false, PrimitiveType.ARRAY, post));
   }
   
   private void handleScript(InputStream input, OutputStream output, GrizzlyRequest request) {
@@ -150,7 +151,7 @@ public class WebScriptDispatcher extends GrizzlyAdapter {
     fillRequestInfos(request, scope);
     
     GenericSQLConnection sqlConnection = new GenericSQLConnection(jdbcURL);
-    scope.register(new Var("SQL_CONNECTION", true, sqlConnection));
+    scope.register(new Var("SQL_CONNECTION", true, PrimitiveType.ANY, sqlConnection));
     
     Reader reader = new InputStreamReader(input);
     PrintWriter writer = new PrintWriter(output);

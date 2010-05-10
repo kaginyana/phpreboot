@@ -6,6 +6,8 @@ import java.dyn.MethodHandles.Lookup;
 import java.lang.reflect.Method;
 
 import com.googlecode.phpreboot.interpreter.Scope;
+import com.googlecode.phpreboot.model.Function;
+import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Var;
 
 public abstract class Module {
@@ -27,7 +29,11 @@ public abstract class Module {
       // generify signature
       mh = MethodHandles.convertArguments(mh, mh.type().generic());
       
-      Var var = new Var(method.getName(), true, mh);
+      // FIXME
+      Function function = new Function(method.getName(), null, null, null, null);
+      function.setMethodHandle(mh);
+      
+      Var var = new Var(method.getName(), true, PrimitiveType.ANY, function);
       scope.register(var);
     }
   }

@@ -3,10 +3,9 @@ package com.googlecode.phpreboot;
 import java.io.PrintWriter;
 import java.sql.SQLException;
 
-import com.googlecode.phpreboot.compiler.PrimitiveType;
-import com.googlecode.phpreboot.interpreter.Evaluator;
 import com.googlecode.phpreboot.interpreter.Interpreter;
 import com.googlecode.phpreboot.interpreter.Scope;
+import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.sql.GenericSQLConnection;
 import com.googlecode.phpreboot.tools.Analyzers;
@@ -28,7 +27,7 @@ public class SQLTest {
       GenericSQLConnection sqlConnection = new GenericSQLConnection(url);
       
       Scope scope = new Scope(null);
-      scope.register(new Var("SQL_CONNECTION", true, sqlConnection));
+      scope.register(new Var("SQL_CONNECTION", true, PrimitiveType.ANY, sqlConnection));
       
       PrintWriter writer = new PrintWriter(System.out);
       Interpreter interpreter = new Interpreter(writer, scope);

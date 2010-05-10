@@ -1,0 +1,23 @@
+
+let CONST_VALUE = 7; 
+
+let array = ["foo"]
+
+function foo(int i):int {
+  return i * i + CONST_VALUE // + size(array)
+}
+
+function bar():int {
+  return foo(3)
+}
+
+function fibo(int n):int {
+  if (n < 2)
+    return 1
+  return fibo(n - 1) + fibo(n - 2)
+}
+
+echo foo(3)
+echo bar()
+echo fibo(7)
+

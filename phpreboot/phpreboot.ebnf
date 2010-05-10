@@ -151,8 +151,8 @@ types:
   'xml_text': String
   
 attributes:
-  symbol: com.googlecode.phpreboot.model.Symbol
-  type: com.googlecode.phpreboot.compiler.Type  
+  symbol: com.googlecode.phpreboot.compiler.LocalVar
+  type: com.googlecode.phpreboot.model.Type  
   callsite: java.dyn.CallSite
   
 starts:

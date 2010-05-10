@@ -2,9 +2,9 @@ package com.googlecode.phpreboot.model;
 
 public class Parameter {
   private final String name;
-  private final /*maybenull*/TypeToken type;
+  private final Type type;
 
-  public Parameter(String name, /*maybenull*/TypeToken type) {
+  public Parameter(String name, Type type) {
     this.name = name;
     this.type = type;
   }
@@ -12,7 +12,12 @@ public class Parameter {
   public String getName() {
     return name;
   }
-  public /*maybenull*/TypeToken getType() {
+  public Type getType() {
     return type;
+  }
+  
+  @Override
+  public String toString() {
+    return type+" "+name;
   }
 }

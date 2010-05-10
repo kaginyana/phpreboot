@@ -21,3 +21,10 @@ echo foo(3)
 echo bar()
 echo fibo(7)
 
+lambda = function(x) {
+  return x + CONST_VALUE
+}
+
+echo lambda(3)
+
+

@@ -20,6 +20,7 @@ import com.googlecode.phpreboot.model.Function;
 import com.googlecode.phpreboot.model.Parameter;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Type;
+import com.googlecode.phpreboot.runtime.RT;
 
 public class Compiler {
   private static int counter;
@@ -58,6 +59,8 @@ public class Compiler {
     mv.visitMaxs(0, 0);
     mv.visitEnd();
     
+    generateStaticInit(cw);
+    
     cw.visitEnd();
     
     byte[] array = cw.toByteArray();
@@ -74,6 +77,19 @@ public class Compiler {
     return mh;
   }
   
+  private static void generateStaticInit(ClassWriter cw) {
+    MethodVisitor mv = cw.visitMethod(Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
+    mv.visitCode();
+    
+    mv.visitLdcInsn(org.objectweb.asm.Type.getType(RT.class));
+    mv.visitLdcInsn("bootstrap");
+    mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/dyn/Linkage", "registerBootstrapMethod", "(Ljava/lang/Class;Ljava/lang/String;)V");
+    mv.visitInsn(Opcodes.RETURN);
+    
+    mv.visitMaxs(0, 0);
+    mv.visitEnd();
+  }
+
   private static Class<?> asClass(Type type) {
     if (type instanceof PrimitiveType) {
       switch((PrimitiveType)type) {

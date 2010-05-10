@@ -191,7 +191,7 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     
     Expr expr = instr_return.getExprOptional();
     if (expr != null) {
-      gen(expr, env);
+      gen(expr, env.expectedType(type));
       insertCast(type, expr.getTypeAttribute());
     }
     
@@ -308,10 +308,11 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     Type expectedType = env.getExpectedType();
     GenEnv newEnv = env.expectedType(PrimitiveType.ANY);
     
-    insertCast(type, leftNode.getTypeAttribute());
     Type left = gen(leftNode, newEnv);
-    insertCast(type, rightNode.getTypeAttribute());
+    //insertCast(left, leftNode.getTypeAttribute());
+    
     Type right = gen(rightNode, newEnv);
+    //insertCast(type, rightNode.getTypeAttribute());
     
     if (left == PrimitiveType.ANY || right == PrimitiveType.ANY) {
       indy(opName, expectedType, left, right);
@@ -380,6 +381,8 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       return visitBinaryOp("mult", IMUL, unaryNode, binaryNode, type, env);
     case expr_div:
       return visitBinaryOp("div", IDIV, unaryNode, binaryNode, type, env);
+    case expr_mod:
+      return visitBinaryOp("mod", IREM, unaryNode, binaryNode, type, env);
 
     case expr_lt:
       return visitBinaryTest("lt", IF_ICMPLT, unaryNode, binaryNode, env);

@@ -5,19 +5,12 @@ import java.dyn.MethodHandle;
 import java.dyn.MethodHandles;
 import java.dyn.MethodHandles.Lookup;
 import java.dyn.MethodType;
-import java.io.InputStreamReader;
-import java.io.Reader;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 
 import com.googlecode.phpreboot.ast.Node;
-import com.googlecode.phpreboot.interpreter.Analyzer;
-import com.googlecode.phpreboot.interpreter.Interpreter;
 import com.googlecode.phpreboot.runtime.Array.Entry;
-import com.googlecode.phpreboot.tools.Analyzers;
-
-
 
 public class RT {
   public static RuntimeException error(String format, Object arg) {
@@ -998,5 +991,78 @@ public class RT {
     } catch (Throwable e) {
       throw RT.error(e);
     } 
+  }
+  
+  
+  // --- operators
+  
+  private final static MethodHandle plus;
+  private final static MethodHandle minus;
+  private final static MethodHandle mult;
+  private final static MethodHandle div;
+  private final static MethodHandle mod;
+  
+  private final static MethodHandle lt;
+  private final static MethodHandle le;
+  private final static MethodHandle gt;
+  private final static MethodHandle ge;
+  static {
+    Lookup lookup = MethodHandles.publicLookup();
+    plus = lookup.findStatic(RT.class, "plus",
+        MethodType.methodType(Object.class, Object.class, Object.class));
+    minus = lookup.findStatic(RT.class, "minus",
+        MethodType.methodType(Object.class, Object.class, Object.class));
+    mult = lookup.findStatic(RT.class, "mult",
+        MethodType.methodType(Object.class, Object.class, Object.class));
+    div = lookup.findStatic(RT.class, "div",
+        MethodType.methodType(Object.class, Object.class, Object.class));
+    mod = lookup.findStatic(RT.class, "mod",
+        MethodType.methodType(Object.class, Object.class, Object.class));
+    
+    lt = lookup.findStatic(RT.class, "lt",
+        MethodType.methodType(boolean.class, Object.class, Object.class));
+    le = lookup.findStatic(RT.class, "le",
+        MethodType.methodType(boolean.class, Object.class, Object.class));
+    gt = lookup.findStatic(RT.class, "ge",
+        MethodType.methodType(boolean.class, Object.class, Object.class));
+    ge = lookup.findStatic(RT.class, "ge",
+        MethodType.methodType(boolean.class, Object.class, Object.class));
+  }
+  
+  public static CallSite bootstrap(Class<?> declaringClass, String name, MethodType methodType) {
+    //FIXME optimize !!
+    MethodHandle target;
+    if ("plus".equals(name)) {
+      target = plus;
+    } else
+      if ("minus".equals(name)) {
+        target = minus;
+      } else
+        if ("mult".equals(name)) {
+          target = mult;
+        } else
+          if ("div".equals(name)) {
+            target = div;
+          } else
+            if ("mod".equals(name)) {
+              target = mod;
+            } else
+              if ("lt".equals(name)) {
+                target = lt;
+              } else
+                if ("le".equals(name)) {
+                  target = le;
+                } else
+                  if ("gt".equals(name)) {
+                    target = gt;
+                  } else
+                    if ("ge".equals(name)) {
+                      target = ge;
+                    } else
+                      throw new AssertionError("unknown operator "+name);
+    
+    CallSite callSite = new CallSite(declaringClass, name, methodType);
+    callSite.setTarget(MethodHandles.convertArguments(target, methodType));
+    return callSite;
   }
 }

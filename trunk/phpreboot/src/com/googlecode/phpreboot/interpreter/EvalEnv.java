@@ -6,7 +6,7 @@ public class EvalEnv {
   private final Echoer echoer;
   private final String label;
   
-  public EvalEnv(Scope scope, Echoer echoer, /*maybenull*/String label) {
+  public EvalEnv(Scope scope, Echoer echoer, /*@Nullable*/String label) {
     this.scope = scope;
     this.echoer = echoer;
     this.label = label;
@@ -18,7 +18,7 @@ public class EvalEnv {
   public Echoer getEchoer() {
     return echoer;
   }
-  public /*maybenull*/String getLabel() {
+  public /*@Nullable*/String getLabel() {
     return label;
   }
 }

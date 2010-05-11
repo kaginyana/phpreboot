@@ -264,6 +264,8 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
       return typeCheckBinaryOp(left, right);
     case expr_div:
       return typeCheckBinaryOp(left, right);
+    case expr_mod:
+      return typeCheckBinaryOp(left, right);
 
     case expr_eq:
     case expr_ne:

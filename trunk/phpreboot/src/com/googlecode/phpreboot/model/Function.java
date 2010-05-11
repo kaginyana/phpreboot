@@ -12,11 +12,11 @@ public class Function {
   private final String name;
   private final List<Parameter> parameters;
   private final Type returnType;
-  private final /*maybenull*/Scope scope;
+  private final /*@Nullable*/Scope scope;
   private final Block block;
   private /*volatile*/ MethodHandle methodHandle;
   
-  public Function(String name, List<Parameter> parameters, Type returnType, /*maybenull*/Scope scope, Block block) {
+  public Function(String name, List<Parameter> parameters, Type returnType, /*@Nullable*/Scope scope, Block block) {
     this.name = name;
     this.parameters = parameters;
     this.returnType = returnType;
@@ -33,7 +33,7 @@ public class Function {
   public Type getReturnType() {
     return returnType;
   }
-  public /*maybenull*/Scope getScope() {
+  public /*@Nullable*/Scope getScope() {
     return scope;
   }
   public Block getBlock() {

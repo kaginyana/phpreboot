@@ -5,6 +5,7 @@ import java.io.PrintWriter;
 import com.googlecode.phpreboot.runtime.Array;
 
 public abstract class Echoer {
+  //TODO add overloaded echo, one by primitive types
   public abstract void echo(Object value);
   
   public static Echoer writerEchoer(final PrintWriter writer) {

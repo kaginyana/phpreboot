@@ -11,6 +11,7 @@ import java.util.Map;
 
 import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.runtime.Array.Entry;
+import com.sun.grizzly.util.ConcurrentReferenceHashMap.Option;
 
 public class RT {
   public static RuntimeException error(String format, Object arg) {
@@ -996,73 +997,199 @@ public class RT {
   
   // --- operators
   
-  private final static MethodHandle plus;
-  private final static MethodHandle minus;
-  private final static MethodHandle mult;
-  private final static MethodHandle div;
-  private final static MethodHandle mod;
-  
-  private final static MethodHandle lt;
-  private final static MethodHandle le;
-  private final static MethodHandle gt;
-  private final static MethodHandle ge;
-  static {
-    Lookup lookup = MethodHandles.publicLookup();
-    plus = lookup.findStatic(RT.class, "plus",
-        MethodType.methodType(Object.class, Object.class, Object.class));
-    minus = lookup.findStatic(RT.class, "minus",
-        MethodType.methodType(Object.class, Object.class, Object.class));
-    mult = lookup.findStatic(RT.class, "mult",
-        MethodType.methodType(Object.class, Object.class, Object.class));
-    div = lookup.findStatic(RT.class, "div",
-        MethodType.methodType(Object.class, Object.class, Object.class));
-    mod = lookup.findStatic(RT.class, "mod",
-        MethodType.methodType(Object.class, Object.class, Object.class));
+  enum Operation {
+    plus(Object.class),
+    minus(Object.class),
+    mult(Object.class),
+    div(Object.class),
+    mod(Object.class),
     
-    lt = lookup.findStatic(RT.class, "lt",
-        MethodType.methodType(boolean.class, Object.class, Object.class));
-    le = lookup.findStatic(RT.class, "le",
-        MethodType.methodType(boolean.class, Object.class, Object.class));
-    gt = lookup.findStatic(RT.class, "ge",
-        MethodType.methodType(boolean.class, Object.class, Object.class));
-    ge = lookup.findStatic(RT.class, "ge",
-        MethodType.methodType(boolean.class, Object.class, Object.class));
+    eq(boolean.class),
+    ne(boolean.class),
+    
+    lt(boolean.class),
+    le(boolean.class),
+    gt(boolean.class),
+    ge(boolean.class);
+    
+    final MethodHandle generic;
+    
+    private Operation(Class<?> returnType) {
+      generic = MethodHandles.lookup().findStatic(RT.class, name(),
+          MethodType.methodType(returnType, Object.class, Object.class));
+    }
   }
   
   public static CallSite bootstrap(Class<?> declaringClass, String name, MethodType methodType) {
-    //FIXME optimize !!
-    MethodHandle target;
-    if ("plus".equals(name)) {
-      target = plus;
-    } else
-      if ("minus".equals(name)) {
-        target = minus;
-      } else
-        if ("mult".equals(name)) {
-          target = mult;
-        } else
-          if ("div".equals(name)) {
-            target = div;
-          } else
-            if ("mod".equals(name)) {
-              target = mod;
-            } else
-              if ("lt".equals(name)) {
-                target = lt;
-              } else
-                if ("le".equals(name)) {
-                  target = le;
-                } else
-                  if ("gt".equals(name)) {
-                    target = gt;
-                  } else
-                    if ("ge".equals(name)) {
-                      target = ge;
-                    } else
-                      throw new AssertionError("unknown operator "+name);
-    
+    Operation operation = Operation.valueOf(name);
     CallSite callSite = new CallSite(declaringClass, name, methodType);
+    MethodHandle target = RTConvertWorkaround.convertArguments(operation.generic, methodType);
+    callSite.setTarget(target);
+    return callSite;
+  }
+  
+  /*
+  public static CallSite bootstrap(Class<?> declaringClass, String name, MethodType methodType) {
+    Operation operation = Operation.valueOf(name);
+    CallSite callSite = new CallSite(declaringClass, name, methodType);
+    
+    Class<?> leftType = methodType.parameterType(0);
+    Class<?> rightType = methodType.parameterType(1);
+    
+    MethodHandle target;
+    if (leftType == Object.class) {
+      if (rightType == Object.class) {
+        target = Operation.fallback_any_any;
+      } else {
+        target = Operation.fallback_any_right(rightType);
+      }
+    } else {
+      target = Operation.fallback_left_any(leftType);
+    }
+    
+    target = MethodHandles.insertArguments(target, 0, operation, callSite);
+    
     callSite.setTarget(MethodHandles.convertArguments(target, methodType));
     return callSite;
   }
+  
+  public enum Operation {
+    plus,
+    minus;
+    
+    private final MethodHandle op_int_int;
+    private final MethodHandle op_double_double;
+    
+    Operation() {
+      Lookup lookup = MethodHandles.lookup();
+      op_int_int = lookup.findStatic(RT.class, name(),
+          MethodType.methodType(int.class, int.class, int.class));
+      op_double_double = lookup.findStatic(RT.class, name(),
+          MethodType.methodType(double.class, double.class, double.class));
+    }
+    
+    private MethodHandle getMethodHandle(Class<?> leftType, Class<?> rightType) {
+      if (leftType == int.class || leftType == Integer.class) {
+        if (rightType == int.class || rightType == Integer.class) {
+          return op_int_int;
+        } 
+        if (rightType == double.class || rightType == Double.class) {
+          return MethodHandles.convertArguments(op_double_double, op_double_double.type());
+        }
+      }
+      if (leftType == double.class || leftType == Double.class) {
+        if (rightType == int.class || rightType == Integer.class) {
+          return MethodHandles.convertArguments(op_double_double, op_double_double.type());
+        } 
+        if (rightType == double.class || rightType == Double.class) {
+          return op_double_double;
+        }
+      }
+      throw error(leftType, rightType);
+    }
+    
+    private RuntimeException error(Class<?> leftType, Class<?> rightType) {
+      return RT.error("no available operator %s(%s,%s)", name(), leftType.getName(), rightType.getName());
+    }
+    
+    public Object slowPath(CallSite callSite, Object left, Object right) throws Throwable {
+      MethodType methodType = callSite.type();
+      Class<?> leftType = methodType.parameterType(0);
+      Class<?> rightType = methodType.parameterType(1);
+      MethodHandle test;
+      if (leftType == Object.class) {
+        leftType = left.getClass();
+        if (rightType == Object.class) {
+          rightType = left.getClass();
+          test = MethodHandles.insertArguments(isInstanceLeftRight, 0, leftType, rightType);
+        } else {
+          test = MethodHandles.insertArguments(isInstance, 0, leftType);
+        }
+      } else {
+        // (rightType == Object.class) {
+        rightType = right.getClass();
+        test = MethodHandles.dropArguments(
+            MethodHandles.insertArguments(isInstance, 0, rightType),
+            0, leftType);
+      }
+      
+      MethodHandle mh = RTConvertWorkaround.convertArguments(
+          getMethodHandle(leftType, rightType),
+          methodType);
+      
+      System.out.println("guard test "+test.type());
+      System.out.println("guard target "+mh.type());
+      System.out.println("guard fallback "+callSite.getTarget().type());
+      
+      callSite.setTarget(MethodHandles.guardWithTest(test, mh, callSite.getTarget()));
+      
+      return mh.invokeGeneric(left, right); 
+    }
+    
+    public static boolean isInstance(Class<?> leftType, Class<?> rightType, Object left, Object right) {
+      return leftType.isInstance(left) && rightType.isInstance(right);
+    }
+    
+    private final static MethodHandle isInstance; 
+    private final static MethodHandle isInstanceLeftRight; 
+    static {
+      Lookup lookup = MethodHandles.publicLookup();
+      isInstance = lookup.findVirtual(Class.class, "isInstance",
+          MethodType.methodType(boolean.class, Object.class));
+      isInstanceLeftRight = lookup.findStatic(Operation.class, "isInstance",
+          MethodType.methodType(boolean.class, Class.class, Class.class, Object.class, Object.class));
+    }
+    
+    
+    
+    / FIXME: workaround MethodHandles.convertArguments bug in JSR292 RI
+    static MethodHandle fallback_left_any(Class<?> leftType) {
+      if (leftType == int.class)
+        return fallback_int_any;
+      if (leftType == double.class)
+        return fallback_double_any;
+      return MethodHandles.convertArguments(fallback_any_any,
+        MethodType.methodType(Object.class, leftType, Object.class));
+    }
+    public static Object fallback_int_any(Operation operation, CallSite callSite, int o1, Object o2) throws Throwable {
+      return operation.slowPath(callSite, o1, o2);
+    }
+    public static Object fallback_double_any(Operation operation, CallSite callSite, double o1, Object o2) throws Throwable {
+      return operation.slowPath(callSite, o1, o2);
+    }
+    
+    static MethodHandle fallback_any_right(Class<?> rightType) {
+      if (rightType == int.class)
+        return fallback_any_int;
+      if (rightType == double.class)
+        return fallback_any_double;
+      return MethodHandles.convertArguments(fallback_any_any,
+        MethodType.methodType(Object.class, Object.class, rightType));
+    }
+    public static Object fallback_any_int(Operation operation, CallSite callSite, Object o1, int o2) throws Throwable {
+      return operation.slowPath(callSite, o1, o2);
+    }
+    public static Object fallback_any_double(Operation operation, CallSite callSite, Object o1, double o2) throws Throwable {
+      return operation.slowPath(callSite, o1, o2);
+    }
+    
+    final static MethodHandle fallback_any_any;
+    private final static MethodHandle fallback_int_any;
+    private final static MethodHandle fallback_double_any;
+    private final static MethodHandle fallback_any_int;
+    private final static MethodHandle fallback_any_double;
+    static {
+      Lookup publicLookup = MethodHandles.lookup();
+      fallback_any_any = publicLookup.findVirtual(Operation.class, "slowPath",
+          MethodType.methodType(Object.class, CallSite.class, Object.class, Object.class));
+      fallback_int_any = publicLookup.findStatic(Operation.class, "fallback_int_any",
+          MethodType.methodType(Object.class, Operation.class, CallSite.class, int.class, Object.class));
+      fallback_double_any = publicLookup.findStatic(Operation.class, "fallback_double_any",
+          MethodType.methodType(Object.class, Operation.class, CallSite.class, double.class, Object.class));
+      fallback_any_int = publicLookup.findStatic(Operation.class, "fallback_any_int",
+          MethodType.methodType(Object.class, Operation.class, CallSite.class, Object.class, int.class));
+      fallback_any_double = publicLookup.findStatic(Operation.class, "fallback_any_double",
+          MethodType.methodType(Object.class, Operation.class, CallSite.class, Object.class, double.class));
+    }
+  }*/
 }

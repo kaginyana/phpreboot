@@ -65,7 +65,7 @@ public class Compiler {
     
     byte[] array = cw.toByteArray();
     
-    //CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
+    CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
     
     MethodHandle mh = define(Compiler.class.getClassLoader(), name, array, methodType);
     if (bindMap.getSlotCount() != 0) {

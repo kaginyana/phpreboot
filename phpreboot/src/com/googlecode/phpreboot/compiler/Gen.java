@@ -34,6 +34,7 @@ import com.googlecode.phpreboot.ast.Block;
 import com.googlecode.phpreboot.ast.Expr;
 import com.googlecode.phpreboot.ast.ExprId;
 import com.googlecode.phpreboot.ast.ExprLiteral;
+import com.googlecode.phpreboot.ast.ExprPlus;
 import com.googlecode.phpreboot.ast.ExprPrimary;
 import com.googlecode.phpreboot.ast.FuncallCall;
 import com.googlecode.phpreboot.ast.Instr;
@@ -48,6 +49,7 @@ import com.googlecode.phpreboot.ast.LiteralValue;
 import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.ast.PrimaryFuncall;
 import com.googlecode.phpreboot.ast.Visitor;
+import com.googlecode.phpreboot.interpreter.Echoer;
 import com.googlecode.phpreboot.interpreter.EvalEnv;
 import com.googlecode.phpreboot.model.Function;
 import com.googlecode.phpreboot.model.Parameter;
@@ -176,12 +178,18 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   
   @Override
   public Type visit(InstrEcho instr_echo, GenEnv env) {
-    mv.visitFieldInsn(GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
-    Type type = gen(instr_echo.getExpr(), env);
-    org.objectweb.asm.Type asmType = asASMType(type);
-    if (asmType.getSort() == org.objectweb.asm.Type.OBJECT)
-      asmType = ASM_ANY_TYPE;
-    mv.visitMethodInsn(INVOKEVIRTUAL, "java/io/PrintStream", "println", '('+asmType.getDescriptor()+")V");
+    
+    System.err.println("expr = "+instr_echo.getExpr());
+    
+    mv.visitVarInsn(ALOAD, 0); // load env
+    mv.visitTypeInsn(CHECKCAST, EvalEnv.class.getName().replace('.', '/')); //FIXME remove when environment is no more an Object
+    
+    mv.visitMethodInsn(INVOKEVIRTUAL, EvalEnv.class.getName().replace('.', '/'), "getEchoer",
+        "()L"+Echoer.class.getName().replace('.', '/')+';');
+    Type exprType = gen(instr_echo.getExpr(), env.expectedType(PrimitiveType.ANY));
+    insertCast(PrimitiveType.ANY, exprType);
+    mv.visitMethodInsn(INVOKEVIRTUAL, Echoer.class.getName().replace('.', '/'), "echo",
+        "(Ljava/lang/Object;)V");
     return null;
   }
   
@@ -314,7 +322,7 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     Type right = gen(rightNode, newEnv);
     //insertCast(type, rightNode.getTypeAttribute());
     
-    if (left == PrimitiveType.ANY || right == PrimitiveType.ANY) {
+    if (type == PrimitiveType.ANY) {
       indy(opName, expectedType, left, right);
       return expectedType;
     } else {
@@ -323,17 +331,43 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     }
   }
   
-  private Type visitBinaryTest(String opName, int opcode, Node leftNode, Node rightNode, GenEnv env) {
+  private Type visitBinaryEq(String opName, int opcode, Node leftNode, Node rightNode, GenEnv env) {
+    Type expectedType = env.getExpectedType();
+    GenEnv newEnv = env.expectedType(PrimitiveType.ANY);
+    Type left = gen(leftNode, newEnv);
+    Type right = gen(rightNode, newEnv);
+    
+    //FIXME
+    expectedType = (expectedType == PrimitiveType.ANY)? PrimitiveType.BOOLEAN: expectedType;
+    indy(opName, expectedType, left, right);
+    return expectedType;
+  }
+  
+  private Type visitBinaryTest(String opName, int kind, Node leftNode, Node rightNode, Type type, GenEnv env) {
+    Type expectedType = env.getExpectedType();
     env = env.expectedType(PrimitiveType.ANY);
     Type left = gen(leftNode, env);
     Type right = gen(rightNode, env);
     
-    if (left == PrimitiveType.ANY || right == PrimitiveType.ANY) {
+    if (type == PrimitiveType.ANY) {
+      expectedType = (expectedType == PrimitiveType.ANY)? PrimitiveType.BOOLEAN: expectedType;
       indy(opName, PrimitiveType.BOOLEAN, left, right);
     } else {
       Label truePart = new Label();
       Label end = new Label();
-      mv.visitJumpInsn(opcode, truePart);
+      
+      switch((PrimitiveType)type) {
+      case INT:
+        mv.visitJumpInsn(kind + IF_ICMPLT - IFLT , truePart);
+        break;
+      case DOUBLE:
+        mv.visitInsn(DCMPG);
+        mv.visitJumpInsn(kind , truePart);
+        break;
+      default:
+        throw new AssertionError("invalid type "+type);
+      }
+      
       mv.visitInsn(ICONST_0);
       mv.visitJumpInsn(GOTO, end);
       mv.visitLabel(truePart);
@@ -384,14 +418,19 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     case expr_mod:
       return visitBinaryOp("mod", IREM, unaryNode, binaryNode, type, env);
 
+    case expr_eq:
+      return visitBinaryEq("eq", IFEQ, unaryNode, binaryNode, env);
+    case expr_ne:
+      return visitBinaryEq("ne", IFNE, unaryNode, binaryNode, env);
+      
     case expr_lt:
-      return visitBinaryTest("lt", IF_ICMPLT, unaryNode, binaryNode, env);
+      return visitBinaryTest("lt", IFLT, unaryNode, binaryNode, type, env);
     case expr_le:
-      return visitBinaryTest("le", IF_ICMPLE, unaryNode, binaryNode, env);
+      return visitBinaryTest("le", IFLE, unaryNode, binaryNode, type, env);
     case expr_gt:
-      return visitBinaryTest("gt", IF_ICMPGT, unaryNode, binaryNode, env);
+      return visitBinaryTest("gt", IFGT, unaryNode, binaryNode, type, env);
     case expr_ge:
-      return visitBinaryTest("ge", IF_ICMPGE, unaryNode, binaryNode, env);
+      return visitBinaryTest("ge", IFGE, unaryNode, binaryNode, type, env);
 
     default:
     }

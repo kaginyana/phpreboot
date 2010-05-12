@@ -44,13 +44,17 @@ import com.googlecode.phpreboot.ast.XmlTextToken;
 import com.googlecode.phpreboot.ast.Xmls;
 import com.googlecode.phpreboot.tools.TerminalEvaluator;
 
+import fr.umlv.tatoo.runtime.buffer.impl.LocationTracker;
+
 public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluator<CharSequence> {
+  private final LocationTracker locationTracker;
   private final Echoer echoer;
   private Scope currentScope;
   private int interpreter = 0;
   boolean enableLineComment = true; //comments that starts with '//' clashes with xquery-like syntax
   
-  public Interpreter(PrintWriter writer, Scope scope) {
+  public Interpreter(LocationTracker locationTracker, PrintWriter writer, Scope scope) {
+    this.locationTracker = locationTracker;
     this.echoer = Echoer.writerEchoer(writer);
     this.currentScope = scope;
   }
@@ -69,15 +73,15 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
   
   @Override
   public IdToken id(CharSequence data) {
-    return new IdToken(data.toString());
+    return computeTokenAnnotation(new IdToken(data.toString()));
   }
   @Override
   public NullLiteralToken null_literal(CharSequence data) {
-    return new NullLiteralToken();
+    return computeTokenAnnotation(new NullLiteralToken());
   }
   @Override
   public BoolLiteralToken bool_literal(CharSequence data) {
-    return new BoolLiteralToken(Boolean.parseBoolean(data.toString()));
+    return computeTokenAnnotation(new BoolLiteralToken(Boolean.parseBoolean(data.toString())));
   }
   @Override
   public ValueLiteralToken value_literal(CharSequence data) {
@@ -88,20 +92,20 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     } catch (NumberFormatException e) {
       value = Double.parseDouble(text);
     }
-    return new ValueLiteralToken(value);
+    return computeTokenAnnotation(new ValueLiteralToken(value));
   }
   @Override
   public StringLiteralToken string_literal(CharSequence data) {
-    return new StringLiteralToken(data.subSequence(1, data.length() - 1).toString());
+    return computeTokenAnnotation(new StringLiteralToken(data.subSequence(1, data.length() - 1).toString()));
   }
   @Override
   public XmlTextToken xml_text(CharSequence data) {
-    return new XmlTextToken(data.toString());
+    return computeTokenAnnotation(new XmlTextToken(data.toString()));
   }
   
   @Override
   public RegexAnycharacterToken regex_anycharacter(CharSequence data) {
-    return new RegexAnycharacterToken(data.toString());
+    return computeTokenAnnotation(new RegexAnycharacterToken(data.toString()));
   }
   
   
@@ -109,11 +113,11 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
   
   @Override
   public AxisNameToken axis_name(CharSequence data) {
-    return new AxisNameToken(data.toString());
+    return computeTokenAnnotation(new AxisNameToken(data.toString()));
   }
   @Override
   public NodeTypeToken node_type(CharSequence data) {
-    return new NodeTypeToken(data.toString());
+    return computeTokenAnnotation(new NodeTypeToken(data.toString()));
   }
   
   
@@ -121,16 +125,16 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
   
   @Override
   public RootDirToken root_dir(CharSequence data) {
-    return new RootDirToken(data.charAt(0)); 
+    return computeTokenAnnotation(new RootDirToken(data.charAt(0))); 
   }
   @Override
   public PathIdToken path_id(CharSequence data) {
-    return new PathIdToken(data.toString());
+    return computeTokenAnnotation(new PathIdToken(data.toString()));
   }
   @Override
   public PortNumberToken port_number(CharSequence data) {
     int port = Integer.parseInt(data.toString());
-    return new PortNumberToken(port);
+    return computeTokenAnnotation(new PortNumberToken(port));
   }
 
   @Override
@@ -139,7 +143,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
       // push a new scope
       currentScope = new Scope(currentScope);
     }
-    return null;
+    return computeTokenAnnotation(new LcurlToken());
   }
   @Override
   public RcurlToken rcurl(CharSequence data) {
@@ -147,7 +151,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
       // pop the current scope
       currentScope = currentScope.getParent();
     }
-    return null;
+    return computeTokenAnnotation(new RcurlToken());
   }
   
   @Override
@@ -157,6 +161,31 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
   @Override
   public void oneline_comment(CharSequence data) {
     // comments
+  }
+  
+  private <N extends Node> N computeTokenAnnotation(N node) {
+    node.setLineNumberAttribute(locationTracker.getLineNumber());
+    node.setColumnNumberAttribute(locationTracker.getColumnNumber());
+    return node;
+  }
+  
+  @Override
+  protected void computeAnnotation(Node node) {
+    List<Node> nodeList = node.nodeList();
+    if (!nodeList.isEmpty()) {
+      for(int i=0; i<nodeList.size(); i++) {
+        Node firstNode = nodeList.get(i);
+        if (firstNode == null) {
+          continue;
+        }
+        node.setLineNumberAttribute(firstNode.getLineNumberAttribute());
+        node.setColumnNumberAttribute(firstNode.getColumnNumberAttribute());
+        return;
+      }
+    }
+    
+    node.setLineNumberAttribute(locationTracker.getLineNumber());
+    node.setColumnNumberAttribute(locationTracker.getColumnNumber());
   }
   
   

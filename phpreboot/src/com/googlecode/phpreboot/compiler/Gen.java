@@ -29,6 +29,10 @@ import java.util.List;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 
+import com.googlecode.phpreboot.ast.ArrayEntry;
+import com.googlecode.phpreboot.ast.ArrayValue;
+import com.googlecode.phpreboot.ast.ArrayValueEntry;
+import com.googlecode.phpreboot.ast.ArrayValueSingle;
 import com.googlecode.phpreboot.ast.AssignmentId;
 import com.googlecode.phpreboot.ast.Block;
 import com.googlecode.phpreboot.ast.Expr;
@@ -38,9 +42,14 @@ import com.googlecode.phpreboot.ast.ExprPlus;
 import com.googlecode.phpreboot.ast.ExprPrimary;
 import com.googlecode.phpreboot.ast.FuncallCall;
 import com.googlecode.phpreboot.ast.Instr;
+import com.googlecode.phpreboot.ast.InstrAssign;
 import com.googlecode.phpreboot.ast.InstrBlock;
+import com.googlecode.phpreboot.ast.InstrDecl;
 import com.googlecode.phpreboot.ast.InstrEcho;
+import com.googlecode.phpreboot.ast.InstrFuncall;
 import com.googlecode.phpreboot.ast.InstrReturn;
+import com.googlecode.phpreboot.ast.LiteralArray;
+import com.googlecode.phpreboot.ast.LiteralArrayEntry;
 import com.googlecode.phpreboot.ast.LiteralBool;
 import com.googlecode.phpreboot.ast.LiteralNull;
 import com.googlecode.phpreboot.ast.LiteralSingle;
@@ -57,11 +66,19 @@ import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Type;
 import com.googlecode.phpreboot.parser.ProductionEnum;
 import com.googlecode.phpreboot.runtime.Array;
+import com.googlecode.phpreboot.runtime.RT;
 import com.googlecode.phpreboot.runtime.Sequence;
 import com.googlecode.phpreboot.runtime.URI;
 import com.googlecode.phpreboot.runtime.XML;
 
 public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
+  private static final String ARRAY_INTERNAL_NAME = getInternalName(Array.class);
+  private static final String ECHOER_INTERNAL_NAME = getInternalName(Echoer.class);
+  private static final String EVAL_ENV_INTERNAL_NAME = getInternalName(EvalEnv.class);
+  private static final String RT_INTERNAL_NAME = getInternalName(RT.class);
+  
+  
+  
   private final MethodVisitor mv;
   
   public Gen(MethodVisitor mv) {
@@ -157,8 +174,12 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     }
     
     // unboxing
-    mv.visitMethodInsn(INVOKEDYNAMIC, INVOKEDYNAMIC_OWNER, "*checkcast",
+    mv.visitMethodInsn(INVOKEDYNAMIC, INVOKEDYNAMIC_OWNER, "checkcast",
           '('+asASMType(exprType).getDescriptor()+')'+asASMType(type).getDescriptor());
+  }
+  
+  private static String getInternalName(Class<?> runtimeClass) {
+    return runtimeClass.getName().replace('.', '/');
   }
   
   // --- visit instructions
@@ -173,28 +194,28 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   
   @Override
   public Type visit(InstrBlock instr_block, GenEnv env) {
+    mv.visitLineNumber(instr_block.getLineNumberAttribute(), new Label());
     return gen(instr_block.getBlock(), env);
   }
   
   @Override
   public Type visit(InstrEcho instr_echo, GenEnv env) {
-    
-    System.err.println("expr = "+instr_echo.getExpr());
-    
+    mv.visitLineNumber(instr_echo.getLineNumberAttribute(), new Label());
     mv.visitVarInsn(ALOAD, 0); // load env
-    mv.visitTypeInsn(CHECKCAST, EvalEnv.class.getName().replace('.', '/')); //FIXME remove when environment is no more an Object
+    mv.visitTypeInsn(CHECKCAST, EVAL_ENV_INTERNAL_NAME); //FIXME remove when environment is no more an Object
     
-    mv.visitMethodInsn(INVOKEVIRTUAL, EvalEnv.class.getName().replace('.', '/'), "getEchoer",
-        "()L"+Echoer.class.getName().replace('.', '/')+';');
+    mv.visitMethodInsn(INVOKEVIRTUAL, EVAL_ENV_INTERNAL_NAME, "getEchoer",
+        "()L"+ECHOER_INTERNAL_NAME+';');
     Type exprType = gen(instr_echo.getExpr(), env.expectedType(PrimitiveType.ANY));
     insertCast(PrimitiveType.ANY, exprType);
-    mv.visitMethodInsn(INVOKEVIRTUAL, Echoer.class.getName().replace('.', '/'), "echo",
+    mv.visitMethodInsn(INVOKEVIRTUAL, ECHOER_INTERNAL_NAME, "echo",
         "(Ljava/lang/Object;)V");
     return null;
   }
   
   @Override
   public Type visit(InstrReturn instr_return, GenEnv env) {
+    mv.visitLineNumber(instr_return.getLineNumberAttribute(), new Label());
     Type type = instr_return.getTypeAttribute();
     
     Expr expr = instr_return.getExprOptional();
@@ -208,11 +229,32 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   }
   
   @Override
+  public Type visit(InstrDecl instr_decl, GenEnv env) {
+    mv.visitLineNumber(instr_decl.getLineNumberAttribute(), new Label());
+    return gen(instr_decl.getDeclaration(), env);
+  }
+  
+  @Override
+  public Type visit(InstrFuncall instr_funcall, GenEnv env) {
+    mv.visitLineNumber(instr_funcall.getLineNumberAttribute(), new Label());
+    return gen(instr_funcall.getFuncall(), env);
+  }
+  
+  @Override
+  public Type visit(InstrAssign instr_assign, GenEnv env) {
+    mv.visitLineNumber(instr_assign.getLineNumberAttribute(), new Label());
+    return gen(instr_assign.getAssignment(), env);
+  }
+  
+  
+  
+  @Override
   public Type visit(AssignmentId assignment_id, GenEnv env) {
-    Type type = gen(assignment_id.getExpr(), env);
     LocalVar var = assignment_id.getSymbolAttribute();
-    insertCast(var.getType(), type);
-    mv.visitVarInsn(asASMType(var.getType()).getOpcode(ISTORE), var.getSlot(env.getShift()));
+    Type type = var.getType();
+    Type exprType = gen(assignment_id.getExpr(), env.expectedType(type));
+    insertCast(type, exprType);
+    mv.visitVarInsn(asASMType(type).getOpcode(ISTORE), var.getSlot(env.getShift()));
     return null;
   }
   
@@ -317,30 +359,127 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     GenEnv newEnv = env.expectedType(PrimitiveType.ANY);
     
     Type left = gen(leftNode, newEnv);
-    //insertCast(left, leftNode.getTypeAttribute());
-    
     Type right = gen(rightNode, newEnv);
-    //insertCast(type, rightNode.getTypeAttribute());
     
-    if (type == PrimitiveType.ANY) {
+    switch((PrimitiveType)type) {
+    case ANY:
       indy(opName, expectedType, left, right);
       return expectedType;
-    } else {
+    case STRING:
+      String desc;
+      if (left == PrimitiveType.STRING) {
+        desc = (right == PrimitiveType.INT)? "(Ljava/lang/String;I)Ljava/lang/String;":
+          (right == PrimitiveType.DOUBLE)? "(Ljava/lang/String;D)Ljava/lang/String;":
+          "(Ljava/lang/String;Ljava/lang/Object;)Ljava/lang/String;";
+      } else { // right == Primitive.STRING
+        desc = (left == PrimitiveType.INT)? "(ILjava/lang/String;)Ljava/lang/String;":
+          (left == PrimitiveType.DOUBLE)? "(DLjava/lang/String;)Ljava/lang/String;":
+          "(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/String;";
+      }
+      mv.visitMethodInsn(INVOKESTATIC, RT_INTERNAL_NAME, "plus", desc);
+      return type;
+    default:
       mv.visitInsn(asASMType(type).getOpcode(opcode));
       return type;
     }
   }
   
   private Type visitBinaryEq(String opName, int opcode, Node leftNode, Node rightNode, GenEnv env) {
-    Type expectedType = env.getExpectedType();
     GenEnv newEnv = env.expectedType(PrimitiveType.ANY);
-    Type left = gen(leftNode, newEnv);
-    Type right = gen(rightNode, newEnv);
+    Type left = leftNode.getTypeAttribute();
+    Type right = rightNode.getTypeAttribute();
     
-    //FIXME
-    expectedType = (expectedType == PrimitiveType.ANY)? PrimitiveType.BOOLEAN: expectedType;
-    indy(opName, expectedType, left, right);
-    return expectedType;
+    Label truePart = new Label();
+    Label end = new Label();
+    
+    all: switch((PrimitiveType)left) {
+    case BOOLEAN:
+      switch((PrimitiveType)right) {
+      case BOOLEAN:
+        gen(leftNode, newEnv);
+        gen(rightNode, newEnv);
+        mv.visitJumpInsn(opcode, truePart);
+        break all;
+      case ANY:
+        gen(leftNode, newEnv);
+        insertCast(PrimitiveType.ANY, PrimitiveType.BOOLEAN);
+        gen(rightNode, newEnv);
+        mv.visitMethodInsn(INVOKESTATIC, RT_INTERNAL_NAME, opName, "(Ljava/lang/Object;Ljava/lang/Object;)Z");
+        return PrimitiveType.BOOLEAN;
+      default:
+        gen(leftNode, newEnv);
+        mv.visitInsn(POP);
+        gen(rightNode, newEnv);
+        mv.visitInsn((right == PrimitiveType.DOUBLE)? POP2: POP);
+        mv.visitInsn((opcode == IF_ICMPEQ)?ICONST_0:ICONST_1);
+        return PrimitiveType.BOOLEAN;
+      }
+    case INT:
+      switch((PrimitiveType)right) {
+      case INT:
+        gen(leftNode, newEnv);
+        gen(rightNode, newEnv);
+        mv.visitJumpInsn(opcode, truePart);
+        break all;
+      case DOUBLE:
+        gen(leftNode, newEnv);
+        insertCast(PrimitiveType.DOUBLE, PrimitiveType.INT);
+        gen(rightNode, newEnv);
+        mv.visitInsn(DCMPG);
+        mv.visitJumpInsn(opcode - IF_ICMPEQ + IFEQ, truePart);
+        break all;
+      case ANY:
+        gen(leftNode, newEnv);
+        insertCast(PrimitiveType.ANY, PrimitiveType.INT);
+        gen(rightNode, newEnv);
+        mv.visitMethodInsn(INVOKESTATIC, RT_INTERNAL_NAME, opName, "(Ljava/lang/Object;Ljava/lang/Object;)Z");
+        return PrimitiveType.BOOLEAN;
+      default:
+        gen(leftNode, newEnv);
+        mv.visitInsn(POP);
+        gen(rightNode, newEnv);
+        mv.visitInsn(POP);
+        mv.visitInsn((opcode == IFEQ)?ICONST_0:ICONST_1);
+        return PrimitiveType.BOOLEAN;
+      }
+    case DOUBLE:
+      switch((PrimitiveType)right) {
+      case INT:
+      case DOUBLE:
+        gen(leftNode, newEnv);
+        gen(rightNode, newEnv);
+        insertCast(PrimitiveType.DOUBLE, right);
+        mv.visitInsn(DCMPG);
+        mv.visitJumpInsn(opcode - IF_ICMPEQ + IFEQ, truePart);
+        break all;
+      case ANY:
+        gen(leftNode, newEnv);
+        insertCast(PrimitiveType.ANY, PrimitiveType.DOUBLE);
+        gen(rightNode, newEnv);
+        mv.visitMethodInsn(INVOKESTATIC, RT_INTERNAL_NAME, opName, "(Ljava/lang/Object;Ljava/lang/Object;)Z");
+        return PrimitiveType.BOOLEAN;
+      default:
+        gen(leftNode, newEnv);
+        mv.visitInsn(POP2);
+        gen(rightNode, newEnv);
+        mv.visitInsn(POP);
+        mv.visitInsn((opcode == IF_ICMPEQ)?ICONST_0:ICONST_1);
+        return PrimitiveType.BOOLEAN;
+      }
+    default:
+      gen(leftNode, newEnv);
+      gen(rightNode, newEnv);
+      insertCast(PrimitiveType.ANY, right);
+      mv.visitMethodInsn(INVOKESTATIC, RT_INTERNAL_NAME, opName, "(Ljava/lang/Object;Ljava/lang/Object;)Z");
+      return PrimitiveType.BOOLEAN;
+    }
+    
+    mv.visitInsn(ICONST_0);
+    mv.visitJumpInsn(GOTO, end);
+    mv.visitLabel(truePart);
+    mv.visitInsn(ICONST_1);
+    mv.visitLabel(end);
+    return PrimitiveType.BOOLEAN;
   }
   
   private Type visitBinaryTest(String opName, int kind, Node leftNode, Node rightNode, Type type, GenEnv env) {
@@ -419,9 +558,9 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       return visitBinaryOp("mod", IREM, unaryNode, binaryNode, type, env);
 
     case expr_eq:
-      return visitBinaryEq("eq", IFEQ, unaryNode, binaryNode, env);
+      return visitBinaryEq("eq", IF_ICMPEQ, unaryNode, binaryNode, env);
     case expr_ne:
-      return visitBinaryEq("ne", IFNE, unaryNode, binaryNode, env);
+      return visitBinaryEq("ne", IF_ICMPNE, unaryNode, binaryNode, env);
       
     case expr_lt:
       return visitBinaryTest("lt", IFLT, unaryNode, binaryNode, type, env);
@@ -478,5 +617,55 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     return PrimitiveType.STRING;
   }
 
-
+  
+  // --- array literal
+  
+  @Override
+  public Type visit(LiteralArray literal_array, GenEnv env) {
+    mv.visitTypeInsn(NEW, ARRAY_INTERNAL_NAME);
+    mv.visitInsn(DUP);
+    mv.visitMethodInsn(INVOKESPECIAL, ARRAY_INTERNAL_NAME, "<init>", "()V");
+    for(ArrayValue arrayValue: literal_array.getArrayValueStar()) {
+      gen(arrayValue, env);
+    }
+    return PrimitiveType.ARRAY;
+  }
+  
+  @Override
+  public Type visit(LiteralArrayEntry literal_array_entry, GenEnv env) {
+    mv.visitTypeInsn(NEW, ARRAY_INTERNAL_NAME);
+    mv.visitInsn(DUP);
+    mv.visitMethodInsn(INVOKESPECIAL, ARRAY_INTERNAL_NAME, "<init>", "()V");
+    
+    for(ArrayEntry arrayEntry: literal_array_entry.getArrayEntryStar()) {
+      gen(arrayEntry, env);
+    }
+    return PrimitiveType.ARRAY;
+  }
+  
+  @Override
+  public Type visit(ArrayEntry array_entry, GenEnv env) {
+    mv.visitInsn(DUP);
+    Type exprTypeKey = gen(array_entry.getExpr(), env.expectedType(PrimitiveType.ANY));
+    insertCast(PrimitiveType.ANY, exprTypeKey);
+    Type exprTypeValue = gen(array_entry.getExpr2(), env.expectedType(PrimitiveType.ANY));
+    insertCast(PrimitiveType.ANY, exprTypeValue);
+    mv.visitMethodInsn(INVOKEVIRTUAL, ARRAY_INTERNAL_NAME, "set",
+        "(Ljava/lang/Object;Ljava/lang/Object;)V");
+    return null; // we don't care about this type
+  }
+  
+  @Override
+  public Type visit(ArrayValueSingle array_value_single, GenEnv env) {
+    mv.visitInsn(DUP);
+    Type exprType = gen(array_value_single.getExpr(), env.expectedType(PrimitiveType.ANY));
+    insertCast(PrimitiveType.ANY, exprType);
+    mv.visitMethodInsn(INVOKEVIRTUAL, ARRAY_INTERNAL_NAME, "add",
+        "(Ljava/lang/Object;)V");
+    return null; // we don't care about this type
+  }
+  @Override
+  public Type visit(ArrayValueEntry array_value_entry, GenEnv env) {
+    return gen(array_value_entry.getArrayEntry(), env);
+  }
 }

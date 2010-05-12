@@ -1,17 +1,15 @@
 package com.googlecode.phpreboot;
 
 import java.io.PrintWriter;
-import java.sql.SQLException;
 
-import com.googlecode.phpreboot.interpreter.Interpreter;
+import com.googlecode.phpreboot.interpreter.Analyzer;
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.sql.GenericSQLConnection;
-import com.googlecode.phpreboot.tools.Analyzers;
 
 public class SQLTest {
-  public static void main(String[] args) throws java.io.IOException, ClassNotFoundException, SQLException {
+  public static void main(String[] args) throws java.io.IOException, ClassNotFoundException {
       java.io.Reader reader;
       if (args.length>0) {
         reader = new java.io.FileReader(args[0]);
@@ -30,9 +28,7 @@ public class SQLTest {
       scope.register(new Var("SQL_CONNECTION", true, PrimitiveType.ANY, sqlConnection));
       
       PrintWriter writer = new PrintWriter(System.out);
-      Interpreter interpreter = new Interpreter(writer, scope);
-      Analyzers.run(reader, interpreter, interpreter, null, null);
-      //System.out.println(interpreter.getScript());
+      Analyzer.analyze(reader, writer, scope);
       
       sqlConnection.close();
     }

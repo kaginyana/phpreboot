@@ -12,6 +12,7 @@ import javax.xml.stream.events.Characters;
 import javax.xml.stream.events.StartElement;
 import javax.xml.stream.events.XMLEvent;
 
+import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.runtime.RT;
 import com.googlecode.phpreboot.runtime.URI;
 import com.googlecode.phpreboot.runtime.XML;
@@ -24,7 +25,7 @@ public class LangModule extends Module {
     try {
       input = uri.getInputStream();
     } catch (IOException e) {
-      throw RT.error(e);
+      throw RT.error((Node)null, e);
     }
     
     XML root = null;
@@ -61,7 +62,7 @@ public class LangModule extends Module {
       }
       
     } catch (XMLStreamException e) {
-      throw RT.error(e);
+      throw RT.error((Node)null, e);
     } finally {
       try {
         input.close();

@@ -10,13 +10,12 @@ import java.io.Reader;
 import java.nio.file.Path;
 import java.util.Map;
 
-import com.googlecode.phpreboot.interpreter.Interpreter;
+import com.googlecode.phpreboot.interpreter.Analyzer;
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.runtime.Array;
 import com.googlecode.phpreboot.sql.GenericSQLConnection;
-import com.googlecode.phpreboot.tools.Analyzers;
 import com.sun.grizzly.tcp.http11.GrizzlyAdapter;
 import com.sun.grizzly.tcp.http11.GrizzlyRequest;
 import com.sun.grizzly.tcp.http11.GrizzlyResponse;
@@ -156,8 +155,7 @@ public class WebScriptDispatcher extends GrizzlyAdapter {
     Reader reader = new InputStreamReader(input);
     PrintWriter writer = new PrintWriter(output);
     try {
-      Interpreter interpreter = new Interpreter(writer, new Scope(scope));
-      Analyzers.run(reader, interpreter, interpreter, null, null);
+      Analyzer.analyze(reader, writer, new Scope(scope));
     } finally {
       sqlConnection.close();
     }

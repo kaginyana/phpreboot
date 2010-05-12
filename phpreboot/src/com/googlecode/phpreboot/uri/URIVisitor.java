@@ -56,7 +56,7 @@ public class URIVisitor extends Visitor<Object, URIEnv, URISyntaxException> {
     try {
       return (URI)eval(node, uriEnv);
     } catch (URISyntaxException e) {
-      throw RT.error(e);
+      throw RT.error(node, e);
     }
   }
   

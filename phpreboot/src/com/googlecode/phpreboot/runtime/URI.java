@@ -7,6 +7,8 @@ import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import com.googlecode.phpreboot.ast.Node;
+
 public class URI {
   // dual representation
   private final java.net.URI uri;
@@ -206,7 +208,7 @@ public class URI {
       try {
         return uri.toURL().openStream();
       } catch (MalformedURLException e) {
-        throw RT.error(e);
+        throw RT.error((Node)null, e);
       }
     }
     return path.newInputStream();

@@ -14,7 +14,6 @@ import java.util.Iterator;
 
 import com.googlecode.phpreboot.doc.Doclet;
 import com.googlecode.phpreboot.interpreter.Analyzer;
-import com.googlecode.phpreboot.interpreter.Interpreter;
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Var;
@@ -169,9 +168,8 @@ public class Main {
     // register modules
     new LangModule().registerModule(rootScope);
     
-    Interpreter interpreter = new Interpreter(writer, rootScope);
     try {
-      Analyzer.analyze(reader, interpreter);
+      Analyzer.analyze(reader, writer, rootScope);
     } catch(Throwable t) {
       if (verbose)
         t.printStackTrace(System.err);

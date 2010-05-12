@@ -1,5 +1,6 @@
 package com.googlecode.phpreboot.interpreter;
 
+import java.io.PrintWriter;
 import java.io.Reader;
 import java.util.IdentityHashMap;
 
@@ -57,8 +58,11 @@ public class Analyzer {
     }
   }
   
-  public static void analyze(Reader reader, Interpreter interpreter) {
-    ReaderWrapper buffer = new ReaderWrapper(reader, new LocationTracker());
+  public static void analyze(Reader reader, PrintWriter writer, Scope rootScope) {
+    LocationTracker locationTracker = new LocationTracker();
+    ReaderWrapper buffer = new ReaderWrapper(reader, locationTracker);
+    
+    Interpreter interpreter = new Interpreter(locationTracker, writer, rootScope);
     
     //TerminalEvaluator<CharSequence> terminalEvaluator = Debug.createTraceProxy(TerminalEvaluator.class, interpreter);
     //GrammarEvaluator grammarEvaluator = Debug.createTraceProxy(GrammarEvaluator.class, interpreter);

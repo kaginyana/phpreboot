@@ -11,7 +11,6 @@ public final class Array implements Sequenceable, ArrayAccess {
 
     public Entry(Object key, Object value) {
       key.getClass();
-      value.getClass();
       this.key = key;
       this.value = value;
     }
@@ -74,6 +73,7 @@ public final class Array implements Sequenceable, ArrayAccess {
     return key.hashCode() & (length-1);
   }
   
+  
   @Override
   public Object get(Object key) {
     Entry[] table = this.table;
@@ -84,11 +84,10 @@ public final class Array implements Sequenceable, ArrayAccess {
         return e.value;
       }
     }
-    return null;
+    return INVALID_KEY;
   }
   
   public void set(Object key, Object value) {
-    value.getClass();
     Entry[] table = this.table;
     int i = hashIndex(key, table.length);
     for (Entry e = table[i]; e != null; e = e.next) {

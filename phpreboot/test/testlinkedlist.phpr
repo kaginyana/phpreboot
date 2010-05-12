@@ -1,0 +1,48 @@
+
+function cons(element, next) {
+  return {"element": element, "next": next}
+}
+
+function nil() {
+  return null
+}
+
+function size(list) {
+  if (list == null)
+    return 0
+  return 1 + size(list.next)
+}
+
+function contains(list, element) {
+  for(l = list; l != null; l = l.next) {
+    if (l.element == element)
+      return true
+  }
+  return false
+}
+
+function display(list) {
+  for(l = list; l != null; l = l.next) {
+    echo l.element
+  }
+  return null
+}
+
+/*
+function reverse(list) {
+  if (list == null)
+    return null
+  if (list.next == null)
+    return list
+  tail = reverse(list.next)
+  return {"element": element, "next": tail}
+}*/
+
+
+list = cons(2, cons(3, nil()));
+
+display(list)
+echo size(list)
+echo contains(list, "foo")
+echo contains(list, 2)
+//display(reverse(list))

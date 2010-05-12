@@ -11,26 +11,38 @@ import java.util.Map;
 
 import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.runtime.Array.Entry;
-import com.sun.grizzly.util.ConcurrentReferenceHashMap.Option;
 
 public class RT {
-  public static RuntimeException error(String format, Object arg) {
-    return error(format, new Object[]{arg});
-  }
-  public static RuntimeException error(String format, Object arg, Object arg2) {
-    return error(format, new Object[]{arg, arg2});
-  }
-  public static RuntimeException error(String format, Object... args) {
-    return new RuntimeException(String.format(format, args));
+  @SuppressWarnings("serial")
+  public static class RTError extends Error {
+    public RTError(String message) {
+      super(message);
+    }
+    public RTError(String message, Throwable cause) {
+      super(message, cause);
+    }
   }
   
-  public static RuntimeException error(Throwable t) {
+  public static RTError error(String format, Object arg) {
+    return error(format, new Object[]{arg});
+  }
+  public static RTError error(String format, Object arg, Object arg2) {
+    return error(format, new Object[]{arg, arg2});
+  }
+  public static RTError error(String format, Object... args) {
+    return new RTError(String.format(format, args));
+  }
+  
+  public static RTError error(Node node, Throwable t) {
     if (t.getCause() != null) {
       t = t.getCause();
     }
-    if (t instanceof RuntimeException)
+    /*if (t instanceof RTError) {
       return (RuntimeException)t;
-    return new RuntimeException(t);
+    }*/
+    String location = (node == null)? "": " at " +
+        node.getLineNumberAttribute() + ',' + node.getColumnNumberAttribute();
+    return new RTError(t.getMessage() + location, t);
   }
   
   
@@ -91,7 +103,7 @@ public class RT {
         return plus(l, (double)(Double)right);
       }
       if (right instanceof String) {
-        return l + (String)right;
+        return plus(l, (String)right);
       }
       throw error("invalid value for operation + "+right);
     }
@@ -104,15 +116,15 @@ public class RT {
         return plus(l, (double)(Double)right);
       }
       if (right instanceof String) {
-        return l + (String)right;
+        return plus(l, (String)right);
       }
       throw error("invalid value for operation + "+right);
     }
     if (left instanceof String) {
-      return ((String)left) + right;
+      return plus((String)left, right);
     }
     if (right instanceof String) {
-      return left + (String)right;
+      return plus(left, (String)right);
     }
     
     throw error("invalid value for operation + "+left+" "+right);
@@ -123,6 +135,25 @@ public class RT {
   public static double plus(double left, double right) {
     return left + right;
   }
+  public static String plus(String left, Object right) {
+    return left + right;
+  }
+  public static String plus(String left, int right) {
+    return left + right;
+  }
+  public static String plus(String left, double right) {
+    return left + right;
+  }
+  public static String plus(Object left, String right) {
+    return left + right;
+  }
+  public static String plus(int left, String right) {
+    return left + right;
+  }
+  public static String plus(double left, String right) {
+    return left + right;
+  }
+  
   
   public static Object minus(Object left, Object right) {
     if (left instanceof Integer) {
@@ -817,8 +848,10 @@ public class RT {
         try {
           //FIXME should be invokeExact
           mh.invokeGeneric(refValue, value);
+        } catch(Error e) {
+          throw e;
         } catch (Throwable e) {
-          throw RT.error(e);
+          throw RT.error((Node)null, e);
         }
         mh = MethodHandles.dropArguments(mh, 1, Object.class);
         MethodHandle test = MethodHandles.insertArguments(test_receiver_and_key, 0, refClass);
@@ -866,8 +899,10 @@ public class RT {
       try {
         //FIXME should be invokeExact
         target.invokeGeneric(refValue, key, value);
+      } catch(Error e) {
+        throw e;
       } catch (Throwable e) {
-        throw RT.error(e);
+        throw RT.error((Node)null, e);
       } 
     }
   }
@@ -889,8 +924,10 @@ public class RT {
         try {
           //FIXME should be invokeExact
           result = mh.invokeGeneric(refValue);
+        } catch(Error e) {
+          throw e;
         } catch (Throwable e) {
-          throw RT.error(e);
+          throw RT.error((Node)null, e);
         }
         mh = MethodHandles.dropArguments(mh, 1, Object.class);
         MethodHandle test = MethodHandles.insertArguments(test_receiver_and_key, 0, refClass);
@@ -903,9 +940,10 @@ public class RT {
     if (refValue instanceof ArrayAccess) {
       ArrayAccess arrayAccess = (ArrayAccess)refValue;
       Object result = arrayAccess.get(key);
-      if (keyMustExist && result == null) {
+      if (keyMustExist && result == ArrayAccess.INVALID_KEY) {
         throw RT.error("member %s doesn't exist for array: %s", key, arrayAccess);
       }
+      result = (result != ArrayAccess.INVALID_KEY)? result: null;
       
       MethodHandle mh = MethodHandles.guardWithTest(test_receiver_asArrayAccess, array_access_get, callsite.getTarget());
       callsite.setTarget(mh);
@@ -936,8 +974,10 @@ public class RT {
       try {
         //FIXME should be invokeExact
         return target.invokeGeneric(refValue, key);
+      } catch(Error e) {
+        throw e;
       } catch (Throwable e) {
-        throw RT.error(e);
+        throw RT.error((Node)null, e);
       } 
     }
   }
@@ -970,8 +1010,10 @@ public class RT {
     MethodHandle target = callSite.getTarget();
     try {
       return target.invokeVarargs(values);
+    } catch(Error e) {
+      throw e;
     } catch (Throwable e) {
-      throw RT.error(e);
+      throw RT.error((Node)null, e);
     } 
   }
   
@@ -989,14 +1031,16 @@ public class RT {
     
     try {
       return target.invokeVarargs(values);
+    } catch(Error e) {
+      throw e;
     } catch (Throwable e) {
-      throw RT.error(e);
+      throw RT.error((Node)null, e);
     } 
   }
   
   
   // --- operators
-  
+  /* raw version
   enum Operation {
     plus(Object.class),
     minus(Object.class),
@@ -1023,39 +1067,71 @@ public class RT {
   public static CallSite bootstrap(Class<?> declaringClass, String name, MethodType methodType) {
     Operation operation = Operation.valueOf(name);
     CallSite callSite = new CallSite(declaringClass, name, methodType);
-    MethodHandle target = RTConvertWorkaround.convertArguments(operation.generic, methodType);
+    //MethodHandle target = RTConvertWorkaround.convertArguments(operation.generic, methodType);
+    MethodHandle target = MethodHandles.convertArguments(operation.generic, methodType);
     callSite.setTarget(target);
     return callSite;
-  }
+  }*/
   
-  /*
+  
   public static CallSite bootstrap(Class<?> declaringClass, String name, MethodType methodType) {
     Operation operation = Operation.valueOf(name);
     CallSite callSite = new CallSite(declaringClass, name, methodType);
     
-    Class<?> leftType = methodType.parameterType(0);
-    Class<?> rightType = methodType.parameterType(1);
-    
-    MethodHandle target;
-    if (leftType == Object.class) {
-      if (rightType == Object.class) {
-        target = Operation.fallback_any_any;
-      } else {
-        target = Operation.fallback_any_right(rightType);
-      }
-    } else {
-      target = Operation.fallback_left_any(leftType);
-    }
-    
-    target = MethodHandles.insertArguments(target, 0, operation, callSite);
-    
+    MethodHandle target = MethodHandles.insertArguments(Operation.slowPath, 0, operation, callSite);
     callSite.setTarget(MethodHandles.convertArguments(target, methodType));
     return callSite;
   }
   
   public enum Operation {
-    plus,
-    minus;
+    plus {
+      @Override
+      MethodHandle getMethodHandle(Class<?> leftType, Class<?> rightType) {
+        if (leftType == String.class) {
+          if (rightType == int.class || rightType == Integer.class)
+            return plus_string_int;
+          if (rightType == double.class || rightType == Double.class)
+            return plus_string_double;
+          return plus_string_any;
+        }
+        if (rightType == String.class) {
+          if (leftType == int.class || leftType == Integer.class)
+            return plus_int_string;
+          if (leftType == double.class || leftType == Double.class)
+            return plus_double_string;
+          return plus_any_string;
+        }
+        return super.getMethodHandle(leftType, rightType);
+      }
+      
+      private final MethodHandle plus_string_any;
+      private final MethodHandle plus_string_int;
+      private final MethodHandle plus_string_double;
+      private final MethodHandle plus_any_string;
+      private final MethodHandle plus_int_string;
+      private final MethodHandle plus_double_string;
+      
+      {
+        Lookup lookup = MethodHandles.publicLookup();
+        plus_string_any = lookup.findStatic(RT.class, "plus",
+            MethodType.methodType(String.class, String.class, Object.class));
+        plus_string_int = lookup.findStatic(RT.class, "plus",
+            MethodType.methodType(String.class, String.class, int.class));
+        plus_string_double = lookup.findStatic(RT.class, "plus",
+            MethodType.methodType(String.class, String.class, double.class));
+        plus_any_string = lookup.findStatic(RT.class, "plus",
+            MethodType.methodType(String.class, Object.class, String.class));
+        plus_int_string = lookup.findStatic(RT.class, "plus",
+            MethodType.methodType(String.class, int.class, String.class));
+        plus_double_string = lookup.findStatic(RT.class, "plus",
+            MethodType.methodType(String.class, double.class, String.class));
+      }
+    },
+    minus,
+    mult,
+    div,
+    mod,
+    ;
     
     private final MethodHandle op_int_int;
     private final MethodHandle op_double_double;
@@ -1068,7 +1144,7 @@ public class RT {
           MethodType.methodType(double.class, double.class, double.class));
     }
     
-    private MethodHandle getMethodHandle(Class<?> leftType, Class<?> rightType) {
+    MethodHandle getMethodHandle(Class<?> leftType, Class<?> rightType) {
       if (leftType == int.class || leftType == Integer.class) {
         if (rightType == int.class || rightType == Integer.class) {
           return op_int_int;
@@ -1088,7 +1164,7 @@ public class RT {
       throw error(leftType, rightType);
     }
     
-    private RuntimeException error(Class<?> leftType, Class<?> rightType) {
+    private RTError error(Class<?> leftType, Class<?> rightType) {
       return RT.error("no available operator %s(%s,%s)", name(), leftType.getName(), rightType.getName());
     }
     
@@ -1100,29 +1176,27 @@ public class RT {
       if (leftType == Object.class) {
         leftType = left.getClass();
         if (rightType == Object.class) {
-          rightType = left.getClass();
+          rightType = right.getClass();
           test = MethodHandles.insertArguments(isInstanceLeftRight, 0, leftType, rightType);
         } else {
           test = MethodHandles.insertArguments(isInstance, 0, leftType);
         }
       } else {
-        // (rightType == Object.class) {
+        // rightType == any
         rightType = right.getClass();
         test = MethodHandles.dropArguments(
             MethodHandles.insertArguments(isInstance, 0, rightType),
             0, leftType);
       }
       
-      MethodHandle mh = RTConvertWorkaround.convertArguments(
+      /*MethodHandle mh = RTConvertWorkaround.convertArguments(
+          getMethodHandle(leftType, rightType),
+          methodType);*/
+      MethodHandle mh = MethodHandles.convertArguments(
           getMethodHandle(leftType, rightType),
           methodType);
       
-      System.out.println("guard test "+test.type());
-      System.out.println("guard target "+mh.type());
-      System.out.println("guard fallback "+callSite.getTarget().type());
-      
       callSite.setTarget(MethodHandles.guardWithTest(test, mh, callSite.getTarget()));
-      
       return mh.invokeGeneric(left, right); 
     }
     
@@ -1140,56 +1214,11 @@ public class RT {
           MethodType.methodType(boolean.class, Class.class, Class.class, Object.class, Object.class));
     }
     
-    
-    
-    / FIXME: workaround MethodHandles.convertArguments bug in JSR292 RI
-    static MethodHandle fallback_left_any(Class<?> leftType) {
-      if (leftType == int.class)
-        return fallback_int_any;
-      if (leftType == double.class)
-        return fallback_double_any;
-      return MethodHandles.convertArguments(fallback_any_any,
-        MethodType.methodType(Object.class, leftType, Object.class));
-    }
-    public static Object fallback_int_any(Operation operation, CallSite callSite, int o1, Object o2) throws Throwable {
-      return operation.slowPath(callSite, o1, o2);
-    }
-    public static Object fallback_double_any(Operation operation, CallSite callSite, double o1, Object o2) throws Throwable {
-      return operation.slowPath(callSite, o1, o2);
-    }
-    
-    static MethodHandle fallback_any_right(Class<?> rightType) {
-      if (rightType == int.class)
-        return fallback_any_int;
-      if (rightType == double.class)
-        return fallback_any_double;
-      return MethodHandles.convertArguments(fallback_any_any,
-        MethodType.methodType(Object.class, Object.class, rightType));
-    }
-    public static Object fallback_any_int(Operation operation, CallSite callSite, Object o1, int o2) throws Throwable {
-      return operation.slowPath(callSite, o1, o2);
-    }
-    public static Object fallback_any_double(Operation operation, CallSite callSite, Object o1, double o2) throws Throwable {
-      return operation.slowPath(callSite, o1, o2);
-    }
-    
-    final static MethodHandle fallback_any_any;
-    private final static MethodHandle fallback_int_any;
-    private final static MethodHandle fallback_double_any;
-    private final static MethodHandle fallback_any_int;
-    private final static MethodHandle fallback_any_double;
+    final static MethodHandle slowPath;
     static {
       Lookup publicLookup = MethodHandles.lookup();
-      fallback_any_any = publicLookup.findVirtual(Operation.class, "slowPath",
+      slowPath = publicLookup.findVirtual(Operation.class, "slowPath",
           MethodType.methodType(Object.class, CallSite.class, Object.class, Object.class));
-      fallback_int_any = publicLookup.findStatic(Operation.class, "fallback_int_any",
-          MethodType.methodType(Object.class, Operation.class, CallSite.class, int.class, Object.class));
-      fallback_double_any = publicLookup.findStatic(Operation.class, "fallback_double_any",
-          MethodType.methodType(Object.class, Operation.class, CallSite.class, double.class, Object.class));
-      fallback_any_int = publicLookup.findStatic(Operation.class, "fallback_any_int",
-          MethodType.methodType(Object.class, Operation.class, CallSite.class, Object.class, int.class));
-      fallback_any_double = publicLookup.findStatic(Operation.class, "fallback_any_double",
-          MethodType.methodType(Object.class, Operation.class, CallSite.class, Object.class, double.class));
     }
-  }*/
+  }
 }

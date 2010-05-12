@@ -6,11 +6,10 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.io.Reader;
 
-import com.googlecode.phpreboot.interpreter.Interpreter;
+import com.googlecode.phpreboot.interpreter.Analyzer;
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Var;
-import com.googlecode.phpreboot.tools.Analyzers;
 import com.sun.javadoc.RootDoc;
 
 public class Doclet {
@@ -22,9 +21,7 @@ public class Doclet {
     Reader reader = new InputStreamReader(
         Doclet.class.getResourceAsStream("doclet.phpr"));
     
-    Interpreter interpreter = new Interpreter(writer, rootScope);
-    Analyzers.run(reader, interpreter, interpreter, null, null);
-    
+    Analyzer.analyze(reader, writer, rootScope);
     return true;
   }
 }

@@ -151,6 +151,8 @@ types:
   'xml_text': String
   
 attributes:
+  lineNumber: int
+  columnNumber: int
   symbol: com.googlecode.phpreboot.compiler.LocalVar
   type: com.googlecode.phpreboot.model.Type  
   callsite: java.dyn.CallSite

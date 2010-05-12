@@ -47,6 +47,7 @@ public class Compiler {
     
     ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
     cw.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC, "GenStub$"+(counter++)+'$'+name, null, "java/lang/Object", null);
+    cw.visitSource("script", null);
     
     MethodType methodType = asMethodType(function, bindMap);
     String desc = methodType.toMethodDescriptorString();

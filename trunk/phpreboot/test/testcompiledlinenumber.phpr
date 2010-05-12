@@ -1,0 +1,9 @@
+
+function fun() {
+  a = 4
+  b = "foo"
+  
+  return b / a
+}
+
+fun();

@@ -61,6 +61,22 @@
   
   <target name="all" depends="jar"/>  
 	
+  <target name="full">
+  	<taskdef name="jarjar" classname="com.tonicsystems.jarjar.JarJarTask"
+  	         classpath="build-lib/jarjar/jarjar-1.0.jar"/>
+  	<jarjar jarfile="phpreboot-full.jar">
+  		<zipfileset src="lib/phpreboot.jar"/>
+  		<zipfileset src="lib/derby.jar"/>
+  		<zipfileset src="lib/jaxen-1.1.2.jar"/>
+  	    <zipfileset src="lib/grizzly-servlet-webserver-1.9.18-k.jar"/>
+  		<zipfileset src="lib/tatoo-runtime.jar"/>
+  		<zipfileset src="lib/asm-all-3.2.jar"/>
+  		<manifest>
+  		    <attribute name="Main-Class" value="com.googlecode.phpreboot.Main"/>   
+  		</manifest>
+  	</jarjar>
+  </target>
+	
   <target name="clean">
 	<delete dir="${classes}"/>
 	<delete dir="${gen-src}"/>

@@ -166,7 +166,7 @@ public class XPathExprVisitor extends Visitor<Object, XPathExprEnv, JaxenExcepti
       return xpathExpr.asList(context);
     } catch (JaxenException e) {
       //throw RT.error("xpath evaluation error %s", xpathExpr);  
-      throw RT.error(e);
+      throw RT.error((Node)null, e);
     }
   }
   

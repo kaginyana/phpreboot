@@ -4,6 +4,8 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 
+import com.googlecode.phpreboot.ast.Node;
+
 public class SQLCursor implements Sequence, ArrayAccess {
   private final ResultSet resultSet;
   private int row = 1;
@@ -51,9 +53,9 @@ public class SQLCursor implements Sequence, ArrayAccess {
         return resultSet.getObject((Integer)key);
       }
     } catch(SQLException e) {
-      throw new RuntimeException(e);
+      throw RT.error((Node)null, e);
     }
-    throw RT.error("invalid column name/index "+key);
+    return INVALID_KEY;
   }
   
   @Override

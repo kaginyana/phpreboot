@@ -200,7 +200,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Block block = function.getBlock();
     EvalEnv evalEnv = new EvalEnv(scope, env.getEchoer(), null);
     try {
-      Evaluator.INSTANCE.eval(block, evalEnv);
+      eval(block, evalEnv);
     } catch(ReturnError e) {
       return function.getReturnType().getRuntimeClass().cast(e.value);
     }
@@ -771,8 +771,10 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     
     try {
       return ((Function)value).getMethodHandle().invokeVarargs(values);
+    } catch(Error e) {
+      throw e;
     } catch (Throwable e) {
-      throw RT.error(e);
+      throw RT.error((Node)null, e);
     }
   }
   

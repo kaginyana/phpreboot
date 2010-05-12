@@ -1,0 +1,25 @@
+
+let s = "foo"
+let t = "bar"
+let i = 3
+
+echo s + t
+echo s + i
+echo i + t
+
+function fun() {
+  echo s + t
+  echo s + i
+  echo i + t
+  return null;
+}
+
+function fun2(s, t, i) {
+  echo s + t
+  echo s + i
+  echo i + t
+  return null;
+}
+
+fun();
+fun2(s, t, i);

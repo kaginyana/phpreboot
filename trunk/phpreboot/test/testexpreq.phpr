@@ -1,0 +1,107 @@
+
+let a = true
+let b = 3
+let c = "foo"
+let d = <foo/>
+
+echo '-- interpreter --'
+echo a == a 
+echo a == b
+echo a == c
+echo a == d
+echo b == b
+echo b == c
+echo b == d
+echo c == c
+echo c == d
+echo d == d
+
+function fun(a, b, c, d) {
+  echo a == a 
+  echo a == b
+  echo a == c
+  echo a == d
+  echo b == b
+  echo b == c
+  echo b == d
+  echo c == c
+  echo c == d
+  echo d == d
+  
+  return null
+}
+
+function fun2(a, b, c) {
+  echo a == a 
+  echo a == b
+  echo a == c
+  echo a == d
+  echo b == b
+  echo b == c
+  echo b == d
+  echo c == c
+  echo c == d
+  echo d == d
+  
+  return null
+}
+
+function fun3(a, b) {
+  echo a == a 
+  echo a == b
+  echo a == c
+  echo a == d
+  echo b == b
+  echo b == c
+  echo b == d
+  echo c == c
+  echo c == d
+  echo d == d
+  
+  return null
+}
+
+function fun4(a) {
+  echo a == a 
+  echo a == b
+  echo a == c
+  echo a == d
+  echo b == b
+  echo b == c
+  echo b == d
+  echo c == c
+  echo c == d
+  echo d == d
+  
+  return null
+}
+
+function fun5() {
+  echo a == a 
+  echo a == b
+  echo a == c
+  echo a == d
+  echo b == b
+  echo b == c
+  echo b == d
+  echo c == c
+  echo c == d
+  echo d == d
+  
+  return null
+}
+
+echo '-- compiler:fun --'
+fun(a, b, c, d)
+
+echo '-- compiler:fun2 --'
+fun2(a, b, c)
+
+echo '-- compiler:fun3 --'
+fun3(a, b)
+
+echo '-- compiler:fun4 --'
+fun4(a)
+
+echo '-- compiler:fun5 --'
+fun5()

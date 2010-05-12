@@ -2,6 +2,12 @@ package com.googlecode.phpreboot.compiler;
 
 import java.util.List;
 
+import org.objectweb.asm.Label;
+
+import com.googlecode.phpreboot.ast.ArrayEntry;
+import com.googlecode.phpreboot.ast.ArrayValue;
+import com.googlecode.phpreboot.ast.ArrayValueEntry;
+import com.googlecode.phpreboot.ast.ArrayValueSingle;
 import com.googlecode.phpreboot.ast.AssignmentId;
 import com.googlecode.phpreboot.ast.Block;
 import com.googlecode.phpreboot.ast.Expr;
@@ -10,9 +16,14 @@ import com.googlecode.phpreboot.ast.ExprLiteral;
 import com.googlecode.phpreboot.ast.ExprPrimary;
 import com.googlecode.phpreboot.ast.FuncallCall;
 import com.googlecode.phpreboot.ast.Instr;
+import com.googlecode.phpreboot.ast.InstrAssign;
 import com.googlecode.phpreboot.ast.InstrBlock;
+import com.googlecode.phpreboot.ast.InstrDecl;
 import com.googlecode.phpreboot.ast.InstrEcho;
+import com.googlecode.phpreboot.ast.InstrFuncall;
 import com.googlecode.phpreboot.ast.InstrReturn;
+import com.googlecode.phpreboot.ast.LiteralArray;
+import com.googlecode.phpreboot.ast.LiteralArrayEntry;
 import com.googlecode.phpreboot.ast.LiteralBool;
 import com.googlecode.phpreboot.ast.LiteralNull;
 import com.googlecode.phpreboot.ast.LiteralSingle;
@@ -77,7 +88,6 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     throw RT.error("incompatible type %s %s", type, exprType);
   }
   
-  
   // --- default visit
   
   @Override
@@ -116,6 +126,21 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     
     isCompatible(env.getFunctionReturnType(), type);
     return env.getFunctionReturnType();
+  }
+  
+  @Override
+  public Type visit(InstrDecl instr_decl, TypeCheckEnv env) {
+    return typeCheck(instr_decl.getDeclaration(), env);
+  }
+  
+  @Override
+  public Type visit(InstrFuncall instr_funcall, TypeCheckEnv env) {
+    return typeCheck(instr_funcall.getFuncall(), env);
+  }
+  
+  @Override
+  public Type visit(InstrAssign instr_assign, TypeCheckEnv env) {
+    return typeCheck(instr_assign.getAssignment(), env);
   }
   
   
@@ -318,5 +343,40 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   @Override
   public Type visit(LiteralString literal_string, TypeCheckEnv env) {
     return PrimitiveType.STRING;
+  }
+  
+  
+  // --- array literal
+  
+  @Override
+  public Type visit(LiteralArray literal_array, TypeCheckEnv env) {
+    for(ArrayValue arrayValue: literal_array.getArrayValueStar()) {
+      typeCheck(arrayValue, env);
+    }
+    return PrimitiveType.ARRAY;
+  }
+  
+  @Override
+  public Type visit(LiteralArrayEntry literal_array_entry, TypeCheckEnv env) {
+    for(ArrayEntry arrayEntry: literal_array_entry.getArrayEntryStar()) {
+      typeCheck(arrayEntry, env);
+    }
+    return PrimitiveType.ARRAY;
+  }
+  
+  @Override
+  public Type visit(ArrayEntry array_entry, TypeCheckEnv env) {
+    typeCheck(array_entry.getExpr(), env);
+    typeCheck(array_entry.getExpr2(), env);
+    return null; // we don't care about this type
+  }
+  
+  @Override
+  public Type visit(ArrayValueSingle array_value_single, TypeCheckEnv env) {
+    return typeCheck(array_value_single.getExpr(), env);
+  }
+  @Override
+  public Type visit(ArrayValueEntry array_value_entry, TypeCheckEnv env) {
+    return typeCheck(array_value_entry.getArrayEntry(), env);
   }
 }

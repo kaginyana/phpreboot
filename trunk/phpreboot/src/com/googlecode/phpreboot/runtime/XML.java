@@ -1,6 +1,5 @@
 package com.googlecode.phpreboot.runtime;
 
-import java.util.ArrayDeque;
 
 /* TODO add a parent
  */
@@ -45,7 +44,7 @@ public class XML implements /*Sequenceable,*/ ArrayAccess {
     }
     Array elements = this.elements;
     if (elements == null)
-      return null;
+      return INVALID_KEY;
     
     for(Sequence seq = elements.sequence(); seq!=null; seq = seq.next()) {
       Object value = seq.getValue();
@@ -56,7 +55,7 @@ public class XML implements /*Sequenceable,*/ ArrayAccess {
         }
       }
     }
-    return null;
+    return INVALID_KEY;
   }
   
   // this method should never returns null

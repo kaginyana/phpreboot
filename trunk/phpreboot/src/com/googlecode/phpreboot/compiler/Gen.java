@@ -2,16 +2,12 @@ package com.googlecode.phpreboot.compiler;
 
 import static org.objectweb.asm.Opcodes.*;
 import static org.objectweb.asm.Opcodes.ALOAD;
-import static org.objectweb.asm.Opcodes.GETSTATIC;
 import static org.objectweb.asm.Opcodes.GOTO;
 import static org.objectweb.asm.Opcodes.I2D;
 import static org.objectweb.asm.Opcodes.IADD;
 import static org.objectweb.asm.Opcodes.ICONST_0;
 import static org.objectweb.asm.Opcodes.ICONST_1;
 import static org.objectweb.asm.Opcodes.IDIV;
-import static org.objectweb.asm.Opcodes.IF_ICMPGE;
-import static org.objectweb.asm.Opcodes.IF_ICMPGT;
-import static org.objectweb.asm.Opcodes.IF_ICMPLE;
 import static org.objectweb.asm.Opcodes.IF_ICMPLT;
 import static org.objectweb.asm.Opcodes.ILOAD;
 import static org.objectweb.asm.Opcodes.IMUL;
@@ -38,7 +34,6 @@ import com.googlecode.phpreboot.ast.Block;
 import com.googlecode.phpreboot.ast.Expr;
 import com.googlecode.phpreboot.ast.ExprId;
 import com.googlecode.phpreboot.ast.ExprLiteral;
-import com.googlecode.phpreboot.ast.ExprPlus;
 import com.googlecode.phpreboot.ast.ExprPrimary;
 import com.googlecode.phpreboot.ast.FuncallCall;
 import com.googlecode.phpreboot.ast.Instr;
@@ -147,6 +142,23 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   private static final org.objectweb.asm.Type ASM_XML_TYPE = org.objectweb.asm.Type.getType(XML.class);
   private static final org.objectweb.asm.Type ASM_URI_TYPE = org.objectweb.asm.Type.getType(URI.class);
 
+  void defaultReturn(Type returnType) {
+    switch((PrimitiveType)returnType) {
+    case VOID:
+      break;
+    case BOOLEAN:
+    case INT:
+      mv.visitInsn(ICONST_0);
+      break;
+    case DOUBLE:
+      mv.visitInsn(DCONST_0);
+      break;
+    default:
+      mv.visitInsn(ACONST_NULL);
+    }
+    
+    mv.visitInsn(asASMType(returnType).getOpcode(IRETURN));
+  }
   
   private void insertCast(Type type, Type exprType) {
     if (type == exprType)
@@ -216,9 +228,9 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   @Override
   public Type visit(InstrReturn instr_return, GenEnv env) {
     mv.visitLineNumber(instr_return.getLineNumberAttribute(), new Label());
+    Expr expr = instr_return.getExprOptional();
     Type type = instr_return.getTypeAttribute();
     
-    Expr expr = instr_return.getExprOptional();
     if (expr != null) {
       gen(expr, env.expectedType(type));
       insertCast(type, expr.getTypeAttribute());

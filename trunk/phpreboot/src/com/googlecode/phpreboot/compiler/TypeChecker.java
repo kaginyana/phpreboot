@@ -1,8 +1,7 @@
 package com.googlecode.phpreboot.compiler;
 
+import java.util.Iterator;
 import java.util.List;
-
-import org.objectweb.asm.Label;
 
 import com.googlecode.phpreboot.ast.ArrayEntry;
 import com.googlecode.phpreboot.ast.ArrayValue;
@@ -39,6 +38,8 @@ import com.googlecode.phpreboot.model.Type;
 import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.parser.ProductionEnum;
 import com.googlecode.phpreboot.runtime.RT;
+
+import static com.googlecode.phpreboot.compiler.LivenessType.*;
 
 public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   // ---
@@ -102,10 +103,17 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   @Override
   public Type visit(Block block, TypeCheckEnv env) {
     TypeCheckEnv typeCheckEnv = new TypeCheckEnv(new LocalScope(env.getScope()), env.getFunctionReturnType(), env.getBindMap());
-    for(Instr instr: block.getInstrStar()) {
-      typeCheck(instr, typeCheckEnv);
+    Type liveness = LivenessType.ALIVE;
+    
+    for(Iterator<Instr> it = block.getInstrStar().iterator(); it.hasNext();) {
+      Instr instr = it.next();
+      if (liveness != LivenessType.ALIVE) {
+        it.remove(); // remove dead code
+        continue;
+      }
+      liveness = typeCheck(instr, typeCheckEnv);
     }
-    return null;
+    return liveness;
   }
   
   @Override
@@ -116,31 +124,35 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   @Override
   public Type visit(InstrEcho instr_echo, TypeCheckEnv env) {
     typeCheck(instr_echo.getExpr(), env);
-    return null;
+    return ALIVE;
   }
   
   @Override
   public Type visit(InstrReturn instr_return, TypeCheckEnv env) {
     Expr expr = instr_return.getExprOptional();
-    Type type = (expr == null)? PrimitiveType.VOID: typeCheck(expr, env);
+    Type exprType = (expr == null)? PrimitiveType.VOID: typeCheck(expr, env);
     
-    isCompatible(env.getFunctionReturnType(), type);
-    return env.getFunctionReturnType();
+    Type functionReturnType = env.getFunctionReturnType();
+    isCompatible(functionReturnType, exprType);
+    return functionReturnType;    //HACK: it also means !Liveness.ALIVE 
   }
   
   @Override
   public Type visit(InstrDecl instr_decl, TypeCheckEnv env) {
-    return typeCheck(instr_decl.getDeclaration(), env);
+    typeCheck(instr_decl.getDeclaration(), env);
+    return ALIVE;
   }
   
   @Override
   public Type visit(InstrFuncall instr_funcall, TypeCheckEnv env) {
-    return typeCheck(instr_funcall.getFuncall(), env);
+    typeCheck(instr_funcall.getFuncall(), env);
+    return ALIVE;
   }
   
   @Override
   public Type visit(InstrAssign instr_assign, TypeCheckEnv env) {
-    return typeCheck(instr_assign.getAssignment(), env);
+    typeCheck(instr_assign.getAssignment(), env);
+    return ALIVE;
   }
   
   

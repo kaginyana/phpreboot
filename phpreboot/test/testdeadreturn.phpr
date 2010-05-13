@@ -1,0 +1,15 @@
+
+function no_return() {
+}
+
+echo no_return()
+
+function dead_return() {
+  i = 3
+  echo i
+  return i
+  i = 4      // dead code
+}
+
+echo dead_return()
+

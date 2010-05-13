@@ -15,7 +15,6 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.util.CheckClassAdapter;
 
 import com.googlecode.phpreboot.ast.Block;
-import com.googlecode.phpreboot.interpreter.EvalEnv;
 import com.googlecode.phpreboot.model.Function;
 import com.googlecode.phpreboot.model.Parameter;
 import com.googlecode.phpreboot.model.PrimitiveType;
@@ -39,8 +38,9 @@ public class Compiler {
     BindMap bindMap = new BindMap();
     TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, function.getReturnType(), bindMap);
     
+    Type liveness;
     try {
-      typeChecker.typeCheck(functionNode, typeCheckEnv);
+      liveness = typeChecker.typeCheck(functionNode, typeCheckEnv);
     } catch(CodeNotCompilableException e) {
       return null;
     }
@@ -56,6 +56,9 @@ public class Compiler {
     
     Gen gen = new Gen(mv);
     gen.gen(functionNode, new GenEnv(bindMap.getSlotCount(), null));
+    if (liveness == LivenessType.ALIVE) {
+      gen.defaultReturn(function.getReturnType());
+    }
     
     mv.visitMaxs(0, 0);
     mv.visitEnd();

@@ -1,8 +1,11 @@
 
 function no_return() {
 }
-
 echo no_return()
+
+function no_return_int():int {
+}
+echo no_return_int()
 
 function dead_return() {
   i = 3

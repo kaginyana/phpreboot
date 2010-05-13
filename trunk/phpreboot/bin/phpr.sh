@@ -31,4 +31,4 @@ else
   PHPR_HOME=`dirname "$PHPR_HOME_1"` # the . dir
 fi
 
-java -server -XX:+UnlockExperimentalVMOptions -XX:+EnableInvokeDynamic -jar $PHPR_HOME/lib/phpreboot.jar $@
+java -server -XX:+AnonymousClasses -XX:+UnlockExperimentalVMOptions -XX:+EnableInvokeDynamic -jar $PHPR_HOME/lib/phpreboot.jar $@

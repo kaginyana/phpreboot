@@ -14,6 +14,8 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.util.CheckClassAdapter;
 
+import sun.dyn.anon.AnonymousClassLoader;
+
 import com.googlecode.phpreboot.ast.Block;
 import com.googlecode.phpreboot.model.Function;
 import com.googlecode.phpreboot.model.Parameter;
@@ -69,9 +71,9 @@ public class Compiler {
     
     byte[] array = cw.toByteArray();
     
-    CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
+    //CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
     
-    MethodHandle mh = define(Compiler.class.getClassLoader(), name, array, methodType);
+    MethodHandle mh = define(name, array, methodType);
     if (bindMap.getSlotCount() != 0) {
       mh = MethodHandles.insertArguments(mh, 0, bindMap.getReferences());
     }
@@ -124,32 +126,66 @@ public class Compiler {
     return MethodType.methodType(asClass(function.getReturnType()), parameterArray);
   }
   
-  private static MethodHandle define(ClassLoader classLoader, String name, byte[] bytecodes, MethodType methodType) {
-    Class<?> declaredClass = define(classLoader, bytecodes);
+  private static MethodHandle define(String name, byte[] bytecodes, MethodType methodType) {
+    Class<?> declaredClass;
+    if (ANONYMOUS_LOADER) {
+      declaredClass = AnonymousLoader.define(bytecodes);
+    } else {
+      declaredClass = StandardLoader.define(bytecodes);
+    }
     return MethodHandles.lookup().findStatic(declaredClass, name, methodType);
   }
   
-  private static Class<?> define(ClassLoader classLoader, byte[] bytecodes) {
+  static final boolean ANONYMOUS_LOADER;
+  static {
+    boolean anonymousLoader;
     try {
-      return (Class<?>) defineClass.invoke(classLoader, null, bytecodes, 0, bytecodes.length);
-    } catch (IllegalAccessException e) {
-      throw new AssertionError(e);
-    } catch (IllegalArgumentException e) {
-      throw new AssertionError(e);
-    } catch (InvocationTargetException e) {
-      throw new AssertionError(e.getCause());
+      AnonymousClassLoader.class.getName();
+      anonymousLoader = true;
+    } catch(Error e) {
+      anonymousLoader = false;
+    }
+    ANONYMOUS_LOADER = anonymousLoader;
+  }
+  
+  static class AnonymousLoader {
+    private static final AnonymousClassLoader LOADER;
+    static {
+      LOADER = new AnonymousClassLoader(null);
+    }
+    static Class<?> define(byte[] bytecodes) {
+      try {
+      return LOADER.loadClass(bytecodes);
+      } catch(Throwable t) {
+        t.printStackTrace();
+        throw new AssertionError(t);
+      }
     }
   }
   
-  private static final Method defineClass;
-  static {
-    Method method;
-    try {
-      method = ClassLoader.class.getDeclaredMethod("defineClass", String.class, byte[].class, int.class, int.class);
-    } catch (NoSuchMethodException e) {
-      throw new AssertionError(e);
+  static class StandardLoader {
+    static Class<?> define(byte[] bytecodes) {
+      try {
+        return (Class<?>) defineClass.invoke(StandardLoader.class.getClassLoader(), null, bytecodes, 0, bytecodes.length);
+      } catch (IllegalAccessException e) {
+        throw new AssertionError(e);
+      } catch (IllegalArgumentException e) {
+        throw new AssertionError(e);
+      } catch (InvocationTargetException e) {
+        throw new AssertionError(e.getCause());
+      }
     }
-    method.setAccessible(true);
-    defineClass = method;
+
+    private static final Method defineClass;
+    static {
+      Method method;
+      try {
+        method = ClassLoader.class.getDeclaredMethod("defineClass", String.class, byte[].class, int.class, int.class);
+      } catch (NoSuchMethodException e) {
+        throw new AssertionError(e);
+      }
+      method.setAccessible(true);
+      defineClass = method;
+    }
   }
 }

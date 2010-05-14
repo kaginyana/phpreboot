@@ -100,6 +100,12 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   
   // --- visit instructions
   
+  // for all instructions the visitor must return the liveness
+  // of the next instruction. By example, visit(Return) should returns
+  // that the next instruction is dead.
+  // Convention: the liveness value can be LivenessType#ALIVE is the flow
+  // is not stopped or any other value if the liveness is dead
+  
   @Override
   public Type visit(Block block, TypeCheckEnv env) {
     TypeCheckEnv typeCheckEnv = new TypeCheckEnv(new LocalScope(env.getScope()), env.getFunctionReturnType(), env.getBindMap());

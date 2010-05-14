@@ -262,7 +262,7 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   
   @Override
   public Type visit(AssignmentId assignment_id, GenEnv env) {
-    LocalVar var = assignment_id.getSymbolAttribute();
+    LocalVar var = (LocalVar)assignment_id.getSymbolAttribute();
     Type type = var.getType();
     Type exprType = gen(assignment_id.getExpr(), env.expectedType(type));
     insertCast(type, exprType);
@@ -275,7 +275,7 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   
   @Override
   public Type visit(FuncallCall funcall_call, GenEnv env) {
-    LocalVar localVar = funcall_call.getSymbolAttribute();
+    LocalVar localVar = (LocalVar)funcall_call.getSymbolAttribute();
     Function function = (Function)localVar.getValue();
     
     mv.visitVarInsn(ALOAD, localVar.getSlot(0));
@@ -318,7 +318,7 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
    
   @Override
   public Type visit(ExprId expr_id, GenEnv env) {
-    LocalVar localVar = expr_id.getSymbolAttribute();
+    LocalVar localVar = (LocalVar)expr_id.getSymbolAttribute();
     if (!localVar.isConstant()) {
       Type type = localVar.getType();
       mv.visitVarInsn(asASMType(type).getOpcode(ILOAD), localVar.getSlot(env.getShift())); 

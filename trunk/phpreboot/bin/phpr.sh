@@ -31,4 +31,5 @@ else
   PHPR_HOME=`dirname "$PHPR_HOME_1"` # the . dir
 fi
 
-java -server -XX:+AnonymousClasses -XX:+UnlockExperimentalVMOptions -XX:+EnableInvokeDynamic -jar $PHPR_HOME/lib/phpreboot.jar $@
+LIB=$PHPR_HOME/lib
+java -server -XX:+AnonymousClasses -XX:+UnlockExperimentalVMOptions -XX:+EnableInvokeDynamic -Xbootclasspath/a:$LIB/phpreboot.jar:$LIB/tatoo-runtime.jar:$LIB/asm-all-3.2.jar:$LIB/grizzly-servlet-webserver-1.9.18-k.jar:$LIB/derby.jar com.googlecode.phpreboot.Main $@

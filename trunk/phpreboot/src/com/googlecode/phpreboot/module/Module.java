@@ -10,6 +10,7 @@ import com.googlecode.phpreboot.model.Function;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Var;
 
+//FIXME module must be loaded lazily
 public abstract class Module {
   private static final Lookup PUBLIC_LOOKUP = MethodHandles.publicLookup();
   

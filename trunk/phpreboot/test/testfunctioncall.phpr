@@ -1,0 +1,11 @@
+
+
+function foo(x) {
+  return x * 3 + x
+}
+
+for(i = 0; i < 1000; i = i + 1) {
+  echo foo(i);
+}
+
+

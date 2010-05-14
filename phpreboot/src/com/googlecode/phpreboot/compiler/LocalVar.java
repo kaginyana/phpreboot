@@ -8,7 +8,7 @@ import com.googlecode.phpreboot.model.Var;
  *   - a constant foldable value
  *   - a constant value which is not foldable and that will be bound
  */
-public class LocalVar extends Var {
+public class LocalVar extends Var implements Symbol {
   private final int slot;
   
   private final static Object LOCAL_VAR_MARKER = new Object();

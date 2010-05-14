@@ -587,6 +587,9 @@ public class RT {
   public static Sequence toSequence(Object o) {
     Class<?> clazz = o.getClass(); // nullcheck
     
+    if (o instanceof Sequence) {
+      return (Sequence)o;
+    }
     if (o instanceof XML) {
       Array array= ((XML)o).elements;
       return (array == null)?null:filterValue(array.sequence(), Filter.AS_XML);

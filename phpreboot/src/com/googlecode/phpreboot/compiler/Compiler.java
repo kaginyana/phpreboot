@@ -4,8 +4,10 @@ import java.dyn.MethodHandle;
 import java.dyn.MethodHandles;
 import java.dyn.MethodType;
 import java.io.PrintWriter;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.UndeclaredThrowableException;
 import java.util.List;
 
 import org.objectweb.asm.ClassReader;
@@ -13,8 +15,6 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.util.CheckClassAdapter;
-
-import sun.dyn.anon.AnonymousClassLoader;
 
 import com.googlecode.phpreboot.ast.Block;
 import com.googlecode.phpreboot.model.Function;
@@ -128,7 +128,7 @@ public class Compiler {
   
   private static MethodHandle define(String name, byte[] bytecodes, MethodType methodType) {
     Class<?> declaredClass;
-    if (ANONYMOUS_LOADER) {
+    if (ANONYMOUS_CLASS_DEFINE != null) {
       declaredClass = AnonymousLoader.define(bytecodes);
     } else {
       declaredClass = StandardLoader.define(bytecodes);
@@ -136,26 +136,44 @@ public class Compiler {
     return MethodHandles.lookup().findStatic(declaredClass, name, methodType);
   }
   
-  static final boolean ANONYMOUS_LOADER;
+  static final MethodHandle ANONYMOUS_CLASS_DEFINE;
   static {
-    boolean anonymousLoader;
+    MethodHandle define;
     try {
-      AnonymousClassLoader.class.getName();
-      anonymousLoader = true;
-    } catch(Error e) {
-      anonymousLoader = false;
+    Class<?> anonymousClassLoaderClass = Class.forName("sun.dyn.anon.AnonymousClassLoader");
+    define = MethodHandles.publicLookup().findVirtual(anonymousClassLoaderClass, "loadClass",
+        MethodType.methodType(Class.class, byte[].class));
+    
+    } catch(ClassNotFoundException e) {
+      define = null;
     }
-    ANONYMOUS_LOADER = anonymousLoader;
+    ANONYMOUS_CLASS_DEFINE = define;
   }
   
   static class AnonymousLoader {
-    private static final AnonymousClassLoader LOADER;
+    private static final Object ANONYMOUS_CLASS_LOADER;
     static {
-      LOADER = new AnonymousClassLoader(null);
+      try {
+        Class<?> anonymousClassLoaderClass = Class.forName("sun.dyn.anon.AnonymousClassLoader");
+        Constructor<?> constructor = anonymousClassLoaderClass.getConstructor(Class.class);
+        ANONYMOUS_CLASS_LOADER = constructor.newInstance((Object)null);
+      } catch (InvocationTargetException e) {
+        Throwable cause = e.getCause();
+        if (cause instanceof RuntimeException) {
+          throw (RuntimeException)cause;
+        }
+        if (cause instanceof Error) {
+          throw (Error)cause;
+        }
+        throw new UndeclaredThrowableException(cause);
+      } catch(ReflectiveOperationException e) {
+        throw new AssertionError(e);
+      }
     }
     static Class<?> define(byte[] bytecodes) {
       try {
-      return LOADER.loadClass(bytecodes);
+        //FIXME use invokeExact instead
+        return ANONYMOUS_CLASS_DEFINE.invokeGeneric(ANONYMOUS_CLASS_LOADER, bytecodes);
       } catch(Throwable t) {
         t.printStackTrace();
         throw new AssertionError(t);
@@ -163,29 +181,11 @@ public class Compiler {
     }
   }
   
-  static class StandardLoader {
+  static class StandardLoader extends ClassLoader {
+    private static final StandardLoader STANDARD_LOADER = new StandardLoader();
+    
     static Class<?> define(byte[] bytecodes) {
-      try {
-        return (Class<?>) defineClass.invoke(StandardLoader.class.getClassLoader(), null, bytecodes, 0, bytecodes.length);
-      } catch (IllegalAccessException e) {
-        throw new AssertionError(e);
-      } catch (IllegalArgumentException e) {
-        throw new AssertionError(e);
-      } catch (InvocationTargetException e) {
-        throw new AssertionError(e.getCause());
-      }
-    }
-
-    private static final Method defineClass;
-    static {
-      Method method;
-      try {
-        method = ClassLoader.class.getDeclaredMethod("defineClass", String.class, byte[].class, int.class, int.class);
-      } catch (NoSuchMethodException e) {
-        throw new AssertionError(e);
-      }
-      method.setAccessible(true);
-      defineClass = method;
+      return STANDARD_LOADER.defineClass(null, bytecodes, 0, bytecodes.length);
     }
   }
 }

@@ -101,25 +101,27 @@ public class Main {
     EnumMap<Option,Object> optionMap = new EnumMap<Option,Object>(Option.class);
 
     ArrayList<Path> filePaths = new ArrayList<Path>(); 
-    Iterator<String> it = Arrays.asList(args).iterator();
-    while(it.hasNext()) {
-      String arg = it.next();
-      if (arg.length()>1 && arg.charAt(0)=='-') {
-        Option option;
-        try {
-          option = Option.valueOf(arg.substring(1));
-        } catch (IllegalArgumentException e) {
-          printHelp();
-          return;
+    if (args.length != 0) {
+      Iterator<String> it = Arrays.asList(args).iterator();
+      while(it.hasNext()) {
+        String arg = it.next();
+        if (arg.length()>1 && arg.charAt(0)=='-') {
+          Option option;
+          try {
+            option = Option.valueOf(arg.substring(1));
+          } catch (IllegalArgumentException e) {
+            printHelp();
+            return;
+          }
+
+          if (!option.parse(optionMap, it)) {
+            printHelp();
+            return;
+          }
+
+        } else {
+          filePaths.add(Paths.get(arg));
         }
-        
-        if (!option.parse(optionMap, it)) {
-          printHelp();
-          return;
-        }
-        
-      } else {
-        filePaths.add(Paths.get(arg));
       }
     }
 
@@ -131,7 +133,7 @@ public class Main {
     //Class.forName(driverName);
     String jdbcURL = protocolScheme + ":" + dbName + ";create=true";
 
-    boolean verbose = optionMap.containsKey(Option.verbose);
+    boolean verbose = true || optionMap.containsKey(Option.verbose);
     
     if (optionMap.containsKey(Option.webserver)) {
       GrizzlyWebServer ws = new GrizzlyWebServer(8080);

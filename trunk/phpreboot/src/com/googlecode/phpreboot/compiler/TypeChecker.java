@@ -9,6 +9,9 @@ import com.googlecode.phpreboot.ast.ArrayValueEntry;
 import com.googlecode.phpreboot.ast.ArrayValueSingle;
 import com.googlecode.phpreboot.ast.AssignmentId;
 import com.googlecode.phpreboot.ast.Block;
+import com.googlecode.phpreboot.ast.ElseIfElse;
+import com.googlecode.phpreboot.ast.ElseIfElseIf;
+import com.googlecode.phpreboot.ast.ElseIfEmpty;
 import com.googlecode.phpreboot.ast.Expr;
 import com.googlecode.phpreboot.ast.ExprId;
 import com.googlecode.phpreboot.ast.ExprLiteral;
@@ -20,6 +23,7 @@ import com.googlecode.phpreboot.ast.InstrBlock;
 import com.googlecode.phpreboot.ast.InstrDecl;
 import com.googlecode.phpreboot.ast.InstrEcho;
 import com.googlecode.phpreboot.ast.InstrFuncall;
+import com.googlecode.phpreboot.ast.InstrIf;
 import com.googlecode.phpreboot.ast.InstrReturn;
 import com.googlecode.phpreboot.ast.LiteralArray;
 import com.googlecode.phpreboot.ast.LiteralArrayEntry;
@@ -76,7 +80,25 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
         }
       }
     }
-    throw RT.error("illegal types %s,%s for binary expression", left, right);
+    throw RT.error("illegal types %s,%s for a binary expression", left, right);
+  }
+  
+  private void checkIsTestable(Type type) {
+    switch((PrimitiveType)type) {
+    case ANY:
+    case INT:
+    case DOUBLE:
+    case STRING:
+      return;
+    default:
+      throw RT.error("illegal types %s for a binary test", type);
+    }
+  }
+  
+  private Type typeCheckBinaryTest(Type left, Type right) {
+    checkIsTestable(left);
+    checkIsTestable(right);
+    return PrimitiveType.BOOLEAN;
   }
   
   public static void isCompatible(Type type, Type exprType) {
@@ -108,7 +130,7 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   
   @Override
   public Type visit(Block block, TypeCheckEnv env) {
-    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(new LocalScope(env.getScope()), env.getFunctionReturnType(), env.getBindMap());
+    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(new LocalScope(env.getScope()), env.getLoopStack(), env.getFunctionReturnType(), env.getBindMap());
     Type liveness = LivenessType.ALIVE;
     
     for(Iterator<Instr> it = block.getInstrStar().iterator(); it.hasNext();) {
@@ -130,6 +152,33 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   @Override
   public Type visit(InstrEcho instr_echo, TypeCheckEnv env) {
     typeCheck(instr_echo.getExpr(), env);
+    return ALIVE;
+  }
+  
+  @Override
+  public Type visit(InstrIf instr_if, TypeCheckEnv env) {
+    Type exprType = typeCheck(instr_if.getExpr(), env);
+    isCompatible(PrimitiveType.BOOLEAN, exprType);
+    
+    Type leftLiveness = typeCheck(instr_if.getInstr(), env);
+    Type rightLiveness = typeCheck(instr_if.getElseIf(), env);
+    return (leftLiveness == ALIVE || rightLiveness == ALIVE)? ALIVE: DEAD;
+  }
+  @Override
+  public Type visit(ElseIfElseIf else_if_else_if, TypeCheckEnv env) {
+    Type exprType = typeCheck(else_if_else_if.getExpr(), env);
+    isCompatible(PrimitiveType.BOOLEAN, exprType);
+    
+    Type leftLiveness = typeCheck(else_if_else_if.getInstr(), env);
+    Type rightLiveness = typeCheck(else_if_else_if.getElseIf(), env);
+    return (leftLiveness == ALIVE || rightLiveness == ALIVE)? ALIVE: DEAD;
+  }
+  @Override
+  public Type visit(ElseIfElse else_if_else, TypeCheckEnv env) {
+    return typeCheck(else_if_else.getInstr(), env);
+  }
+  @Override
+  public Type visit(ElseIfEmpty else_if_empty, TypeCheckEnv env) {
     return ALIVE;
   }
   
@@ -217,6 +266,7 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
       return function.getReturnType();
     }
     
+    System.err.println("code is not compilable: "+funcall_call.getKind());
     throw CodeNotCompilableException.INSTANCE;
   }
   
@@ -315,13 +365,13 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
       return PrimitiveType.BOOLEAN;
 
     case expr_lt:
-      return typeCheckBinaryOp(left, right);
+      return typeCheckBinaryTest(left, right);
     case expr_le:
-      return typeCheckBinaryOp(left, right);
+      return typeCheckBinaryTest(left, right);
     case expr_gt:
-      return typeCheckBinaryOp(left, right);
+      return typeCheckBinaryTest(left, right);
     case expr_ge:
-      return typeCheckBinaryOp(left, right);
+      return typeCheckBinaryTest(left, right);
 
     default:
     }

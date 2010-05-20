@@ -21,6 +21,7 @@ import com.googlecode.phpreboot.model.Function;
 import com.googlecode.phpreboot.model.Parameter;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Type;
+import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.runtime.RT;
 
 public class Compiler {
@@ -30,6 +31,7 @@ public class Compiler {
     String name = function.getName();
     
     LocalScope localScope = new LocalScope(function.getScope());
+    localScope.register(new Var(function.getName(), true, PrimitiveType.ANY, function));
     for(Parameter parameter: function.getParameters()) {
       Type type = parameter.getType();
       localScope.register(new LocalVar(parameter.getName(), true, type, localScope.nextSlot(type)));
@@ -37,8 +39,9 @@ public class Compiler {
      
     Block functionNode = function.getBlock();
     TypeChecker typeChecker = new TypeChecker();
+    LoopStack loopStack = new LoopStack();
     BindMap bindMap = new BindMap();
-    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, function.getReturnType(), bindMap);
+    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, function.getReturnType(), bindMap);
     
     Type liveness;
     try {
@@ -57,7 +60,7 @@ public class Compiler {
     mv.visitCode();
     
     Gen gen = new Gen(mv);
-    gen.gen(functionNode, new GenEnv(bindMap.getSlotCount(), null));
+    gen.gen(functionNode, new GenEnv(bindMap.getSlotCount(), null, null));
     if (liveness == LivenessType.ALIVE) {
       gen.defaultReturn(function.getReturnType());
     }
@@ -71,7 +74,7 @@ public class Compiler {
     
     byte[] array = cw.toByteArray();
     
-    //CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
+    CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
     
     MethodHandle mh = define(name, array, methodType);
     if (bindMap.getSlotCount() != 0) {
@@ -147,7 +150,7 @@ public class Compiler {
     } catch(ClassNotFoundException e) {
       define = null;
     }
-    ANONYMOUS_CLASS_DEFINE = define;
+    ANONYMOUS_CLASS_DEFINE = /*define*/null;
   }
   
   static class AnonymousLoader {

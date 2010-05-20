@@ -6,6 +6,7 @@ import java.dyn.MethodHandles;
 import java.dyn.MethodHandles.Lookup;
 import java.dyn.MethodType;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -283,6 +284,7 @@ public class RT {
     return (left == null)? right != null: !left.equals(right);
   }
   
+  @SuppressWarnings("unchecked")
   public static boolean lt(Object left, Object right) {
     if (left instanceof Integer) {
       int l = (Integer)left;
@@ -304,6 +306,9 @@ public class RT {
       }
       throw error("invalid type "+right);
     }
+    if (left instanceof Comparable<?> && right.getClass() == left.getClass()) {
+      return lt((Comparable<? super Object>)left, right);
+    }
     throw error("invalid type "+left);
   }
   public static boolean lt(int left, int right) {
@@ -312,7 +317,11 @@ public class RT {
   public static boolean lt(double left, double right) {
     return left < right;
   }
+  public static boolean lt(Comparable<? super Object> left, Object right) {
+    return left.compareTo(right) < 0;
+  }
   
+  @SuppressWarnings("unchecked")
   public static boolean le(Object left, Object right) {
     if (left instanceof Integer) {
       int l = (Integer)left;
@@ -334,6 +343,9 @@ public class RT {
       }
       throw error("invalid type "+right);
     }
+    if (left instanceof Comparable<?> && right.getClass() == left.getClass()) {
+      return le((Comparable<? super Object>)left, right);
+    }
     throw error("invalid type "+left);
   }
   public static boolean le(int left, int right) {
@@ -342,7 +354,11 @@ public class RT {
   public static boolean le(double left, double right) {
     return left <= right;
   }
+  public static boolean le(Comparable<? super Object> left, Object right) {
+    return left.compareTo(right) <= 0;
+  }
   
+  @SuppressWarnings("unchecked")
   public static boolean gt(Object left, Object right) {
     if (left instanceof Integer) {
       int l = (Integer)left;
@@ -364,6 +380,9 @@ public class RT {
       }
       throw error("invalid type "+right);
     }
+    if (left instanceof Comparable<?> && right.getClass() == left.getClass()) {
+      return gt((Comparable<? super Object>)left, right);
+    }
     throw error("invalid type "+left);
   }
   public static boolean gt(int left, int right) {
@@ -372,7 +391,11 @@ public class RT {
   public static boolean gt(double left, double right) {
     return left > right;
   }
+  public static boolean gt(Comparable<? super Object> left, Object right) {
+    return left.compareTo(right) > 0;
+  }
   
+  @SuppressWarnings("unchecked")
   public static boolean ge(Object left, Object right) {
     if (left instanceof Integer) {
       int l = (Integer)left;
@@ -394,6 +417,9 @@ public class RT {
       }
       throw error("invalid type "+right);
     }
+    if (left instanceof Comparable<?> && right.getClass() == left.getClass()) {
+      return ge((Comparable<? super Object>)left, right);
+    }
     throw error("invalid type "+left);
   }
   public static boolean ge(int left, int right) {
@@ -401,6 +427,9 @@ public class RT {
   }
   public static boolean ge(double left, double right) {
     return left >= right;
+  }
+  public static boolean ge(Comparable<? super Object> left, Object right) {
+    return left.compareTo(right) >= 0;
   }
   
   
@@ -1078,76 +1107,41 @@ public class RT {
   
   
   public static CallSite bootstrap(Class<?> declaringClass, String name, MethodType methodType) {
-    Operation operation = Operation.valueOf(name);
+    OpBehavior opBehavior = OpBehavior.valueOf(name);
     CallSite callSite = new CallSite(declaringClass, name, methodType);
     
-    MethodHandle target = MethodHandles.insertArguments(Operation.slowPath, 0, operation, callSite);
+    MethodHandle target = MethodHandles.insertArguments(OpBehavior.slowPath, 0, opBehavior, callSite);
     callSite.setTarget(MethodHandles.convertArguments(target, methodType));
     return callSite;
   }
   
-  public enum Operation {
-    plus {
-      @Override
-      MethodHandle getMethodHandle(Class<?> leftType, Class<?> rightType) {
-        if (leftType == String.class) {
-          if (rightType == int.class || rightType == Integer.class)
-            return plus_string_int;
-          if (rightType == double.class || rightType == Double.class)
-            return plus_string_double;
-          return plus_string_any;
-        }
-        if (rightType == String.class) {
-          if (leftType == int.class || leftType == Integer.class)
-            return plus_int_string;
-          if (leftType == double.class || leftType == Double.class)
-            return plus_double_string;
-          return plus_any_string;
-        }
-        return super.getMethodHandle(leftType, rightType);
-      }
-      
-      private final MethodHandle plus_string_any;
-      private final MethodHandle plus_string_int;
-      private final MethodHandle plus_string_double;
-      private final MethodHandle plus_any_string;
-      private final MethodHandle plus_int_string;
-      private final MethodHandle plus_double_string;
-      
-      {
-        Lookup lookup = MethodHandles.publicLookup();
-        plus_string_any = lookup.findStatic(RT.class, "plus",
-            MethodType.methodType(String.class, String.class, Object.class));
-        plus_string_int = lookup.findStatic(RT.class, "plus",
-            MethodType.methodType(String.class, String.class, int.class));
-        plus_string_double = lookup.findStatic(RT.class, "plus",
-            MethodType.methodType(String.class, String.class, double.class));
-        plus_any_string = lookup.findStatic(RT.class, "plus",
-            MethodType.methodType(String.class, Object.class, String.class));
-        plus_int_string = lookup.findStatic(RT.class, "plus",
-            MethodType.methodType(String.class, int.class, String.class));
-        plus_double_string = lookup.findStatic(RT.class, "plus",
-            MethodType.methodType(String.class, double.class, String.class));
-      }
-    },
-    minus,
-    mult,
-    div,
-    mod,
-    ;
-    
+  public static boolean isInstance(Class<?> leftType, Class<?> rightType, Object left, Object right) {
+    return leftType.isInstance(left) && rightType.isInstance(right);
+  }
+  
+  static class OpBehavior {
+    private final String operator;
     private final MethodHandle op_int_int;
     private final MethodHandle op_double_double;
     
-    Operation() {
-      Lookup lookup = MethodHandles.lookup();
-      op_int_int = lookup.findStatic(RT.class, name(),
-          MethodType.methodType(int.class, int.class, int.class));
-      op_double_double = lookup.findStatic(RT.class, name(),
-          MethodType.methodType(double.class, double.class, double.class));
+    // constructor for sub classes
+    OpBehavior(String operator, MethodHandle op_init_int, MethodHandle op_double_double) {
+      this.operator = operator;
+      this.op_int_int = op_init_int;
+      this.op_double_double = op_double_double;
     }
     
-    MethodHandle getMethodHandle(Class<?> leftType, Class<?> rightType) {
+    // constructor for binary op 
+    OpBehavior(String operator, Lookup lookup, String name) {
+      this(operator,
+          lookup.findStatic(RT.class, name,
+              MethodType.methodType(int.class, int.class, int.class)),
+          lookup.findStatic(RT.class, name,
+              MethodType.methodType(double.class, double.class, double.class))
+            );
+    }
+    
+    /*@Nullabble*/MethodHandle getMethodHandle(Class<?> leftType, Class<?> rightType) {
       if (leftType == int.class || leftType == Integer.class) {
         if (rightType == int.class || rightType == Integer.class) {
           return op_int_int;
@@ -1164,11 +1158,103 @@ public class RT {
           return op_double_double;
         }
       }
-      throw error(leftType, rightType);
+      return null;
     }
     
-    private RTError error(Class<?> leftType, Class<?> rightType) {
-      return RT.error("no available operator %s(%s,%s)", name(), leftType.getName(), rightType.getName());
+    static class Plus extends OpBehavior {
+      private final MethodHandle plus_string_any;
+      private final MethodHandle plus_string_int;
+      private final MethodHandle plus_string_double;
+      private final MethodHandle plus_any_string;
+      private final MethodHandle plus_int_string;
+      private final MethodHandle plus_double_string;
+      
+      Plus(Lookup lookup) {
+        super("+", lookup, "plus");
+        plus_string_any = lookup.findStatic(RT.class, "plus",
+            MethodType.methodType(String.class, String.class, Object.class));
+        plus_string_int = lookup.findStatic(RT.class, "plus",
+            MethodType.methodType(String.class, String.class, int.class));
+        plus_string_double = lookup.findStatic(RT.class, "plus",
+            MethodType.methodType(String.class, String.class, double.class));
+        plus_any_string = lookup.findStatic(RT.class, "plus",
+            MethodType.methodType(String.class, Object.class, String.class));
+        plus_int_string = lookup.findStatic(RT.class, "plus",
+            MethodType.methodType(String.class, int.class, String.class));
+        plus_double_string = lookup.findStatic(RT.class, "plus",
+            MethodType.methodType(String.class, double.class, String.class));
+      }
+      
+      @Override
+      /*@Nullabble*/MethodHandle getMethodHandle(Class<?> leftType, Class<?> rightType) {
+        if (leftType == String.class) {
+          if (rightType == int.class || rightType == Integer.class)
+            return plus_string_int;
+          if (rightType == double.class || rightType == Double.class)
+            return plus_string_double;
+          return plus_string_any;
+        }
+        if (rightType == String.class) {
+          if (leftType == int.class || leftType == Integer.class)
+            return plus_int_string;
+          if (leftType == double.class || leftType == Double.class)
+            return plus_double_string;
+          return plus_any_string;
+        }
+        return super.getMethodHandle(leftType, rightType);
+      }
+    }
+    
+    static class Cmp extends OpBehavior {
+      private final MethodHandle op_cmp_any;
+      
+      Cmp(String operator, Lookup lookup, String name) {
+        super(operator,
+            lookup.findStatic(RT.class, name,
+                MethodType.methodType(boolean.class, int.class, int.class)),
+            lookup.findStatic(RT.class, name,
+                MethodType.methodType(boolean.class, double.class, double.class))
+              );
+        op_cmp_any = lookup.findStatic(RT.class, name,
+            MethodType.methodType(boolean.class, Comparable.class, Object.class));
+      }
+      
+      @Override
+      /*@Nullabble*/MethodHandle getMethodHandle(Class<?> leftType, Class<?> rightType) {
+        /*@Nullabble*/MethodHandle mh = super.getMethodHandle(leftType, rightType);
+        if (mh != null)
+          return mh;
+        if (rightType == leftType && Comparable.class.isAssignableFrom(leftType)) {
+          return op_cmp_any;
+        }
+        return null;
+      }
+    }
+    
+    static OpBehavior valueOf(String name) {
+      OpBehavior opBehavior = BEHAVIOR_MAP.get(name);
+      if (opBehavior == null) {
+        throw RT.error("unknown operation %s", name);
+      }
+      return opBehavior;
+    }
+    private static final HashMap<String, OpBehavior> BEHAVIOR_MAP;
+    static {
+      Lookup lookup = MethodHandles.publicLookup();
+      HashMap<String, OpBehavior> map = new HashMap<String, RT.OpBehavior>();
+      map.put("plus", new Plus(lookup));
+      
+      map.put("minus", new OpBehavior("-", lookup, "minus"));
+      map.put("mult", new OpBehavior("*", lookup, "mult"));
+      map.put("div", new OpBehavior("/", lookup, "div"));
+      map.put("mod", new OpBehavior("%", lookup, "mod"));
+      
+      map.put("lt", new Cmp("<", lookup, "lt"));
+      map.put("le", new Cmp("<=", lookup, "le"));
+      map.put("gt", new Cmp(">", lookup, "gt"));
+      map.put("ge", new Cmp(">=", lookup, "ge"));
+      
+      BEHAVIOR_MAP = map;
     }
     
     public Object slowPath(CallSite callSite, Object left, Object right) throws Throwable {
@@ -1192,19 +1278,16 @@ public class RT {
             0, leftType);
       }
       
-      /*MethodHandle mh = RTConvertWorkaround.convertArguments(
-          getMethodHandle(leftType, rightType),
-          methodType);*/
-      MethodHandle mh = MethodHandles.convertArguments(
-          getMethodHandle(leftType, rightType),
-          methodType);
-      
+      MethodHandle mh = getMethodHandle(leftType, rightType);
+      if (mh == null)
+        throw error(leftType, rightType);
+      mh = MethodHandles.convertArguments(mh, methodType);
       callSite.setTarget(MethodHandles.guardWithTest(test, mh, callSite.getTarget()));
       return mh.invokeGeneric(left, right); 
     }
     
-    public static boolean isInstance(Class<?> leftType, Class<?> rightType, Object left, Object right) {
-      return leftType.isInstance(left) && rightType.isInstance(right);
+    private RTError error(Class<?> leftType, Class<?> rightType) {
+      return RT.error("no available operator %s(%s,%s)", operator, leftType.getName(), rightType.getName());
     }
     
     private final static MethodHandle isInstance; 
@@ -1213,14 +1296,14 @@ public class RT {
       Lookup lookup = MethodHandles.publicLookup();
       isInstance = lookup.findVirtual(Class.class, "isInstance",
           MethodType.methodType(boolean.class, Object.class));
-      isInstanceLeftRight = lookup.findStatic(Operation.class, "isInstance",
+      isInstanceLeftRight = lookup.findStatic(RT.class, "isInstance",
           MethodType.methodType(boolean.class, Class.class, Class.class, Object.class, Object.class));
     }
     
     final static MethodHandle slowPath;
     static {
       Lookup publicLookup = MethodHandles.lookup();
-      slowPath = publicLookup.findVirtual(Operation.class, "slowPath",
+      slowPath = publicLookup.findVirtual(OpBehavior.class, "slowPath",
           MethodType.methodType(Object.class, CallSite.class, Object.class, Object.class));
     }
   }

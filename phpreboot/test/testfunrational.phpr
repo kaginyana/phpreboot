@@ -1,0 +1,30 @@
+
+function test(int x, int y) {
+  echo x == y
+  echo x != y
+  echo x < y
+  echo x <= y
+  echo x > y
+  echo x >= y
+}
+
+test(2, 4)
+test(3, 3)
+
+
+function test2(int x, int y) {
+  if (x == y)
+    echo 'foo'
+  else
+    echo 'bar'
+  
+  if (x != y) {
+    echo 'foobar'
+  }
+  
+  if (x < y)
+    echo 'foobar'
+}
+
+test2(2, 4)
+test2(3, 3)

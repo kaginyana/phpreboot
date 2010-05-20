@@ -209,6 +209,11 @@ productions:
         | action xmls                               { instr_xmls }
         ;
         
+  else_if = 'elseif' '(' expr ')' instr else_if              { else_if_else_if }
+          | 'else' instr                                     { else_if_else }
+          |                                        [ifelse]  { else_if_empty }
+          ;      
+        
   assignment = 'id' '=' expr                  { assignment_id }
              | 'id' '.' 'id' '=' expr         { assignment_field } 
              | primary '.' 'id' '=' expr      { assignment_primary_field }
@@ -254,10 +259,7 @@ productions:
                | 'default' ':'        { inner_switch_default }
                ;
         
-  else_if = 'elseif' '(' expr ')' instr else_if              { else_if_else_if }
-          | 'else' instr                                     { else_if_else }
-          |                                        [ifelse]  { else_if_empty }
-          ;
+  
   
   literal = single_literal                     { literal_single }
           | '[' array_value/'comma'* ']'       { literal_array }
@@ -277,7 +279,6 @@ productions:
               | array_entry     { array_value_entry }
               ;
               
-  
   
   primary = 'id' '[' expr ']'       { primary_array_access }     
           | primary '[' expr ']'    { primary_primary_array_access }                          

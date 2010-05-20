@@ -8,7 +8,6 @@ import static org.objectweb.asm.Opcodes.IADD;
 import static org.objectweb.asm.Opcodes.ICONST_0;
 import static org.objectweb.asm.Opcodes.ICONST_1;
 import static org.objectweb.asm.Opcodes.IDIV;
-import static org.objectweb.asm.Opcodes.IF_ICMPLT;
 import static org.objectweb.asm.Opcodes.ILOAD;
 import static org.objectweb.asm.Opcodes.IMUL;
 import static org.objectweb.asm.Opcodes.INEG;
@@ -31,6 +30,9 @@ import com.googlecode.phpreboot.ast.ArrayValueEntry;
 import com.googlecode.phpreboot.ast.ArrayValueSingle;
 import com.googlecode.phpreboot.ast.AssignmentId;
 import com.googlecode.phpreboot.ast.Block;
+import com.googlecode.phpreboot.ast.ElseIfElse;
+import com.googlecode.phpreboot.ast.ElseIfElseIf;
+import com.googlecode.phpreboot.ast.ElseIfEmpty;
 import com.googlecode.phpreboot.ast.Expr;
 import com.googlecode.phpreboot.ast.ExprId;
 import com.googlecode.phpreboot.ast.ExprLiteral;
@@ -42,6 +44,7 @@ import com.googlecode.phpreboot.ast.InstrBlock;
 import com.googlecode.phpreboot.ast.InstrDecl;
 import com.googlecode.phpreboot.ast.InstrEcho;
 import com.googlecode.phpreboot.ast.InstrFuncall;
+import com.googlecode.phpreboot.ast.InstrIf;
 import com.googlecode.phpreboot.ast.InstrReturn;
 import com.googlecode.phpreboot.ast.LiteralArray;
 import com.googlecode.phpreboot.ast.LiteralArrayEntry;
@@ -67,6 +70,7 @@ import com.googlecode.phpreboot.runtime.URI;
 import com.googlecode.phpreboot.runtime.XML;
 
 public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
+  private static final String FUNCTION_INTERNAL_NAME = getInternalName(Function.class);
   private static final String ARRAY_INTERNAL_NAME = getInternalName(Array.class);
   private static final String ECHOER_INTERNAL_NAME = getInternalName(Echoer.class);
   private static final String EVAL_ENV_INTERNAL_NAME = getInternalName(EvalEnv.class);
@@ -74,7 +78,7 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   
   
   
-  private final MethodVisitor mv;
+  final MethodVisitor mv;
   
   public Gen(MethodVisitor mv) {
     this.mv = mv;
@@ -226,6 +230,32 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   }
   
   @Override
+  public Type visit(InstrIf instr_if, GenEnv env) {
+    mv.visitLineNumber(instr_if.getLineNumberAttribute(), new Label());
+    Node elseIf = instr_if.getElseIf();
+    elseIf = (elseIf instanceof ElseIfEmpty)? null: elseIf;
+    IfParts ifParts = new IfParts(true, instr_if.getInstr(), elseIf);
+    gen(instr_if.getExpr(), env.ifParts(ifParts));
+    return null;
+  }
+  @Override
+  public Type visit(ElseIfElseIf else_if_else_if, GenEnv env) {
+    Node elseIf = else_if_else_if.getElseIf();
+    elseIf = (elseIf instanceof ElseIfEmpty)? null: elseIf;
+    IfParts ifParts = new IfParts(true, else_if_else_if.getInstr(), elseIf);
+    gen(else_if_else_if.getExpr(), env.ifParts(ifParts));
+    return null;
+  }
+  @Override
+  public Type visit(ElseIfElse else_if_else, GenEnv env) {
+    return gen(else_if_else.getInstr(), env);
+  }
+  @Override
+  public Type visit(ElseIfEmpty else_if_empty, GenEnv env) {
+    throw new AssertionError("must not be called");
+  }
+  
+  @Override
   public Type visit(InstrReturn instr_return, GenEnv env) {
     mv.visitLineNumber(instr_return.getLineNumberAttribute(), new Label());
     Expr expr = instr_return.getExprOptional();
@@ -271,6 +301,265 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   }
   
   
+
+  
+  // --- visit test condition
+  
+  private static int inverseTestOpcode(int opcode) {
+    return (opcode % 2 == 0)? opcode - 1: opcode + 1;
+  }
+  
+  private void genInstrOrExprBranches(IfParts ifParts, Label trueLabel, Label endLabel, boolean lastInstrIsAMethodCall, GenEnv env) {
+    if (!lastInstrIsAMethodCall || ifParts.inCondition) {
+      if (lastInstrIsAMethodCall) {
+        mv.visitJumpInsn(IFNE, trueLabel);
+      }
+      Node falsePart = ifParts.falsePart;
+      gen(falsePart, env);
+      Node truePart = ifParts.truePart;
+      if (truePart != null) {
+        // don't generate a goto if false part is an instruction that doesn't live anymore
+        boolean live = !ifParts.inCondition || falsePart.getTypeAttribute() == LivenessType.ALIVE;
+        if (live) {
+          mv.visitJumpInsn(GOTO, endLabel);
+        }
+        mv.visitLabel(trueLabel);
+        gen(truePart, env);
+        if (live) {
+          mv.visitLabel(endLabel);
+        }
+      } else {
+        mv.visitLabel(trueLabel);
+      }
+      return;
+    } 
+  }
+  
+  private void genOnlyOneBranch(IfParts ifParts, int opcode, GenEnv env) {
+    if (opcode == IF_ICMPEQ) {
+      gen(ifParts.falsePart, env);
+    } else {
+      Node truePart = ifParts.truePart;
+      if (truePart != null) {
+        gen(truePart, env);
+      }
+    }
+  }
+  
+  private Type visitBinaryEq(String opName, int opcode, Node leftNode, Node rightNode, GenEnv env) {
+    Label trueLabel = new Label();
+    Label endLabel = new Label();
+    IfParts ifParts = env.getIfParts();
+    if (ifParts == null) {  // if not a condition, create fake true/false nodes
+      ifParts = new IfParts(false, TRUE_NODE, FALSE_NODE);
+    } else {
+      // create an invariant: false part is never null if in condition
+      if (ifParts.falsePart == null) {
+        ifParts = ifParts.swap();
+        opcode = inverseTestOpcode(opcode);
+      } 
+    }
+    
+    GenEnv newEnv = env.expectedType(PrimitiveType.ANY).ifParts(null);
+    Type left = leftNode.getTypeAttribute();
+    Type right = rightNode.getTypeAttribute();
+    
+    switch((PrimitiveType)left) {
+    case BOOLEAN:
+      switch((PrimitiveType)right) {
+      case BOOLEAN:
+        gen(leftNode, newEnv);
+        gen(rightNode, newEnv);
+        mv.visitJumpInsn(opcode, trueLabel);
+        genInstrOrExprBranches(ifParts, trueLabel, endLabel, false, env);
+        return PrimitiveType.BOOLEAN;
+      case ANY:
+        gen(leftNode, newEnv);
+        insertCast(PrimitiveType.ANY, PrimitiveType.BOOLEAN);
+        gen(rightNode, newEnv);
+        mv.visitMethodInsn(INVOKESTATIC, RT_INTERNAL_NAME, opName, "(Ljava/lang/Object;Ljava/lang/Object;)Z");
+        genInstrOrExprBranches(ifParts, trueLabel, endLabel, true, env);
+        return PrimitiveType.BOOLEAN;
+      default:
+        gen(leftNode, newEnv);
+        mv.visitInsn(POP);
+        gen(rightNode, newEnv);
+        mv.visitInsn((right == PrimitiveType.DOUBLE)? POP2: POP);
+        genOnlyOneBranch(ifParts, opcode, env);
+        return PrimitiveType.BOOLEAN;
+      }
+    case INT:
+      switch((PrimitiveType)right) {
+      case INT:
+        gen(leftNode, newEnv);
+        gen(rightNode, newEnv);
+        mv.visitJumpInsn(opcode, trueLabel);
+        genInstrOrExprBranches(ifParts, trueLabel, endLabel, false, env);
+        return PrimitiveType.BOOLEAN;
+      case DOUBLE:
+        gen(leftNode, newEnv);
+        insertCast(PrimitiveType.DOUBLE, PrimitiveType.INT);
+        gen(rightNode, newEnv);
+        mv.visitInsn(DCMPG);
+        mv.visitJumpInsn(opcode - IF_ICMPEQ + IFEQ, trueLabel);
+        genInstrOrExprBranches(ifParts, trueLabel, endLabel, false, env);
+        return PrimitiveType.BOOLEAN;
+      case ANY:
+        gen(leftNode, newEnv);
+        insertCast(PrimitiveType.ANY, PrimitiveType.INT);
+        gen(rightNode, newEnv);
+        mv.visitMethodInsn(INVOKESTATIC, RT_INTERNAL_NAME, opName, "(Ljava/lang/Object;Ljava/lang/Object;)Z");
+        genInstrOrExprBranches(ifParts, trueLabel, endLabel, true, env);
+        return PrimitiveType.BOOLEAN;
+      default:
+        gen(leftNode, newEnv);
+        mv.visitInsn(POP);
+        gen(rightNode, newEnv);
+        mv.visitInsn(POP);
+        genOnlyOneBranch(ifParts, opcode, env);
+        return PrimitiveType.BOOLEAN;
+      }
+    case DOUBLE:
+      switch((PrimitiveType)right) {
+      case INT:
+      case DOUBLE:
+        gen(leftNode, newEnv);
+        gen(rightNode, newEnv);
+        insertCast(PrimitiveType.DOUBLE, right);
+        mv.visitInsn(DCMPG);
+        mv.visitJumpInsn(opcode - IF_ICMPEQ + IFEQ, trueLabel);
+        genInstrOrExprBranches(ifParts, trueLabel, endLabel, false, env);
+        return PrimitiveType.BOOLEAN;
+      case ANY:
+        gen(leftNode, newEnv);
+        insertCast(PrimitiveType.ANY, PrimitiveType.DOUBLE);
+        gen(rightNode, newEnv);
+        mv.visitMethodInsn(INVOKESTATIC, RT_INTERNAL_NAME, opName, "(Ljava/lang/Object;Ljava/lang/Object;)Z");
+        genInstrOrExprBranches(ifParts, trueLabel, endLabel, true, env);
+        return PrimitiveType.BOOLEAN;
+      default:
+        gen(leftNode, newEnv);
+        mv.visitInsn(POP2);
+        gen(rightNode, newEnv);
+        mv.visitInsn(POP);
+        genOnlyOneBranch(ifParts, opcode, env);
+        return PrimitiveType.BOOLEAN;
+      }
+    default:
+      gen(leftNode, newEnv);
+      gen(rightNode, newEnv);
+      insertCast(PrimitiveType.ANY, right);
+      mv.visitMethodInsn(INVOKESTATIC, RT_INTERNAL_NAME, opName, "(Ljava/lang/Object;Ljava/lang/Object;)Z");
+      genInstrOrExprBranches(ifParts, trueLabel, endLabel, true, env);
+      return PrimitiveType.BOOLEAN;
+    }
+  }
+
+  private Type visitUnaryNot(Node unaryNode, GenEnv env) {
+    IfParts ifParts = env.getIfParts();
+    if (ifParts == null) {  // if not a condition, create fake true/false nodes inverted
+      env = env.ifParts(new IfParts(false, FALSE_NODE, TRUE_NODE));
+    } else {
+      // invert parts
+      env = env.ifParts(ifParts.swap());
+    }
+    
+    gen(unaryNode, env.expectedType(PrimitiveType.BOOLEAN));
+    return PrimitiveType.BOOLEAN;
+  }
+  
+  private Type visitBinaryTest(String opName, int opcode, Node leftNode, Node rightNode, GenEnv env) {
+    Label trueLabel = new Label();
+    Label endLabel = new Label();
+    IfParts ifParts = env.getIfParts();
+    if (ifParts == null) {  // if not a condition, create fake true/false nodes
+      ifParts = new IfParts(false, TRUE_NODE, FALSE_NODE);
+    } else {
+      // create an invariant: false part is never null if in condition
+      if (ifParts.falsePart == null) {
+        ifParts = ifParts.swap();
+        opcode = inverseTestOpcode(opcode);
+      } 
+    }
+    
+    GenEnv newEnv = env.expectedType(PrimitiveType.ANY).ifParts(null);
+    Type left = leftNode.getTypeAttribute();
+    Type right = rightNode.getTypeAttribute();
+    
+    top: switch((PrimitiveType)left) {
+    case INT:
+      switch((PrimitiveType)right) {
+      case INT:
+        gen(leftNode, newEnv);
+        gen(rightNode, newEnv);
+        mv.visitJumpInsn(opcode, trueLabel);
+        genInstrOrExprBranches(ifParts, trueLabel, endLabel, false, env);
+        return PrimitiveType.BOOLEAN;
+      case DOUBLE:
+        gen(leftNode, newEnv);
+        insertCast(PrimitiveType.DOUBLE, PrimitiveType.INT);
+        gen(rightNode, newEnv);
+        mv.visitInsn(DCMPG);
+        mv.visitJumpInsn(opcode - IF_ICMPEQ + IFEQ, trueLabel);
+        genInstrOrExprBranches(ifParts, trueLabel, endLabel, false, env);
+        return PrimitiveType.BOOLEAN;
+      default:
+        break top;
+      }
+    case DOUBLE:
+      switch((PrimitiveType)right) {
+      case INT:
+      case DOUBLE:
+        gen(leftNode, newEnv);
+        gen(rightNode, newEnv);
+        insertCast(PrimitiveType.DOUBLE, right);
+        mv.visitInsn(DCMPG);
+        mv.visitJumpInsn(opcode - IF_ICMPEQ + IFEQ, trueLabel);
+        genInstrOrExprBranches(ifParts, trueLabel, endLabel, false, env);
+        return PrimitiveType.BOOLEAN;
+      default:
+        break top;
+      }
+    default:
+    }
+    
+    gen(leftNode, newEnv);
+    gen(rightNode, newEnv);
+    indy(opName, PrimitiveType.BOOLEAN, left, right);
+    genInstrOrExprBranches(ifParts, trueLabel, endLabel, true, env);
+    return PrimitiveType.BOOLEAN;
+  }
+  
+  class TrueConstNode extends Node {
+    private final int opcode;
+    
+    TrueConstNode(boolean value) {
+      opcode = (value)?ICONST_1: ICONST_0;
+    }
+    
+    @Override
+    public Object getKind() {
+      throw new UnsupportedOperationException();
+    }
+    @Override
+    public boolean isToken() {
+      throw new UnsupportedOperationException();
+    }
+    @Override
+    public List<Node> nodeList() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public <_R, _P, _E extends Exception> _R accept(Visitor<? extends _R, ? super _P, ? extends _E> visitor, _P param) throws _E {
+      mv.visitInsn(opcode);
+      return null;
+    }
+  }
+  private final TrueConstNode TRUE_NODE = new TrueConstNode(true);
+  private final TrueConstNode FALSE_NODE = new TrueConstNode(false);
+  
+  
 // --- visit fun call
   
   @Override
@@ -279,7 +568,7 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     Function function = (Function)localVar.getValue();
     
     mv.visitVarInsn(ALOAD, localVar.getSlot(0));
-    mv.visitMethodInsn(INVOKEVIRTUAL, Function.class.getName().replace('.', '/'), "getMethodHandle", "()Ljava/dyn/MethodHandle;");
+    mv.visitMethodInsn(INVOKEVIRTUAL, FUNCTION_INTERNAL_NAME, "getMethodHandle", "()Ljava/dyn/MethodHandle;");
     
     mv.visitVarInsn(ALOAD, env.getShift()); // environment
     
@@ -289,7 +578,7 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     for(int i=0; i<exprStar.size(); i++) {
       Expr expr = exprStar.get(i);
       Type expectedType = parameters.get(i).getType();
-      Type exprType = gen(expr, new GenEnv(env.getShift(), expectedType));
+      Type exprType = gen(expr, new GenEnv(env.getShift(), env.getIfParts(), expectedType));
       insertCast(expectedType, exprType);
       desc.append(asASMType(expectedType).getDescriptor());
     }
@@ -313,6 +602,7 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   public Type visit(PrimaryFuncall primary_funcall, GenEnv env) {
     return gen(primary_funcall.getFuncall(), env);
   }
+  
   
   // --- visit expression
    
@@ -353,7 +643,7 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     return gen(expr_primary.getPrimary(), env);
   }
   
-  private Type visitUnaryOp(String opName, int opcode, Node exprNode, Type type, GenEnv env) {
+  private Type visitUnaryOp(String opName, int opcode, Node exprNode, GenEnv env) {
     Type exprType = gen(exprNode, env.expectedType(PrimitiveType.ANY));
     
     if (exprType == PrimitiveType.ANY) {
@@ -361,8 +651,8 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       indy(opName, expectedType, exprType);
       return expectedType;
     } else {
-      mv.visitInsn(asASMType(type).getOpcode(opcode));
-      return type;
+      mv.visitInsn(asASMType(exprType).getOpcode(opcode));
+      return exprType;
     }
   }
   
@@ -396,139 +686,6 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     }
   }
   
-  private Type visitBinaryEq(String opName, int opcode, Node leftNode, Node rightNode, GenEnv env) {
-    GenEnv newEnv = env.expectedType(PrimitiveType.ANY);
-    Type left = leftNode.getTypeAttribute();
-    Type right = rightNode.getTypeAttribute();
-    
-    Label truePart = new Label();
-    Label end = new Label();
-    
-    all: switch((PrimitiveType)left) {
-    case BOOLEAN:
-      switch((PrimitiveType)right) {
-      case BOOLEAN:
-        gen(leftNode, newEnv);
-        gen(rightNode, newEnv);
-        mv.visitJumpInsn(opcode, truePart);
-        break all;
-      case ANY:
-        gen(leftNode, newEnv);
-        insertCast(PrimitiveType.ANY, PrimitiveType.BOOLEAN);
-        gen(rightNode, newEnv);
-        mv.visitMethodInsn(INVOKESTATIC, RT_INTERNAL_NAME, opName, "(Ljava/lang/Object;Ljava/lang/Object;)Z");
-        return PrimitiveType.BOOLEAN;
-      default:
-        gen(leftNode, newEnv);
-        mv.visitInsn(POP);
-        gen(rightNode, newEnv);
-        mv.visitInsn((right == PrimitiveType.DOUBLE)? POP2: POP);
-        mv.visitInsn((opcode == IF_ICMPEQ)?ICONST_0:ICONST_1);
-        return PrimitiveType.BOOLEAN;
-      }
-    case INT:
-      switch((PrimitiveType)right) {
-      case INT:
-        gen(leftNode, newEnv);
-        gen(rightNode, newEnv);
-        mv.visitJumpInsn(opcode, truePart);
-        break all;
-      case DOUBLE:
-        gen(leftNode, newEnv);
-        insertCast(PrimitiveType.DOUBLE, PrimitiveType.INT);
-        gen(rightNode, newEnv);
-        mv.visitInsn(DCMPG);
-        mv.visitJumpInsn(opcode - IF_ICMPEQ + IFEQ, truePart);
-        break all;
-      case ANY:
-        gen(leftNode, newEnv);
-        insertCast(PrimitiveType.ANY, PrimitiveType.INT);
-        gen(rightNode, newEnv);
-        mv.visitMethodInsn(INVOKESTATIC, RT_INTERNAL_NAME, opName, "(Ljava/lang/Object;Ljava/lang/Object;)Z");
-        return PrimitiveType.BOOLEAN;
-      default:
-        gen(leftNode, newEnv);
-        mv.visitInsn(POP);
-        gen(rightNode, newEnv);
-        mv.visitInsn(POP);
-        mv.visitInsn((opcode == IFEQ)?ICONST_0:ICONST_1);
-        return PrimitiveType.BOOLEAN;
-      }
-    case DOUBLE:
-      switch((PrimitiveType)right) {
-      case INT:
-      case DOUBLE:
-        gen(leftNode, newEnv);
-        gen(rightNode, newEnv);
-        insertCast(PrimitiveType.DOUBLE, right);
-        mv.visitInsn(DCMPG);
-        mv.visitJumpInsn(opcode - IF_ICMPEQ + IFEQ, truePart);
-        break all;
-      case ANY:
-        gen(leftNode, newEnv);
-        insertCast(PrimitiveType.ANY, PrimitiveType.DOUBLE);
-        gen(rightNode, newEnv);
-        mv.visitMethodInsn(INVOKESTATIC, RT_INTERNAL_NAME, opName, "(Ljava/lang/Object;Ljava/lang/Object;)Z");
-        return PrimitiveType.BOOLEAN;
-      default:
-        gen(leftNode, newEnv);
-        mv.visitInsn(POP2);
-        gen(rightNode, newEnv);
-        mv.visitInsn(POP);
-        mv.visitInsn((opcode == IF_ICMPEQ)?ICONST_0:ICONST_1);
-        return PrimitiveType.BOOLEAN;
-      }
-    default:
-      gen(leftNode, newEnv);
-      gen(rightNode, newEnv);
-      insertCast(PrimitiveType.ANY, right);
-      mv.visitMethodInsn(INVOKESTATIC, RT_INTERNAL_NAME, opName, "(Ljava/lang/Object;Ljava/lang/Object;)Z");
-      return PrimitiveType.BOOLEAN;
-    }
-    
-    mv.visitInsn(ICONST_0);
-    mv.visitJumpInsn(GOTO, end);
-    mv.visitLabel(truePart);
-    mv.visitInsn(ICONST_1);
-    mv.visitLabel(end);
-    return PrimitiveType.BOOLEAN;
-  }
-  
-  private Type visitBinaryTest(String opName, int kind, Node leftNode, Node rightNode, Type type, GenEnv env) {
-    Type expectedType = env.getExpectedType();
-    env = env.expectedType(PrimitiveType.ANY);
-    Type left = gen(leftNode, env);
-    Type right = gen(rightNode, env);
-    
-    if (type == PrimitiveType.ANY) {
-      expectedType = (expectedType == PrimitiveType.ANY)? PrimitiveType.BOOLEAN: expectedType;
-      indy(opName, PrimitiveType.BOOLEAN, left, right);
-    } else {
-      Label truePart = new Label();
-      Label end = new Label();
-      
-      switch((PrimitiveType)type) {
-      case INT:
-        mv.visitJumpInsn(kind + IF_ICMPLT - IFLT , truePart);
-        break;
-      case DOUBLE:
-        mv.visitInsn(DCMPG);
-        mv.visitJumpInsn(kind , truePart);
-        break;
-      default:
-        throw new AssertionError("invalid type "+type);
-      }
-      
-      mv.visitInsn(ICONST_0);
-      mv.visitJumpInsn(GOTO, end);
-      mv.visitLabel(truePart);
-      mv.visitInsn(ICONST_1);
-      mv.visitLabel(end);
-    }
-    return PrimitiveType.BOOLEAN;
-  }
-  
-  
   @Override
   protected Type visit(Expr expr, GenEnv env) {
     Type type = expr.getTypeAttribute();
@@ -539,20 +696,12 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     switch(kind) {
     case expr_unary_plus:
       return type;
-      
     case expr_unary_minus:
-      return visitUnaryOp("-", INEG, unaryNode, type, env);
-    
+      return visitUnaryOp("-", INEG, unaryNode, env);
+      
     case expr_unary_not:
-      /*
-      if (type == PrimitiveType.ANY) {
-        indy("unary_not", joinReturnType(env.getExpectedType(), PrimitiveType.BOOLEAN), type);
-      } else {
-        mv.visitInsn(INOT);
-      }
-      return null;
-      */
-      throw new UnsupportedOperationException("NYI");
+      return visitUnaryNot(unaryNode, env);
+    
     default:
     }
 
@@ -575,22 +724,37 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       return visitBinaryEq("ne", IF_ICMPNE, unaryNode, binaryNode, env);
       
     case expr_lt:
-      return visitBinaryTest("lt", IFLT, unaryNode, binaryNode, type, env);
+      return visitBinaryTest("lt", IF_ICMPLT, unaryNode, binaryNode, env);
     case expr_le:
-      return visitBinaryTest("le", IFLE, unaryNode, binaryNode, type, env);
+      return visitBinaryTest("le", IF_ICMPLE, unaryNode, binaryNode, env);
     case expr_gt:
-      return visitBinaryTest("gt", IFGT, unaryNode, binaryNode, type, env);
+      return visitBinaryTest("gt", IF_ICMPGT, unaryNode, binaryNode, env);
     case expr_ge:
-      return visitBinaryTest("ge", IFGE, unaryNode, binaryNode, type, env);
+      return visitBinaryTest("ge", IF_ICMPGE, unaryNode, binaryNode, env);
 
     default:
+      throw new AssertionError("unknown expression "+kind);  
     }
-
-    throw new AssertionError("unknown expression "+kind);
   }
   
   
   // --- literals
+  
+  private  void integerConst(int value) {
+    if (value >= -1 && value <= 5) {
+      mv.visitInsn(ICONST_0 + value);
+      return;
+    }
+    if (value >= Byte.MIN_VALUE && value <= Byte.MAX_VALUE) {
+      mv.visitIntInsn(BIPUSH, value);
+      return;
+    }
+    if (value >= Short.MIN_VALUE && value <= Short.MAX_VALUE) {
+      mv.visitIntInsn(SIPUSH, value);
+      return;
+    }
+    mv.visitLdcInsn(value);
+  }
   
   @Override
   public Type visit(ExprLiteral primary_literal, GenEnv env) {
@@ -618,7 +782,11 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   @Override
   public Type visit(LiteralValue literal_value, GenEnv env) {
     Object value = literal_value.getValueLiteral().getValue();
-    mv.visitLdcInsn(value);
+    if (value instanceof Integer) {
+      integerConst((Integer)value);
+    } else {
+      mv.visitLdcInsn(value);
+    }
     return literal_value.getTypeAttribute();
   }
   

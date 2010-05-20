@@ -1,4 +1,5 @@
 
+/*
 function fibo(a) {
   if (a == 0)
     return 1
@@ -6,6 +7,21 @@ function fibo(a) {
     return 1
   else
     return fibo(a - 1) + fibo(a - 2)
+}*/
+
+/*
+function fibo(int a):int {
+  if (a < 2)
+    return 1
+  else
+    return fibo(a - 1) + fibo(a - 2)
+}
+*/
+
+function fibo(int a):int {
+  if (a < 2)
+    return 1
+  return fibo(a - 1) + fibo(a - 2)
 }
 
 echo fibo(7)

@@ -3,7 +3,7 @@ package com.googlecode.phpreboot.compiler;
 import com.googlecode.phpreboot.model.Type;
 
 enum LivenessType implements Type {
-  ALIVE;
+  ALIVE, DEAD;
 
   @Override
   public String getName() {

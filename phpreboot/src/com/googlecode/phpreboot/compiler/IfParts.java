@@ -1,13 +1,11 @@
 package com.googlecode.phpreboot.compiler;
 
-import com.googlecode.phpreboot.ast.Node;
-
 class IfParts {
   final boolean inCondition;
-  final /*@Nullable*/Node truePart;
-  final /*@Nullable*/Node falsePart;
+  final /*@Nullable*/GeneratorClosure truePart;
+  final /*@Nullable*/GeneratorClosure falsePart;
   
-  IfParts(boolean inCondition, /*@Nullable*/Node truePart, /*@Nullable*/Node falsePart) {
+  IfParts(boolean inCondition, /*@Nullable*/GeneratorClosure truePart, /*@Nullable*/GeneratorClosure falsePart) {
     this.inCondition = inCondition;
     this.truePart = truePart;
     this.falsePart = falsePart;

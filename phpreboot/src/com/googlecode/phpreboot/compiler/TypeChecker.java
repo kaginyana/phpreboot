@@ -103,7 +103,7 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     return PrimitiveType.BOOLEAN;
   }
   
-  public static void isCompatible(Type type, Type exprType) {
+  private static void isCompatible(Type type, Type exprType) {
     if (type == PrimitiveType.ANY)
       return;
     if (type == exprType)
@@ -112,6 +112,23 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
       return;
     throw RT.error("incompatible type %s %s", type, exprType);
   }
+  
+  private static Type inferType(Object value) {
+    if (value instanceof Boolean) {
+      return PrimitiveType.BOOLEAN;
+    }
+    if (value instanceof Integer) {
+      return PrimitiveType.BOOLEAN;
+    }
+    if (value instanceof Double) {
+      return PrimitiveType.DOUBLE;
+    }
+    if (value instanceof String) {
+      return PrimitiveType.STRING;
+    }
+    return PrimitiveType.ANY;
+  }
+  
   
   // --- default visit
   
@@ -220,9 +237,11 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     String name = assignment_id.getId().getValue();
     LocalScope scope = env.getScope();
     Var var = scope.lookup(name);
+    
+    LocalVar localVar;
     if (var == null) {
       // auto-declaration
-      var = new LocalVar(name, false, PrimitiveType.ANY, scope.nextSlot(PrimitiveType.ANY));
+      localVar = new LocalVar(name, false, PrimitiveType.ANY, scope.nextSlot(PrimitiveType.ANY));
       scope.register(var);
     } else {
       
@@ -230,10 +249,17 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
         throw RT.error("try to assign a read only variable %s", name);
       
       isCompatible(var.getType(), exprType);
+      
+      if (var instanceof LocalVar) {
+        localVar = (LocalVar)var;
+      } else {
+        localVar = env.getBindMap().bind(name, var.isReadOnly(), var.getValue(), var.getType());
+        scope.register(localVar);
+      }
     }
     
-    assignment_id.setSymbolAttribute((LocalVar)var);
-    return var.getType();
+    assignment_id.setSymbolAttribute(localVar);
+    return localVar.getType();
   }
   
   
@@ -282,7 +308,14 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
         isCompatible(parameters.get(i).getType(), exprType);
       }
       
-      LocalVar localVar = env.getBindMap().bind(function, PrimitiveType.FUNCTION);
+      LocalVar localVar;
+      if (var instanceof LocalVar) {
+        localVar = (LocalVar)var;
+      } else {
+        localVar = env.getBindMap().bind(name, var.isReadOnly(), function, PrimitiveType.FUNCTION);
+        env.getScope().register(localVar);
+      }
+      
       funcall_call.setSymbolAttribute(localVar);
       return function.getReturnType();
     }
@@ -316,27 +349,29 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
       return type;
     }
     
-    // constants
     Object value = var.getValue();
-    if (value instanceof Boolean) {
-      expr_id.setSymbolAttribute(LocalVar.createConstantFoldable(value));
-      return PrimitiveType.BOOLEAN;
-    }
-    if (value instanceof Integer) {
-      expr_id.setSymbolAttribute(LocalVar.createConstantFoldable(value));
-      return PrimitiveType.INT;
-    }
-    if (value instanceof Double) {
-      expr_id.setSymbolAttribute(LocalVar.createConstantFoldable(value));
-      return PrimitiveType.DOUBLE;
-    }
-    if (value instanceof String) {
-      expr_id.setSymbolAttribute(LocalVar.createConstantFoldable(value));
-      return PrimitiveType.STRING;
+    if (var.isReadOnly()) {  // constants
+      if (value instanceof Boolean) {
+        expr_id.setSymbolAttribute(LocalVar.createConstantFoldable(value));
+        return PrimitiveType.BOOLEAN;
+      }
+      if (value instanceof Integer) {
+        expr_id.setSymbolAttribute(LocalVar.createConstantFoldable(value));
+        return PrimitiveType.INT;
+      }
+      if (value instanceof Double) {
+        expr_id.setSymbolAttribute(LocalVar.createConstantFoldable(value));
+        return PrimitiveType.DOUBLE;
+      }
+      if (value instanceof String) {
+        expr_id.setSymbolAttribute(LocalVar.createConstantFoldable(value));
+        return PrimitiveType.STRING;
+      }
     }
     
     // bound constant
-    LocalVar bindVar = env.getBindMap().bind(value, type);
+    LocalVar bindVar = env.getBindMap().bind(name, var.isReadOnly(), value, type);
+    env.getScope().register(bindVar);
     expr_id.setSymbolAttribute(bindVar);
     return type;
   }

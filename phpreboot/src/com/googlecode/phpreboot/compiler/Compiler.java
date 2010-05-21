@@ -6,7 +6,6 @@ import java.dyn.MethodType;
 import java.io.PrintWriter;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.util.List;
 
@@ -17,6 +16,10 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.util.CheckClassAdapter;
 
 import com.googlecode.phpreboot.ast.Block;
+import com.googlecode.phpreboot.ast.LabeledInstrWhile;
+import com.googlecode.phpreboot.ast.Node;
+import com.googlecode.phpreboot.interpreter.EvalEnv;
+import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.Function;
 import com.googlecode.phpreboot.model.Parameter;
 import com.googlecode.phpreboot.model.PrimitiveType;
@@ -74,17 +77,86 @@ public class Compiler {
     
     byte[] array = cw.toByteArray();
     
-    CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
+    //CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
     
     MethodHandle mh = define(name, array, methodType);
     if (bindMap.getSlotCount() != 0) {
-      mh = MethodHandles.insertArguments(mh, 0, bindMap.getReferences());
+      mh = MethodHandles.insertArguments(mh, 1, bindMap.getReferenceValues());
     }
     
     //System.err.println("compiled method "+mh.type());
     
     return mh;
   }
+  
+  
+  public static boolean traceCompile(LabeledInstrWhile labeledInstrWhile, EvalEnv env) {
+    Scope scope = env.getScope();
+    LocalScope localScope = new LocalScope(scope);
+    
+    TypeChecker typeChecker = new TypeChecker();
+    LoopStack loopStack = new LoopStack();
+    BindMap bindMap = new BindMap();
+    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, /*FIXME need the enclosing return type*/null, bindMap);
+    
+    try {
+      typeChecker.typeCheck(labeledInstrWhile, typeCheckEnv);
+    } catch(CodeNotCompilableException e) {
+      return false;
+    }
+    
+    ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+    cw.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC, "GenStub$"+(counter++)+"$trace", null, "java/lang/Object", null);
+    cw.visitSource("script", null);
+    
+    MethodType methodType = asTraceMethodType(bindMap);
+    String desc = methodType.toMethodDescriptorString();
+    MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC|Opcodes.ACC_STATIC, "trace", desc, null, null);
+    mv.visitCode();
+    
+    Gen gen = new Gen(mv);
+    gen.gen(labeledInstrWhile, new GenEnv(bindMap.getSlotCount() + bindMap.getReferencesCount(), null, null));
+    
+    // restore env vars
+    Object[] vars;
+    List<LocalVar> references = bindMap.getReferences();
+    if (!references.isEmpty()) {
+      vars = gen.restoreEnv(bindMap, scope);
+    } else {
+      vars = null;
+    }
+    
+    mv.visitInsn(Opcodes.RETURN);
+    
+    mv.visitMaxs(0, 0);
+    mv.visitEnd();
+    
+    generateStaticInit(cw);
+    
+    cw.visitEnd();
+    
+    byte[] array = cw.toByteArray();
+    
+    //CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
+    
+    MethodHandle mh = define("trace", array, methodType);
+    if (vars != null) {
+      mh = MethodHandles.insertArguments(mh, 1 + bindMap.getReferencesCount(), vars);
+    }
+    
+    try {
+      mh.invokeVarargs(bindMap.getReferenceValues(env));
+    } catch(Error e) {
+      throw e;
+    } catch (Throwable e) {
+      throw RT.error((Node)null, e);
+    }
+    
+    //System.err.println("compiled method "+mh.type());
+    
+    return true;
+  }
+  
   
   private static void generateStaticInit(ClassWriter cw) {
     MethodVisitor mv = cw.visitMethod(Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
@@ -119,14 +191,27 @@ public class Compiler {
     List<Parameter> parameters = function.getParameters();
     int count = bindMap.getReferencesCount();
     Class<?>[] parameterArray = new Class<?>[count + 1 + parameters.size()];
+    parameterArray[0] = /*EvalEnv.class*/ Object.class;
     for(int i=0; i<count; i++) {
-      parameterArray[i] = bindMap.getReferenceClass(i);
+      parameterArray[i + 1] = bindMap.getReferenceClass(i);
     }
-    parameterArray[count] = /*EvalEnv.class*/ Object.class;
     for(int i = 0; i < parameters.size(); i++) {
-      parameterArray[count + 1 + i] = asClass(parameters.get(i).getType());
+      parameterArray[i + count + 1] = asClass(parameters.get(i).getType());
     }
     return MethodType.methodType(asClass(function.getReturnType()), parameterArray);
+  }
+  
+  private static MethodType asTraceMethodType(BindMap bindMap) {
+    int count = bindMap.getReferencesCount();
+    Class<?>[] parameterArray = new Class<?>[count * 2 + 1];
+    parameterArray[0] = /*EvalEnv.class*/ Object.class;
+    for(int i=0; i<count; i++) {
+      parameterArray[i + 1] = bindMap.getReferenceClass(i);
+    }
+    for(int i=0; i<count; i++) {
+      parameterArray[i + count + 1] = Var.class;
+    }
+    return MethodType.methodType(void.class, parameterArray);
   }
   
   private static MethodHandle define(String name, byte[] bytecodes, MethodType methodType) {

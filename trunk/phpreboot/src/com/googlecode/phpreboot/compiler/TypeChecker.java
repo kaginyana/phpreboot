@@ -24,7 +24,9 @@ import com.googlecode.phpreboot.ast.InstrDecl;
 import com.googlecode.phpreboot.ast.InstrEcho;
 import com.googlecode.phpreboot.ast.InstrFuncall;
 import com.googlecode.phpreboot.ast.InstrIf;
+import com.googlecode.phpreboot.ast.InstrLabeled;
 import com.googlecode.phpreboot.ast.InstrReturn;
+import com.googlecode.phpreboot.ast.LabeledInstrWhile;
 import com.googlecode.phpreboot.ast.LiteralArray;
 import com.googlecode.phpreboot.ast.LiteralArrayEntry;
 import com.googlecode.phpreboot.ast.LiteralBool;
@@ -232,6 +234,25 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     
     assignment_id.setSymbolAttribute((LocalVar)var);
     return var.getType();
+  }
+  
+  
+  // --- labeled instructions
+  
+  @Override
+  public Type visit(InstrLabeled instr_labeled, TypeCheckEnv env) {
+    //TODO get and propagate label
+    
+    return typeCheck(instr_labeled.getLabeledInstr(), env);
+  }
+  
+  @Override
+  public Type visit(LabeledInstrWhile labeled_instr_while, TypeCheckEnv env) {
+    Expr expr = labeled_instr_while.getExpr();
+    Type exprType = typeCheck(expr, env);
+    isCompatible(PrimitiveType.BOOLEAN, exprType);
+    typeCheck(labeled_instr_while.getInstr(), env);
+    return ALIVE;
   }
   
   

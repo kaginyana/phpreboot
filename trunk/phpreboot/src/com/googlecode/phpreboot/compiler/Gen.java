@@ -1,5 +1,7 @@
 package com.googlecode.phpreboot.compiler;
 
+import static com.googlecode.phpreboot.compiler.LivenessType.ALIVE;
+
 import static org.objectweb.asm.Opcodes.*;
 import static org.objectweb.asm.Opcodes.ALOAD;
 import static org.objectweb.asm.Opcodes.GOTO;
@@ -45,7 +47,9 @@ import com.googlecode.phpreboot.ast.InstrDecl;
 import com.googlecode.phpreboot.ast.InstrEcho;
 import com.googlecode.phpreboot.ast.InstrFuncall;
 import com.googlecode.phpreboot.ast.InstrIf;
+import com.googlecode.phpreboot.ast.InstrLabeled;
 import com.googlecode.phpreboot.ast.InstrReturn;
+import com.googlecode.phpreboot.ast.LabeledInstrWhile;
 import com.googlecode.phpreboot.ast.LiteralArray;
 import com.googlecode.phpreboot.ast.LiteralArrayEntry;
 import com.googlecode.phpreboot.ast.LiteralBool;
@@ -234,7 +238,7 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     mv.visitLineNumber(instr_if.getLineNumberAttribute(), new Label());
     Node elseIf = instr_if.getElseIf();
     elseIf = (elseIf instanceof ElseIfEmpty)? null: elseIf;
-    IfParts ifParts = new IfParts(true, instr_if.getInstr(), elseIf);
+    IfParts ifParts = new IfParts(true, generator(instr_if.getInstr()), generator(elseIf));
     gen(instr_if.getExpr(), env.ifParts(ifParts));
     return null;
   }
@@ -242,7 +246,7 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   public Type visit(ElseIfElseIf else_if_else_if, GenEnv env) {
     Node elseIf = else_if_else_if.getElseIf();
     elseIf = (elseIf instanceof ElseIfEmpty)? null: elseIf;
-    IfParts ifParts = new IfParts(true, else_if_else_if.getInstr(), elseIf);
+    IfParts ifParts = new IfParts(true, generator(else_if_else_if.getInstr()), generator(elseIf));
     gen(else_if_else_if.getExpr(), env.ifParts(ifParts));
     return null;
   }
@@ -305,8 +309,41 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   
   // --- visit test condition
   
+  private /*@Nullable*/GeneratorClosure generator(final /*@Nullable*/Node node) {
+    if (node == null)
+      return null;
+    
+    return new GeneratorClosure() {
+      @Override
+      Type gen(GenEnv env) {
+        return Gen.this.gen(node, env);
+      }
+      @Override
+      Type liveness() {
+        return node.getTypeAttribute();
+      }
+    };
+  }
+  
   private static int inverseTestOpcode(int opcode) {
     return (opcode % 2 == 0)? opcode - 1: opcode + 1;
+  }
+  
+  private static String inverseTestOpName(String opName) {
+    //FIXME replace by a switch on string when eclipse supports 1.7
+    if (opName == "lt")
+      return "ge";
+    if (opName == "le")
+      return "gt";
+    if (opName == "gt")
+      return "le";
+    if (opName == "ge")
+      return "lt";
+    if (opName == "eq")
+      return "ne";
+    if (opName == "ne")
+      return "eq";
+    throw new AssertionError("unknown opName");
   }
   
   private void genInstrOrExprBranches(IfParts ifParts, Label trueLabel, Label endLabel, boolean lastInstrIsAMethodCall, GenEnv env) {
@@ -314,17 +351,17 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       if (lastInstrIsAMethodCall) {
         mv.visitJumpInsn(IFNE, trueLabel);
       }
-      Node falsePart = ifParts.falsePart;
-      gen(falsePart, env);
-      Node truePart = ifParts.truePart;
+      GeneratorClosure falsePart = ifParts.falsePart;
+      falsePart.gen(env);
+      GeneratorClosure truePart = ifParts.truePart;
       if (truePart != null) {
         // don't generate a goto if false part is an instruction that doesn't live anymore
-        boolean live = !ifParts.inCondition || falsePart.getTypeAttribute() == LivenessType.ALIVE;
+        boolean live = /*!ifParts.inCondition ||*/ falsePart.liveness() == LivenessType.ALIVE;
         if (live) {
           mv.visitJumpInsn(GOTO, endLabel);
         }
         mv.visitLabel(trueLabel);
-        gen(truePart, env);
+        truePart.gen(env);
         if (live) {
           mv.visitLabel(endLabel);
         }
@@ -337,11 +374,11 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   
   private void genOnlyOneBranch(IfParts ifParts, int opcode, GenEnv env) {
     if (opcode == IF_ICMPEQ) {
-      gen(ifParts.falsePart, env);
+      ifParts.falsePart.gen(env);
     } else {
-      Node truePart = ifParts.truePart;
+      GeneratorClosure truePart = ifParts.truePart;
       if (truePart != null) {
-        gen(truePart, env);
+        truePart.gen(env);
       }
     }
   }
@@ -351,12 +388,13 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     Label endLabel = new Label();
     IfParts ifParts = env.getIfParts();
     if (ifParts == null) {  // if not a condition, create fake true/false nodes
-      ifParts = new IfParts(false, TRUE_NODE, FALSE_NODE);
+      ifParts = new IfParts(false, trueGenerator, falseGenerator);
     } else {
       // create an invariant: false part is never null if in condition
       if (ifParts.falsePart == null) {
         ifParts = ifParts.swap();
         opcode = inverseTestOpcode(opcode);
+        opName = inverseTestOpName(opName);
       } 
     }
     
@@ -458,7 +496,7 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   private Type visitUnaryNot(Node unaryNode, GenEnv env) {
     IfParts ifParts = env.getIfParts();
     if (ifParts == null) {  // if not a condition, create fake true/false nodes inverted
-      env = env.ifParts(new IfParts(false, FALSE_NODE, TRUE_NODE));
+      env = env.ifParts(new IfParts(false, falseGenerator, trueGenerator));
     } else {
       // invert parts
       env = env.ifParts(ifParts.swap());
@@ -473,12 +511,13 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     Label endLabel = new Label();
     IfParts ifParts = env.getIfParts();
     if (ifParts == null) {  // if not a condition, create fake true/false nodes
-      ifParts = new IfParts(false, TRUE_NODE, FALSE_NODE);
+      ifParts = new IfParts(false, trueGenerator, falseGenerator);
     } else {
       // create an invariant: false part is never null if in condition
       if (ifParts.falsePart == null) {
         ifParts = ifParts.swap();
         opcode = inverseTestOpcode(opcode);
+        opName = inverseTestOpName(opName);
       } 
     }
     
@@ -530,37 +569,66 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     return PrimitiveType.BOOLEAN;
   }
   
-  class TrueConstNode extends Node {
-    private final int opcode;
-    
-    TrueConstNode(boolean value) {
-      opcode = (value)?ICONST_1: ICONST_0;
-    }
-    
-    @Override
-    public Object getKind() {
-      throw new UnsupportedOperationException();
+  class ConstGenerator extends GeneratorClosure {
+    private final boolean value;
+
+    ConstGenerator(boolean value) {
+      this.value = value;
     }
     @Override
-    public boolean isToken() {
-      throw new UnsupportedOperationException();
-    }
-    @Override
-    public List<Node> nodeList() {
-      throw new UnsupportedOperationException();
+    Type liveness() {
+      return ALIVE;
     }
 
     @Override
-    public <_R, _P, _E extends Exception> _R accept(Visitor<? extends _R, ? super _P, ? extends _E> visitor, _P param) throws _E {
-      mv.visitInsn(opcode);
-      return null;
+    Type gen(GenEnv env) {
+      mv.visitInsn((value)?ICONST_1: ICONST_0);
+      return PrimitiveType.BOOLEAN;
     }
   }
-  private final TrueConstNode TRUE_NODE = new TrueConstNode(true);
-  private final TrueConstNode FALSE_NODE = new TrueConstNode(false);
+  private final ConstGenerator trueGenerator = new ConstGenerator(true);
+  private final ConstGenerator falseGenerator = new ConstGenerator(false);
   
   
-// --- visit fun call
+  // --- labeled instructions
+  
+  @Override
+  public Type visit(InstrLabeled instr_labeled, GenEnv env) {
+    return gen(instr_labeled.getLabeledInstr(), env);
+  }
+  
+  @Override
+  public Type visit(LabeledInstrWhile labeled_instr_while, GenEnv env) {
+    mv.visitLineNumber(labeled_instr_while.getLineNumberAttribute(), new Label());
+    
+    final Instr instr = labeled_instr_while.getInstr();
+    final Label start = new Label();
+    mv.visitLabel(start);
+    IfParts ifParts = new IfParts(true, new GeneratorClosure() {
+      @Override
+      Type liveness() {
+        // liveness is not needed because there is no true part
+        throw new AssertionError();
+      }
+      
+      @Override
+      Type gen(GenEnv env) {
+        Gen.this.gen(instr, env);
+        if (instr.getTypeAttribute() == ALIVE) {
+          mv.visitJumpInsn(GOTO, start);
+        }
+        return null;
+      }
+    }, null);
+    
+    Expr expr = labeled_instr_while.getExpr();
+    gen(expr, env.ifParts(ifParts));
+    
+    return ALIVE;
+  }
+  
+  
+  // --- visit fun call
   
   @Override
   public Type visit(FuncallCall funcall_call, GenEnv env) {

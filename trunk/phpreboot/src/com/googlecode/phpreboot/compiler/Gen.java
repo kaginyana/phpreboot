@@ -25,6 +25,7 @@ import java.util.List;
 
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
 
 import com.googlecode.phpreboot.ast.ArrayEntry;
 import com.googlecode.phpreboot.ast.ArrayValue;
@@ -62,10 +63,12 @@ import com.googlecode.phpreboot.ast.PrimaryFuncall;
 import com.googlecode.phpreboot.ast.Visitor;
 import com.googlecode.phpreboot.interpreter.Echoer;
 import com.googlecode.phpreboot.interpreter.EvalEnv;
+import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.Function;
 import com.googlecode.phpreboot.model.Parameter;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Type;
+import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.parser.ProductionEnum;
 import com.googlecode.phpreboot.runtime.Array;
 import com.googlecode.phpreboot.runtime.RT;
@@ -74,6 +77,7 @@ import com.googlecode.phpreboot.runtime.URI;
 import com.googlecode.phpreboot.runtime.XML;
 
 public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
+  private static final String VAR_INTERNAL_NAME = getInternalName(Var.class);
   private static final String FUNCTION_INTERNAL_NAME = getInternalName(Function.class);
   private static final String ARRAY_INTERNAL_NAME = getInternalName(Array.class);
   private static final String ECHOER_INTERNAL_NAME = getInternalName(Echoer.class);
@@ -202,6 +206,25 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     return runtimeClass.getName().replace('.', '/');
   }
   
+  
+  // --- restore environment at the end of a trace 
+  
+  Object[] restoreEnv(BindMap bindMap, Scope scope) {
+    List<LocalVar> references = bindMap.getReferences();
+    Object[] vars = new Object[references.size()];
+    for(int i=0; i< references.size(); i++) {
+      LocalVar bindReference = references.get(i);
+      vars[i] = scope.lookup(bindReference.getName());
+      Type bindReferenceType = bindReference.getType();
+      mv.visitVarInsn(ALOAD, bindReference.getSlot(bindMap.getReferencesCount()));
+      mv.visitVarInsn(asASMType(bindReferenceType).getOpcode(ILOAD), bindReference.getSlot(0));
+      insertCast(PrimitiveType.ANY, bindReferenceType);
+      mv.visitMethodInsn(INVOKEVIRTUAL, VAR_INTERNAL_NAME, "setValue", "(Ljava/lang/Object;)V");
+    }
+    return vars;
+  }
+  
+  
   // --- visit instructions
   
   @Override
@@ -300,10 +323,10 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     Type type = var.getType();
     Type exprType = gen(assignment_id.getExpr(), env.expectedType(type));
     insertCast(type, exprType);
-    mv.visitVarInsn(asASMType(type).getOpcode(ISTORE), var.getSlot(env.getShift()));
+    int shift = (var.isConstant())?0:env.getShift();
+    mv.visitVarInsn(asASMType(type).getOpcode(ISTORE), var.getSlot(shift));
     return null;
   }
-  
   
 
   

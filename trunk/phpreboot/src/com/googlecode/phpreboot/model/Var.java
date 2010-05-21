@@ -27,6 +27,8 @@ public class Var {
   public Object getValue() {
     return value;
   }
+  
+  // called directly by the runtime, signature must not changed
   public void setValue(Object value) {
     if (isReadOnly())
       throw RT.error("variable %s is read only", name);

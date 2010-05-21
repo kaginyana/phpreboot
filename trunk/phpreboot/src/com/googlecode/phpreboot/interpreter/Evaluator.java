@@ -174,7 +174,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   }
   
   public static final Evaluator INSTANCE = new Evaluator();
-  
+  private static final int LOOP_COUNTER_THRESOLD = 300;
   
   // ---
   
@@ -446,7 +446,13 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Instr instr = labeled_instr_while.getInstr();
     Expr expr = labeled_instr_while.getExpr();
     try {
-      while(checkBoolean(expr, env)) {
+      for(int counter = 0; ; counter++) {
+        if (counter == LOOP_COUNTER_THRESOLD) {
+          Compiler.traceCompile(labeled_instr_while, env);
+          break;
+        }
+        if (!checkBoolean(expr, env))
+          break;
         try {
           eval(instr, env);
         } catch(ContinueError e) {

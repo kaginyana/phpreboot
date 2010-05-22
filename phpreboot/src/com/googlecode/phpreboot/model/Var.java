@@ -28,6 +28,11 @@ public class Var {
     return value;
   }
   
+  @Override
+  public String toString() {
+    return "var name:"+name+" readOnly:"+readOnly+" type:"+type+" value:"+value;
+  }
+  
   // called directly by the runtime, signature must not changed
   public void setValue(Object value) {
     if (isReadOnly())

@@ -155,7 +155,7 @@ attributes:
   columnNumber: int
   symbol: com.googlecode.phpreboot.compiler.Symbol
   type: com.googlecode.phpreboot.model.Type  
-  callsite: java.dyn.CallSite
+  profile: com.googlecode.phpreboot.interpreter.Profile
   
 starts:
   script  

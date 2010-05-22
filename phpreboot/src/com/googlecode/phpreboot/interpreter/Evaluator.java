@@ -449,26 +449,22 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Instr instr = labeled_instr_while.getInstr();
     Expr expr = labeled_instr_while.getExpr();
     LoopProfile profile = (LoopProfile)labeled_instr_while.getProfileAttribute();
-    boolean optimisticTrace;
     if (profile == null) {
       profile = new LoopProfile();
       labeled_instr_while.setProfileAttribute(profile);
-      optimisticTrace = true;
     } else {
       if (profile.hasATrace()) {       // try to reuse previous trace if available
         if (profile.callTrace(env)) {  
           return null;  // shortcut
         }
-        optimisticTrace = false;
-      } else {
-        optimisticTrace = true;
+        profile.counter = 0;
       }
     }
     
     int counter = profile.counter;
     for(;;) {
       if (++counter > LOOP_COUNTER_THRESOLD) {
-        if (Compiler.traceCompile(labeled_instr_while, profile, optimisticTrace, env)) {
+        if (Compiler.traceCompile(labeled_instr_while, profile, true, env)) {
           break;
         }
         counter = Integer.MIN_VALUE;  // disable trace compilation

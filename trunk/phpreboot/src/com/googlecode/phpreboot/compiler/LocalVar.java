@@ -11,17 +11,19 @@ import com.googlecode.phpreboot.model.Var;
 public class LocalVar extends Var implements Symbol {
   private final int slot;
   private final boolean bound;
+  private final boolean optimistic;
   
   private final static Object LOCAL_VAR_MARKER = new Object();
   
-  private LocalVar(String name, boolean readOnly, Type type, Object value, boolean bound, int slot) {
+  private LocalVar(String name, boolean readOnly, Type type, boolean optimistic, Object value, boolean bound, int slot) {
     super(name, readOnly, type, value);
+    this.optimistic = optimistic;
     this.bound = bound;
     this.slot = slot;
   }
   
-  public LocalVar(String name, boolean readOnly, Type type, int slot) {
-    this(name, readOnly, type, LOCAL_VAR_MARKER, false, slot);
+  public LocalVar(String name, boolean readOnly, Type type, boolean optimistic, int slot) {
+    this(name, readOnly, type, optimistic, LOCAL_VAR_MARKER, false, slot);
   }
   
   public boolean isConstant() {
@@ -32,15 +34,24 @@ public class LocalVar extends Var implements Symbol {
     return getType() == null;
   }
  
+  public boolean isOptimistic() {
+    return optimistic;
+  }
+  
+  @Override
+  public String toString() {
+    return super.toString() + " optimistic:"+optimistic+" bound:"+bound+" slot:"+slot;
+  }
+  
   public int getSlot(int shift) {
     return shift + slot;
   }
   
   public static LocalVar createConstantFoldable(Object value) {
-    return new LocalVar(null, true, null, value, true, -1);
+    return new LocalVar(null, true, null, false, value, true, -1);
   }
   
-  public static LocalVar createConstantBound(String name, boolean readOnly, Object value, Type type, int slot) {
-    return new LocalVar(name, readOnly, type, value, true, slot);
+  public static LocalVar createConstantBound(String name, boolean readOnly, Type type, boolean optimistic, Object value, int slot) {
+    return new LocalVar(name, readOnly, type, optimistic, value, true, slot);
   }
 }

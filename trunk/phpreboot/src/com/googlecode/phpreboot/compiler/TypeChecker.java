@@ -37,6 +37,7 @@ import com.googlecode.phpreboot.ast.LiteralValue;
 import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.ast.PrimaryFuncall;
 import com.googlecode.phpreboot.ast.Visitor;
+import com.googlecode.phpreboot.interpreter.Profile.VarProfile;
 import com.googlecode.phpreboot.model.Function;
 import com.googlecode.phpreboot.model.Parameter;
 import com.googlecode.phpreboot.model.PrimitiveType;
@@ -113,22 +114,22 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     throw RT.error("incompatible type %s %s", type, exprType);
   }
   
-  private static Type inferType(Object value) {
-    if (value instanceof Boolean) {
-      return PrimitiveType.BOOLEAN;
+  private static void isOptimiticCompatible(Var var, Type exprType) {
+    LocalVar localVar;
+    if (!((var instanceof LocalVar) && ((localVar = (LocalVar)var)).isOptimistic())) {
+      isCompatible(var.getType(), exprType);
+      return; // never reached
     }
-    if (value instanceof Integer) {
-      return PrimitiveType.BOOLEAN;
-    }
-    if (value instanceof Double) {
-      return PrimitiveType.DOUBLE;
-    }
-    if (value instanceof String) {
-      return PrimitiveType.STRING;
-    }
-    return PrimitiveType.ANY;
+    
+    if (!checkOptimisticCompatible(localVar.getType(), exprType))
+      throw OptimiticAssertionException.INSTANCE;
   }
   
+  private static boolean checkOptimisticCompatible(Type type, Type exprType) {
+    if (type == exprType)
+      return true;
+    return type == PrimitiveType.DOUBLE && exprType == PrimitiveType.INT;
+  }
   
   // --- default visit
   
@@ -149,7 +150,7 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   
   @Override
   public Type visit(Block block, TypeCheckEnv env) {
-    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(new LocalScope(env.getScope()), env.getLoopStack(), env.getFunctionReturnType(), env.getBindMap());
+    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(new LocalScope(env.getScope()), env.getLoopStack(), env.getFunctionReturnType(), env.getBindMap(), env.allowOptimisticType());
     Type liveness = LivenessType.ALIVE;
     
     for(Iterator<Instr> it = block.getInstrStar().iterator(); it.hasNext();) {
@@ -241,19 +242,34 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     LocalVar localVar;
     if (var == null) {
       // auto-declaration
-      localVar = new LocalVar(name, false, PrimitiveType.ANY, scope.nextSlot(PrimitiveType.ANY));
-      scope.register(var);
+      Type type = PrimitiveType.ANY;
+      if (env.allowOptimisticType()) {
+        // got a profile ?
+        VarProfile profile = (VarProfile)assignment_id.getProfileAttribute();
+        if (profile != null) {
+          type = Compiler.inferType(profile.getVar().getValue());
+          
+          // check if inferred type is compatible otherwise revert back
+          if (type != PrimitiveType.ANY && !checkOptimisticCompatible(type, exprType)) {
+            type = PrimitiveType.ANY;
+          }
+        }
+      }
+      
+      localVar = new LocalVar(name, false, type, type != PrimitiveType.ANY, scope.nextSlot(type));
+      scope.register(localVar);
+      
     } else {
       
       if (var.isReadOnly())
         throw RT.error("try to assign a read only variable %s", name);
       
-      isCompatible(var.getType(), exprType);
+      isOptimiticCompatible(var, exprType);
       
       if (var instanceof LocalVar) {
         localVar = (LocalVar)var;
       } else {
-        localVar = env.getBindMap().bind(name, var.isReadOnly(), var.getValue(), var.getType());
+        localVar = env.getBindMap().bind(name, var.isReadOnly(), var.getValue(), var.getType(), env.allowOptimisticType());
         scope.register(localVar);
       }
     }
@@ -312,7 +328,7 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
       if (var instanceof LocalVar) {
         localVar = (LocalVar)var;
       } else {
-        localVar = env.getBindMap().bind(name, var.isReadOnly(), function, PrimitiveType.FUNCTION);
+        localVar = env.getBindMap().bind(name, var.isReadOnly(), function, PrimitiveType.FUNCTION, false);
         env.getScope().register(localVar);
       }
       
@@ -350,6 +366,11 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     }
     
     Object value = var.getValue();
+    /*FIXME constants can be only constant for one compilation
+     *      this doesn't allow to reuse a trace.
+     *      should be only enabled in non-trace mode.
+     */
+    /*
     if (var.isReadOnly()) {  // constants
       if (value instanceof Boolean) {
         expr_id.setSymbolAttribute(LocalVar.createConstantFoldable(value));
@@ -367,13 +388,13 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
         expr_id.setSymbolAttribute(LocalVar.createConstantFoldable(value));
         return PrimitiveType.STRING;
       }
-    }
+    } */
     
     // bound constant
-    LocalVar bindVar = env.getBindMap().bind(name, var.isReadOnly(), value, type);
+    LocalVar bindVar = env.getBindMap().bind(name, var.isReadOnly(), value, type, env.allowOptimisticType());
     env.getScope().register(bindVar);
     expr_id.setSymbolAttribute(bindVar);
-    return type;
+    return bindVar.getType();
   }
   
   @Override

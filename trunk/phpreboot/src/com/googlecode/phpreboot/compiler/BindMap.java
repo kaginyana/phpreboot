@@ -3,6 +3,7 @@ package com.googlecode.phpreboot.compiler;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Type;
 
 public class BindMap {
@@ -10,10 +11,18 @@ public class BindMap {
   private final ArrayList<LocalVar> bindReferences =
     new ArrayList<LocalVar>();
   
-  public LocalVar bind(String name, boolean isReadOnly, Object value, Type type) {
-    //FIXME use value type if type is any
+  public LocalVar bind(String name, boolean isReadOnly, Object value, Type type, boolean allowOptimiticType) {
+    boolean optimistic;
+    if (allowOptimiticType && type == PrimitiveType.ANY) {
+      type = Compiler.inferType(value);
+      optimistic = !(isReadOnly || type == PrimitiveType.ANY);
+    } else {
+      optimistic = false;
+    }
     
-    LocalVar constant = LocalVar.createConstantBound(name, isReadOnly, value, type, slotCount++);
+    int slot = slotCount;
+    slotCount = slot + ((type == PrimitiveType.DOUBLE)?2 :1);
+    LocalVar constant = LocalVar.createConstantBound(name, isReadOnly, type, optimistic, value, slot);
     bindReferences.add(constant);
     return constant;
   }
@@ -26,32 +35,18 @@ public class BindMap {
     return bindReferences.size();
   }
   
-  public Class<?> getReferenceClass(int index) {
-    return bindReferences.get(index).getType().getRuntimeClass();
+  public Type getReferenceType(int index) {
+    return bindReferences.get(index).getType();
   }
   
   public List<LocalVar> getReferences() {
     return bindReferences;
   }
   
-  public Object[] getReferenceValues() {
-    ArrayList<LocalVar> bindReferences = this.bindReferences;
-    int size = bindReferences.size();
-    Object[] array = new Object[size];
-    for(int i=0; i<size; i++) {
-      array[i] = bindReferences.get(i).getValue(); 
+  public void dump() {
+    System.err.println("-- bindmap:");
+    for(LocalVar localVar: bindReferences) {
+      System.err.println(localVar);
     }
-    return array;
-  }
-  
-  public Object[] getReferenceValues(Object env) {
-    ArrayList<LocalVar> bindReferences = this.bindReferences;
-    int size = bindReferences.size();
-    Object[] array = new Object[1 + size];
-    array[0] = env;
-    for(int i=0; i<size; i++) {
-      array[i + 1] = bindReferences.get(i).getValue(); 
-    }
-    return array;
   }
 }

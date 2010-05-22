@@ -25,7 +25,6 @@ import java.util.List;
 
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
 
 import com.googlecode.phpreboot.ast.ArrayEntry;
 import com.googlecode.phpreboot.ast.ArrayValue;
@@ -178,6 +177,7 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     
     if (type == PrimitiveType.DOUBLE && exprType == PrimitiveType.INT) {
       mv.visitInsn(I2D);
+      return;
     }
     
     // boxing
@@ -207,21 +207,24 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   }
   
   
-  // --- restore environment at the end of a trace 
-  
-  Object[] restoreEnv(BindMap bindMap, Scope scope) {
-    List<LocalVar> references = bindMap.getReferences();
-    Object[] vars = new Object[references.size()];
-    for(int i=0; i< references.size(); i++) {
-      LocalVar bindReference = references.get(i);
-      vars[i] = scope.lookup(bindReference.getName());
-      Type bindReferenceType = bindReference.getType();
-      mv.visitVarInsn(ALOAD, bindReference.getSlot(bindMap.getReferencesCount()));
-      mv.visitVarInsn(asASMType(bindReferenceType).getOpcode(ILOAD), bindReference.getSlot(0));
-      insertCast(PrimitiveType.ANY, bindReferenceType);
+  // restore environment at the end of a trace and
+  // prepare arguments for the first call
+  void restoreEnv(List<LocalVar> references, int slotCount, Scope scope, Object[] args) {
+    int size = references.size();
+    for(int i=0; i< size; i++) {
+      LocalVar localVar = references.get(i);
+      args[i + 1] = localVar.getValue();
+      localVar.setValue(null);   // avoid a memory leak
+      
+      Var var = scope.lookup(localVar.getName());
+      args[i + size + 1] = var;
+      
+      Type type = localVar.getType();
+      mv.visitVarInsn(ALOAD, localVar.getSlot(slotCount));
+      mv.visitVarInsn(asASMType(type).getOpcode(ILOAD), localVar.getSlot(0));
+      insertCast(PrimitiveType.ANY, type);
       mv.visitMethodInsn(INVOKEVIRTUAL, VAR_INTERNAL_NAME, "setValue", "(Ljava/lang/Object;)V");
     }
-    return vars;
   }
   
   
@@ -751,14 +754,16 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     Type expectedType = env.getExpectedType();
     GenEnv newEnv = env.expectedType(PrimitiveType.ANY);
     
-    Type left = gen(leftNode, newEnv);
-    Type right = gen(rightNode, newEnv);
-    
+    Type left, right;
     switch((PrimitiveType)type) {
     case ANY:
+      left = gen(leftNode, newEnv);
+      right = gen(rightNode, newEnv);
       indy(opName, expectedType, left, right);
       return expectedType;
     case STRING:
+      left = gen(leftNode, newEnv);
+      right = gen(rightNode, newEnv);
       String desc;
       if (left == PrimitiveType.STRING) {
         desc = (right == PrimitiveType.INT)? "(Ljava/lang/String;I)Ljava/lang/String;":
@@ -772,6 +777,10 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       mv.visitMethodInsn(INVOKESTATIC, RT_INTERNAL_NAME, "plus", desc);
       return type;
     default:
+      left = gen(leftNode, newEnv);
+      insertCast(type, left);
+      right = gen(rightNode, newEnv);
+      insertCast(type, right);
       mv.visitInsn(asASMType(type).getOpcode(opcode));
       return type;
     }

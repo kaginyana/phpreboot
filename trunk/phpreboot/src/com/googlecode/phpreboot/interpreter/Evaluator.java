@@ -98,6 +98,8 @@ import com.googlecode.phpreboot.ast.XmlsEmptyTag;
 import com.googlecode.phpreboot.ast.XmlsStartEndTag;
 import com.googlecode.phpreboot.compiler.Compiler;
 import com.googlecode.phpreboot.flwor.XPathExprVisitor;
+import com.googlecode.phpreboot.interpreter.Profile.LoopProfile;
+import com.googlecode.phpreboot.interpreter.Profile.VarProfile;
 import com.googlecode.phpreboot.model.Function;
 import com.googlecode.phpreboot.model.Parameter;
 import com.googlecode.phpreboot.model.PrimitiveType;
@@ -223,6 +225,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       throw RT.error("variable %s already exists", name);
     }
   }
+  
   
   // --- function definition
   
@@ -445,23 +448,45 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   public Object visit(LabeledInstrWhile labeled_instr_while, EvalEnv env) {
     Instr instr = labeled_instr_while.getInstr();
     Expr expr = labeled_instr_while.getExpr();
-    try {
-      for(int counter = 0; ; counter++) {
-        if (counter == LOOP_COUNTER_THRESOLD) {
-          Compiler.traceCompile(labeled_instr_while, env);
-          break;
+    LoopProfile profile = (LoopProfile)labeled_instr_while.getProfileAttribute();
+    boolean optimisticTrace;
+    if (profile == null) {
+      profile = new LoopProfile();
+      labeled_instr_while.setProfileAttribute(profile);
+      optimisticTrace = true;
+    } else {
+      if (profile.hasATrace()) {       // try to reuse previous trace if available
+        if (profile.callTrace(env)) {  
+          return null;  // shortcut
         }
-        if (!checkBoolean(expr, env))
-          break;
-        try {
-          eval(instr, env);
-        } catch(ContinueError e) {
-          e.mayRethrow(env);
-        }
+        optimisticTrace = false;
+      } else {
+        optimisticTrace = true;
       }
-    } catch(BreakError e) {
-      e.mayRethrow(env);
     }
+    
+    int counter = profile.counter;
+    for(;;) {
+      if (++counter > LOOP_COUNTER_THRESOLD) {
+        if (Compiler.traceCompile(labeled_instr_while, profile, optimisticTrace, env)) {
+          break;
+        }
+        counter = Integer.MIN_VALUE;  // disable trace compilation
+      }
+
+      if (!checkBoolean(expr, env))
+        break;
+      try {
+        eval(instr, env);
+      } catch(ContinueError e) {
+        e.mayRethrow(env);
+      } catch(BreakError e) {
+        e.mayRethrow(env);
+        break;
+      }
+    }
+    
+    profile.counter = counter;
     return null;
   }
   
@@ -661,9 +686,21 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       // auto declaration
       var = new Var(name, false, PrimitiveType.ANY, value);
       scope.register(var);
+      
+      // profile
+      if (Compiler.enableVarProfile(value)) {
+        VarProfile profile = (VarProfile)assignment_id.getProfileAttribute();
+        if (profile == null) {
+          profile = new VarProfile();
+          assignment_id.setProfileAttribute(profile);
+        }
+        profile.var = var;
+      }
+      
     } else {
       var.setValue(value);
     }
+    
     return null;
   }
   

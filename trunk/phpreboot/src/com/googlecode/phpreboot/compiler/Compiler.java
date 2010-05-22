@@ -19,6 +19,7 @@ import com.googlecode.phpreboot.ast.Block;
 import com.googlecode.phpreboot.ast.LabeledInstrWhile;
 import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.interpreter.EvalEnv;
+import com.googlecode.phpreboot.interpreter.Profile.LoopProfile;
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.Function;
 import com.googlecode.phpreboot.model.Parameter;
@@ -37,14 +38,14 @@ public class Compiler {
     localScope.register(new Var(function.getName(), true, PrimitiveType.ANY, function));
     for(Parameter parameter: function.getParameters()) {
       Type type = parameter.getType();
-      localScope.register(new LocalVar(parameter.getName(), true, type, localScope.nextSlot(type)));
+      localScope.register(new LocalVar(parameter.getName(), true, type, false, localScope.nextSlot(type)));
     }
      
     Block functionNode = function.getBlock();
     TypeChecker typeChecker = new TypeChecker();
     LoopStack loopStack = new LoopStack();
     BindMap bindMap = new BindMap();
-    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, function.getReturnType(), bindMap);
+    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, function.getReturnType(), bindMap, false);
     
     Type liveness;
     try {
@@ -80,8 +81,16 @@ public class Compiler {
     //CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
     
     MethodHandle mh = define(name, array, methodType);
-    if (bindMap.getSlotCount() != 0) {
-      mh = MethodHandles.insertArguments(mh, 1, bindMap.getReferenceValues());
+    
+    List<LocalVar> bindReferences = bindMap.getReferences();
+    if (!bindReferences.isEmpty()) {
+      int size = bindReferences.size();
+      Object[] boundArray = new Object[size];
+      for(int i=0; i<size; i++) {
+        boundArray[i] = bindReferences.get(i).getValue(); 
+      }
+      
+      mh = MethodHandles.insertArguments(mh, 1, boundArray);
     }
     
     //System.err.println("compiled method "+mh.type());
@@ -90,19 +99,31 @@ public class Compiler {
   }
   
   
-  public static boolean traceCompile(LabeledInstrWhile labeledInstrWhile, EvalEnv env) {
+  public static boolean traceCompile(LabeledInstrWhile labeledInstrWhile, LoopProfile profile, boolean optimisticTrace, EvalEnv env) {
     Scope scope = env.getScope();
     LocalScope localScope = new LocalScope(scope);
     
     TypeChecker typeChecker = new TypeChecker();
     LoopStack loopStack = new LoopStack();
     BindMap bindMap = new BindMap();
-    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, /*FIXME need the enclosing return type*/null, bindMap);
+    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, /*FIXME need the enclosing return type*/null, bindMap, optimisticTrace);
     
     try {
       typeChecker.typeCheck(labeledInstrWhile, typeCheckEnv);
     } catch(CodeNotCompilableException e) {
       return false;
+    } catch(OptimiticAssertionException e) {
+      System.err.println("optimistic typecheck failed");
+      // typecheck again but don't perform optimistic assumption
+      loopStack = new LoopStack();
+      bindMap = new BindMap();
+      localScope = new LocalScope(scope);
+      typeCheckEnv = new TypeCheckEnv(localScope, loopStack, /*FIXME need the enclosing return type*/null, bindMap, false);
+      try {
+        typeChecker.typeCheck(labeledInstrWhile, typeCheckEnv);
+      } catch(CodeNotCompilableException e2) {
+        return false;
+      }
     }
     
     ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
@@ -118,12 +139,12 @@ public class Compiler {
     gen.gen(labeledInstrWhile, new GenEnv(bindMap.getSlotCount() + bindMap.getReferencesCount(), null, null));
     
     // restore env vars
-    Object[] vars;
     List<LocalVar> references = bindMap.getReferences();
-    if (!references.isEmpty()) {
-      vars = gen.restoreEnv(bindMap, scope);
-    } else {
-      vars = null;
+    int size = references.size();
+    Object[] args = new Object[2 * size + 1];
+    args[0] = env;
+    if (size != 0) {
+      gen.restoreEnv(references, bindMap.getSlotCount() -1 /*XXX - env size */, scope, args);
     }
     
     mv.visitInsn(Opcodes.RETURN);
@@ -137,15 +158,16 @@ public class Compiler {
     
     byte[] array = cw.toByteArray();
     
-    //CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
+    bindMap.dump();
+    CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
     
     MethodHandle mh = define("trace", array, methodType);
-    if (vars != null) {
-      mh = MethodHandles.insertArguments(mh, 1 + bindMap.getReferencesCount(), vars);
-    }
+    
+    // record for reuse
+    profile.recordTrace(bindMap, mh);
     
     try {
-      mh.invokeVarargs(bindMap.getReferenceValues(env));
+      mh.invokeVarargs(args);
     } catch(Error e) {
       throw e;
     } catch (Throwable e) {
@@ -173,7 +195,7 @@ public class Compiler {
 
   private static Class<?> asClass(Type type) {
     if (type instanceof PrimitiveType) {
-      switch((PrimitiveType)type) {
+      switch((PrimitiveType)type) { // use primitive type instead of their wrapper
       case BOOLEAN:
         return boolean.class;
       case INT:
@@ -193,7 +215,7 @@ public class Compiler {
     Class<?>[] parameterArray = new Class<?>[count + 1 + parameters.size()];
     parameterArray[0] = /*EvalEnv.class*/ Object.class;
     for(int i=0; i<count; i++) {
-      parameterArray[i + 1] = bindMap.getReferenceClass(i);
+      parameterArray[i + 1] = asClass(bindMap.getReferenceType(i));
     }
     for(int i = 0; i < parameters.size(); i++) {
       parameterArray[i + count + 1] = asClass(parameters.get(i).getType());
@@ -206,13 +228,39 @@ public class Compiler {
     Class<?>[] parameterArray = new Class<?>[count * 2 + 1];
     parameterArray[0] = /*EvalEnv.class*/ Object.class;
     for(int i=0; i<count; i++) {
-      parameterArray[i + 1] = bindMap.getReferenceClass(i);
+      parameterArray[i + 1] = asClass(bindMap.getReferenceType(i));
     }
     for(int i=0; i<count; i++) {
       parameterArray[i + count + 1] = Var.class;
     }
     return MethodType.methodType(void.class, parameterArray);
   }
+  
+  
+  // --- profile
+  
+  public static Type inferType(Object value) {
+    if (value instanceof Boolean) {
+      return PrimitiveType.BOOLEAN;
+    }
+    if (value instanceof Integer) {
+      return PrimitiveType.INT;
+    }
+    if (value instanceof Double) {
+      return PrimitiveType.DOUBLE;
+    }
+    if (value instanceof String) {
+      return PrimitiveType.STRING;
+    }
+    return PrimitiveType.ANY;
+  }
+  
+  public static boolean enableVarProfile(Object value) {
+    return inferType(value) != PrimitiveType.ANY;
+  }
+  
+  
+  // --- define
   
   private static MethodHandle define(String name, byte[] bytecodes, MethodType methodType) {
     Class<?> declaredClass;
@@ -235,7 +283,7 @@ public class Compiler {
     } catch(ClassNotFoundException e) {
       define = null;
     }
-    ANONYMOUS_CLASS_DEFINE = /*define*/null;
+    ANONYMOUS_CLASS_DEFINE = define/*null*/;
   }
   
   static class AnonymousLoader {

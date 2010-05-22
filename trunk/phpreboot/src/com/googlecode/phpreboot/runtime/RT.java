@@ -11,6 +11,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 import com.googlecode.phpreboot.ast.Node;
+import com.googlecode.phpreboot.interpreter.Profile;
 import com.googlecode.phpreboot.runtime.Array.Entry;
 
 public class RT {
@@ -821,6 +822,13 @@ public class RT {
   }
   
   
+  static class CallSiteProfile extends CallSite implements Profile {
+    public CallSiteProfile(MethodType type) {
+      super(RT.class, "", type);
+    }
+  }
+  
+  
   // --- member access
   
   private final static MethodHandle array_set;
@@ -910,20 +918,20 @@ public class RT {
   }
   
   public static void interpreterArraySet(Node node, Object refValue, Object key, Object value, boolean keyMustExist) {
-    CallSite callSite = node.getCallsiteAttribute();
+    CallSiteProfile callSite = (CallSiteProfile)node.getProfileAttribute();
     MethodHandle target;
     if (callSite == null) {
       
       // cache for next call
       
       MethodType methodType = MethodType.methodType(void.class, Object.class, Object.class, Object.class);
-      callSite = new CallSite(RT.class, "", methodType);
+      callSite = new CallSiteProfile(methodType);
       target = MethodHandles.insertArguments(slowPathArraySet, 0, callSite, keyMustExist);
       callSite.setTarget(target);
       
       slowPathArraySet(callSite, keyMustExist, refValue, key, value);
       
-      node.setCallsiteAttribute(callSite);
+      node.setProfileAttribute(callSite);
       
     } else {
       target = callSite.getTarget();
@@ -985,19 +993,19 @@ public class RT {
   }
   
   public static Object interpreterArrayGet(Node node, Object refValue, Object key, boolean keyMustExist) {
-    CallSite callSite = node.getCallsiteAttribute();
+    CallSiteProfile callSite = (CallSiteProfile)node.getProfileAttribute();
     MethodHandle target;
     if (callSite == null) {
       
       // cache for next call
       
       MethodType methodType = MethodType.methodType(Object.class, Object.class, Object.class);
-      callSite = new CallSite(RT.class, "", methodType);
+      callSite = new CallSiteProfile(methodType);
       target = MethodHandles.insertArguments(slowPathArrayGet, 0, callSite, keyMustExist);
       callSite.setTarget(target);
       
       Object result = slowPathArrayGet(callSite, keyMustExist, refValue, key);
-      node.setCallsiteAttribute(callSite);
+      node.setProfileAttribute(callSite);
       return result;
       
     } else {
@@ -1027,11 +1035,11 @@ public class RT {
   }
   
   public static Object interpreterMethodCall(Node node, String name, Object[] values) {
-    CallSite callSite = node.getCallsiteAttribute();
+    CallSiteProfile callSite = (CallSiteProfile)node.getProfileAttribute();
     if (callSite == null) {
       MethodType type = MethodType.genericMethodType(values.length);
-      callSite = new CallSite(RT.class, "", type);
-      node.setCallsiteAttribute(callSite);
+      callSite = new CallSiteProfile(type);
+      node.setProfileAttribute(callSite);
       MethodHandle mh = MethodHandles.insertArguments(slowPathMethodCall, 0, callSite, name);
       mh = MethodHandles.collectArguments(mh, type);
       callSite.setTarget(mh);

@@ -4,10 +4,13 @@ import java.dyn.MethodHandle;
 import java.dyn.MethodHandles;
 import java.dyn.MethodHandles.Lookup;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.Function;
+import com.googlecode.phpreboot.model.Parameter;
 import com.googlecode.phpreboot.model.PrimitiveType;
+import com.googlecode.phpreboot.model.Type;
 import com.googlecode.phpreboot.model.Var;
 
 //FIXME module must be loaded lazily
@@ -30,12 +33,35 @@ public abstract class Module {
       // generify signature
       mh = MethodHandles.convertArguments(mh, mh.type().generic());
       
-      // FIXME
-      Function function = new Function(method.getName(), null, null, null, null);
+      Function function = createFunction(method);
       function.setMethodHandle(mh);
       
       Var var = new Var(method.getName(), true, PrimitiveType.ANY, function);
       scope.register(var);
     }
+  }
+  
+  private static Function createFunction(Method method) {
+    ArrayList<Parameter> parameters = new ArrayList<Parameter>();
+    Class<?>[] parameterTypes = method.getParameterTypes();
+    for(int i=0; i< parameterTypes.length; i++) {
+      Parameter parameter = new Parameter("arg"+i, asType(parameterTypes[i]));
+      parameters.add(parameter);
+    }
+    
+    return new Function(method.getName(), parameters, asType(method.getReturnType()), null, null);
+  }
+  
+  private static Type asType(Class<?> runtimeClass) {
+    //FIXME finish implementation and move the method in package runtime
+    if (runtimeClass == boolean.class)
+      return PrimitiveType.BOOLEAN;
+    if (runtimeClass == int.class)
+      return PrimitiveType.INT;
+    if (runtimeClass == double.class)
+      return PrimitiveType.DOUBLE;
+    if (runtimeClass == String.class)
+      return PrimitiveType.STRING;
+    return PrimitiveType.ANY;
   }
 }

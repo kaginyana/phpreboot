@@ -4,7 +4,7 @@
   <property name="tatoo-build.dir" location="build-lib"/>
   <property name="tatoo.jar" location="${tatoo-build.dir}/tatoo.jar"/>
   <property name="lib" location="lib"/>
-  <property name="libs" value="${lib}/derby.jar:${lib}/grizzly-servlet-webserver-1.9.18-k.jar:${lib}/jaxen-1.1.2.jar:${lib}/tatoo-runtime.jar:${lib}/asm-all-3.2.jar"/>
+  <property name="libs" value="${lib}/derby.jar:${lib}/grizzly-servlet-webserver-1.9.18-k.jar:${lib}/jaxen-1.1.2.jar:${lib}/tatoo-runtime.jar:${lib}/asm-all-3.2.jar:${lib}/hs19-b01-jsr292-patch.jar"/>
   <property name="phpreboot.jar" value="${lib}/phpreboot.jar"/>
 	
   <property name="src" value="src"/>
@@ -51,7 +51,7 @@
     <jar destfile="${phpreboot.jar}">
 	  <fileset dir="${classes}"/>
 	  <manifest>
-	    <attribute name="Class-Path" value="derby.jar grizzly-servlet-webserver-1.9.18-k.jar jaxen-1.1.2.jar tatoo-runtime.jar asm-all-3.2.jar"/>   
+	    <attribute name="Class-Path" value="derby.jar grizzly-servlet-webserver-1.9.18-k.jar jaxen-1.1.2.jar tatoo-runtime.jar asm-all-3.2.jar hs19-b01-jsr292-patch.jar"/>   
 	    <attribute name="Main-Class" value="com.googlecode.phpreboot.Main"/>   
 	  </manifest>
 	</jar>

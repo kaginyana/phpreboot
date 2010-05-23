@@ -36,6 +36,7 @@ import com.googlecode.phpreboot.ast.LiteralString;
 import com.googlecode.phpreboot.ast.LiteralValue;
 import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.ast.PrimaryFuncall;
+import com.googlecode.phpreboot.ast.PrimaryParens;
 import com.googlecode.phpreboot.ast.Visitor;
 import com.googlecode.phpreboot.interpreter.Profile.VarProfile;
 import com.googlecode.phpreboot.model.Function;
@@ -348,6 +349,10 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     return typeCheck(primary_funcall.getFuncall(), env);
   }
   
+  @Override
+  public Type visit(PrimaryParens primary_parens, TypeCheckEnv env) {
+    return typeCheck(primary_parens.getExpr(), env);
+  }
   
   // --- visit expression
    

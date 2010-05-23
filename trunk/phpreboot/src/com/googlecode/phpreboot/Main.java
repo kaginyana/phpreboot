@@ -18,6 +18,7 @@ import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.module.LangModule;
+import com.googlecode.phpreboot.module.MathModule;
 import com.googlecode.phpreboot.sql.GenericSQLConnection;
 import com.googlecode.phpreboot.webserver.WebScriptDispatcher;
 import com.sun.grizzly.http.embed.GrizzlyWebServer;
@@ -169,6 +170,7 @@ public class Main {
 
     // register modules
     new LangModule().registerModule(rootScope);
+    new MathModule().registerModule(rootScope);
     
     try {
       Analyzer.analyze(reader, writer, rootScope);

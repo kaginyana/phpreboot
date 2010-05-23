@@ -1,11 +1,11 @@
 
 function array_walk(array, lambda) {
-  parameter_count = parameterCount(lambda.type)
-  if (parameter_count == 2) {   // 1 eval environment + 1 parameter
+  parameter_count = lambda.parameters.size
+  if (parameter_count == 1) {   
     foreach(array as value) {
       lambda(value)
     }
-  } elseif(parameter_count == 3) {  // 1 eval environment + 2 parameters 
+  } elseif(parameter_count == 2) {
     foreach(array as key: value) {
       lambda(key, value)
     }

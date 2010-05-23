@@ -9,7 +9,7 @@ public class LocalScope extends Scope {
   
   public LocalScope(Scope parent) {
     super(parent);
-    slotCount = 1;
+    slotCount = 0;
   }
   
   public LocalScope(LocalScope parent) {
@@ -18,8 +18,8 @@ public class LocalScope extends Scope {
   }
   
   public int nextSlot(Type type) {
-    int slotCount = this.slotCount;
-    this.slotCount= slotCount + ((type == PrimitiveType.DOUBLE)?2: 1);
-    return slotCount;
+    int slot = this.slotCount;
+    this.slotCount= slot + ((type == PrimitiveType.DOUBLE)?2: 1);
+    return slot;
   }
 }

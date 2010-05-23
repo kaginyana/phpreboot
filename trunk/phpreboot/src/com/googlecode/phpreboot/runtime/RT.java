@@ -823,8 +823,8 @@ public class RT {
   
   
   static class CallSiteProfile extends CallSite implements Profile {
-    public CallSiteProfile(MethodType type) {
-      super(RT.class, "", type);
+    public CallSiteProfile() {
+      super();
     }
   }
   
@@ -832,9 +832,8 @@ public class RT {
   // --- member access
   
   private final static MethodHandle array_set;
-  private final static MethodHandle array_access_get;
+  private final static MethodHandle array_access;
   private final static MethodHandle test_receiver_asArray;
-  private final static MethodHandle test_receiver_asArrayAccess;
   private final static MethodHandle test_receiver_and_key;
   private final static MethodHandle slowPathArraySet;
   private final static MethodHandle slowPathArrayGet;
@@ -845,14 +844,12 @@ public class RT {
         lookup.findVirtual(Array.class, "set",
           MethodType.methodType(void.class, Object.class, Object.class)),
         MethodType.methodType(void.class, Object.class, Object.class, Object.class));
-    array_access_get = MethodHandles.convertArguments(
-        lookup.findVirtual(ArrayAccess.class, "get",
-          MethodType.methodType(Object.class, Object.class)),
-        MethodType.methodType(Object.class, Object.class, Object.class));
+    array_access = MethodHandles.convertArguments(
+        lookup.findStatic(RT.class, "array_access",
+          MethodType.methodType(Object.class, boolean.class, ArrayAccess.class, Object.class)),
+        MethodType.methodType(Object.class, boolean.class, Object.class, Object.class));
     
     test_receiver_asArray = lookup.findStatic(RT.class, "test_receiver_asArray",
-        MethodType.methodType(boolean.class, Object.class));
-    test_receiver_asArrayAccess = lookup.findStatic(RT.class, "test_receiver_asArrayAccess",
         MethodType.methodType(boolean.class, Object.class));
     test_receiver_and_key = lookup.findStatic(RT.class, "test_receiver_and_key",
         MethodType.methodType(boolean.class, Class.class, Object.class, Object.class));
@@ -876,6 +873,14 @@ public class RT {
     return key instanceof String && receiverClass.isInstance(refValue);
   }
   
+  public static Object array_access(boolean keyMustExist, ArrayAccess arrayAccess, Object key) {
+    Object result = arrayAccess.get(key);
+    if (keyMustExist && result == ArrayAccess.INVALID_KEY) {
+      throw RT.error("member %s doesn't exist for array: %s", key, arrayAccess);
+    }
+    return (result != ArrayAccess.INVALID_KEY)? result: null;
+  }
+  
   public static void slowPathArraySet(CallSite callsite, boolean keyMustExist, Object refValue, Object key, Object value) {
     Class<?> refClass = refValue.getClass(); // also nullcheck
     
@@ -887,7 +892,9 @@ public class RT {
             MethodType.methodType(void.class, Object.class, Object.class));
         try {
           //FIXME should be invokeExact
-          mh.invokeGeneric(refValue, value);
+          //XXX workaround bug in jdk7b94
+          //mh.invokeGeneric(refValue, value);
+          mh.invokeVarargs(refValue, value);
         } catch(Error e) {
           throw e;
         } catch (Throwable e) {
@@ -924,8 +931,8 @@ public class RT {
       
       // cache for next call
       
-      MethodType methodType = MethodType.methodType(void.class, Object.class, Object.class, Object.class);
-      callSite = new CallSiteProfile(methodType);
+      //MethodType methodType = MethodType.methodType(void.class, Object.class, Object.class, Object.class);
+      callSite = new CallSiteProfile();
       target = MethodHandles.insertArguments(slowPathArraySet, 0, callSite, keyMustExist);
       callSite.setTarget(target);
       
@@ -938,7 +945,9 @@ public class RT {
       
       try {
         //FIXME should be invokeExact
-        target.invokeGeneric(refValue, key, value);
+        //XXX workaround bug in jdk7b94
+        //target.invokeGeneric(refValue, key, value);
+        target.invokeVarargs(refValue, key, value);
       } catch(Error e) {
         throw e;
       } catch (Throwable e) {
@@ -963,7 +972,9 @@ public class RT {
         Object result;
         try {
           //FIXME should be invokeExact
-          result = mh.invokeGeneric(refValue);
+          //XXX workaround bug in jdk7b94
+          //result = mh.invokeGeneric(refValue);
+          result = mh.invokeVarargs(refValue);
         } catch(Error e) {
           throw e;
         } catch (Throwable e) {
@@ -979,13 +990,11 @@ public class RT {
       
     if (refValue instanceof ArrayAccess) {
       ArrayAccess arrayAccess = (ArrayAccess)refValue;
-      Object result = arrayAccess.get(key);
-      if (keyMustExist && result == ArrayAccess.INVALID_KEY) {
-        throw RT.error("member %s doesn't exist for array: %s", key, arrayAccess);
-      }
-      result = (result != ArrayAccess.INVALID_KEY)? result: null;
+      Object result = array_access(keyMustExist, arrayAccess, key);
       
-      MethodHandle mh = MethodHandles.guardWithTest(test_receiver_asArrayAccess, array_access_get, callsite.getTarget());
+      MethodHandle test = MethodHandles.insertArguments(test_receiver_class, 0, refValue.getClass());
+      MethodHandle fastPath = MethodHandles.insertArguments(array_access, 0, keyMustExist);
+      MethodHandle mh = MethodHandles.guardWithTest(test, fastPath, callsite.getTarget());
       callsite.setTarget(mh);
       return result;
     } 
@@ -999,8 +1008,8 @@ public class RT {
       
       // cache for next call
       
-      MethodType methodType = MethodType.methodType(Object.class, Object.class, Object.class);
-      callSite = new CallSiteProfile(methodType);
+      //MethodType methodType = MethodType.methodType(Object.class, Object.class, Object.class);
+      callSite = new CallSiteProfile();
       target = MethodHandles.insertArguments(slowPathArrayGet, 0, callSite, keyMustExist);
       callSite.setTarget(target);
       
@@ -1013,7 +1022,9 @@ public class RT {
       
       try {
         //FIXME should be invokeExact
-        return target.invokeGeneric(refValue, key);
+        //XXX workaround bug in jdk7b94
+        //return target.invokeGeneric(refValue, key);
+        return target.invokeVarargs(refValue, key);
       } catch(Error e) {
         throw e;
       } catch (Throwable e) {
@@ -1038,7 +1049,7 @@ public class RT {
     CallSiteProfile callSite = (CallSiteProfile)node.getProfileAttribute();
     if (callSite == null) {
       MethodType type = MethodType.genericMethodType(values.length);
-      callSite = new CallSiteProfile(type);
+      callSite = new CallSiteProfile();
       node.setProfileAttribute(callSite);
       MethodHandle mh = MethodHandles.insertArguments(slowPathMethodCall, 0, callSite, name);
       mh = MethodHandles.collectArguments(mh, type);
@@ -1064,7 +1075,7 @@ public class RT {
       throw RT.error("no function %s with values %s", name, Arrays.toString(values));
     }
     
-    target = MethodHandles.convertArguments(target, callSite.type());
+    target = MethodHandles.convertArguments(target, callSite.getTarget().type());
     MethodHandle test = MethodHandles.insertArguments(test_receiver_class, 0, receiverClass);
     MethodHandle guard = MethodHandles.guardWithTest(test, target, callSite.getTarget());
     callSite.setTarget(guard);
@@ -1114,9 +1125,9 @@ public class RT {
   }*/
   
   
-  public static CallSite bootstrap(Class<?> declaringClass, String name, MethodType methodType) {
+  public static CallSite bootstrap(@SuppressWarnings("unused") Class<?> declaringClass, String name, MethodType methodType) {
     OpBehavior opBehavior = OpBehavior.valueOf(name);
-    CallSite callSite = new CallSite(declaringClass, name, methodType);
+    CallSite callSite = new CallSite();
     
     MethodHandle target = MethodHandles.insertArguments(OpBehavior.slowPath, 0, opBehavior, callSite);
     callSite.setTarget(MethodHandles.convertArguments(target, methodType));
@@ -1266,7 +1277,7 @@ public class RT {
     }
     
     public Object slowPath(CallSite callSite, Object left, Object right) throws Throwable {
-      MethodType methodType = callSite.type();
+      MethodType methodType = callSite.getTarget().type();
       Class<?> leftType = methodType.parameterType(0);
       Class<?> rightType = methodType.parameterType(1);
       MethodHandle test;
@@ -1289,9 +1300,14 @@ public class RT {
       MethodHandle mh = getMethodHandle(leftType, rightType);
       if (mh == null)
         throw error(leftType, rightType);
+      
+      //XXX use invokeVarargs instead of invokeGeneric to workaround bug of jdk7b94
+      //Object result =  mh.invokeGeneric(left, right);
+      Object result = mh.invokeVarargs(left, right);
+      
       mh = MethodHandles.convertArguments(mh, methodType);
       callSite.setTarget(MethodHandles.guardWithTest(test, mh, callSite.getTarget()));
-      return mh.invokeGeneric(left, right); 
+      return result; 
     }
     
     private RTError error(Class<?> leftType, Class<?> rightType) {

@@ -59,6 +59,7 @@ import com.googlecode.phpreboot.ast.LiteralString;
 import com.googlecode.phpreboot.ast.LiteralValue;
 import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.ast.PrimaryFuncall;
+import com.googlecode.phpreboot.ast.PrimaryParens;
 import com.googlecode.phpreboot.ast.Visitor;
 import com.googlecode.phpreboot.interpreter.Echoer;
 import com.googlecode.phpreboot.interpreter.EvalEnv;
@@ -214,16 +215,20 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     for(int i=0; i< size; i++) {
       LocalVar localVar = references.get(i);
       args[i + 1] = localVar.getValue();
-      localVar.setValue(null);   // avoid a memory leak
+      
+      //FIXME doesn't work with read-only value
+      //localVar.setValue(null);   // avoid a memory leak
       
       Var var = scope.lookup(localVar.getName());
       args[i + size + 1] = var;
       
-      Type type = localVar.getType();
-      mv.visitVarInsn(ALOAD, localVar.getSlot(slotCount));
-      mv.visitVarInsn(asASMType(type).getOpcode(ILOAD), localVar.getSlot(0));
-      insertCast(PrimitiveType.ANY, type);
-      mv.visitMethodInsn(INVOKEVIRTUAL, VAR_INTERNAL_NAME, "setValue", "(Ljava/lang/Object;)V");
+      if (!var.isReadOnly()) {
+        Type type = localVar.getType();
+        mv.visitVarInsn(ALOAD, localVar.getSlot(slotCount));
+        mv.visitVarInsn(asASMType(type).getOpcode(ILOAD), localVar.getSlot(0));
+        insertCast(PrimitiveType.ANY, type);
+        mv.visitMethodInsn(INVOKEVIRTUAL, VAR_INTERNAL_NAME, "setValue", "(Ljava/lang/Object;)V");
+      }
     }
   }
   
@@ -664,7 +669,7 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     mv.visitVarInsn(ALOAD, localVar.getSlot(0));
     mv.visitMethodInsn(INVOKEVIRTUAL, FUNCTION_INTERNAL_NAME, "getMethodHandle", "()Ljava/dyn/MethodHandle;");
     
-    mv.visitVarInsn(ALOAD, env.getShift()); // environment
+    mv.visitVarInsn(ALOAD, 0); // environment
     
     List<Expr> exprStar = funcall_call.getExprStar();
     List<Parameter> parameters = function.getParameters();
@@ -695,6 +700,11 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   @Override
   public Type visit(PrimaryFuncall primary_funcall, GenEnv env) {
     return gen(primary_funcall.getFuncall(), env);
+  }
+  
+  @Override
+  public Type visit(PrimaryParens primary_parens, GenEnv env) {
+    return gen(primary_parens.getExpr(), env);
   }
   
   

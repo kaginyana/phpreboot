@@ -78,6 +78,7 @@ public class Compiler {
     
     byte[] array = cw.toByteArray();
     
+    //bindMap.dump();
     //CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
     
     MethodHandle mh = define(name, array, methodType);
@@ -144,7 +145,7 @@ public class Compiler {
     Object[] args = new Object[2 * size + 1];
     args[0] = env;
     if (size != 0) {
-      gen.restoreEnv(references, bindMap.getSlotCount() -1 /*XXX - env size */, scope, args);
+      gen.restoreEnv(references, bindMap.getSlotCount() -1 /*XXX substract env slot */, scope, args);
     }
     
     mv.visitInsn(Opcodes.RETURN);
@@ -158,8 +159,8 @@ public class Compiler {
     
     byte[] array = cw.toByteArray();
     
-    bindMap.dump();
-    CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
+    //bindMap.dump();
+    //CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
     
     MethodHandle mh = define("trace", array, methodType);
     
@@ -276,14 +277,13 @@ public class Compiler {
   static {
     MethodHandle define;
     try {
-    Class<?> anonymousClassLoaderClass = Class.forName("sun.dyn.anon.AnonymousClassLoader");
-    define = MethodHandles.publicLookup().findVirtual(anonymousClassLoaderClass, "loadClass",
-        MethodType.methodType(Class.class, byte[].class));
-    
+      Class<?> anonymousClassLoaderClass = Class.forName("sun.dyn.anon.AnonymousClassLoader");
+      define = MethodHandles.publicLookup().findVirtual(anonymousClassLoaderClass, "loadClass",
+          MethodType.methodType(Class.class, byte[].class));
     } catch(ClassNotFoundException e) {
       define = null;
     }
-    ANONYMOUS_CLASS_DEFINE = define/*null*/;
+    ANONYMOUS_CLASS_DEFINE = define;
   }
   
   static class AnonymousLoader {
@@ -308,8 +308,8 @@ public class Compiler {
     }
     static Class<?> define(byte[] bytecodes) {
       try {
-        //FIXME use invokeExact instead
-        return ANONYMOUS_CLASS_DEFINE.invokeGeneric(ANONYMOUS_CLASS_LOADER, bytecodes);
+        //XXX workaround bug in jdk7b94, should use invokeGeneric instead
+        return (Class<?>)ANONYMOUS_CLASS_DEFINE.invokeVarargs(ANONYMOUS_CLASS_LOADER, bytecodes);
       } catch(Throwable t) {
         t.printStackTrace();
         throw new AssertionError(t);

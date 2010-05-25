@@ -26,9 +26,8 @@ public abstract class Module {
       
       MethodHandle mh = PUBLIC_LOOKUP.unreflect(method);
       
-      // bind the method handles to the current module
       if (!Modifier.isStatic(method.getModifiers())) {
-        mh = MethodHandles.insertArguments(mh, 0, this);
+        throw new AssertionError("method in module must be static "+method);
       }
       
       // add a unused parameter for the environment

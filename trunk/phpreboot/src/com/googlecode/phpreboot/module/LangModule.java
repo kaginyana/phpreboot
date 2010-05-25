@@ -19,7 +19,7 @@ import com.googlecode.phpreboot.runtime.XML;
 
 public class LangModule extends Module {
   @Export
-  public XML document(URI uri) {
+  public static XML document(URI uri) {
     XMLInputFactory factory = XMLInputFactory.newFactory();
     InputStream input;
     try {

@@ -3,23 +3,55 @@ package com.googlecode.phpreboot.compiler;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 
-import com.googlecode.phpreboot.ast.Node;
+import org.objectweb.asm.Label;
 
-public class LoopStack {
-  private final ArrayDeque<Node> stack =
-    new ArrayDeque<Node>();
-  private final HashMap<String,Node> labelMap =
-    new HashMap<String, Node>();
+class LoopStack<E> {
+  static class Labels {
+    final Label breakLabel;
+    final Label continueLabel;
+    
+    Labels(Label breakLabel, Label continueLabel) {
+      this.breakLabel = breakLabel;
+      this.continueLabel = continueLabel;
+    }
+  }
   
-  public void push(/*@Nullable*/String label, Node node) {
-    stack.push(node);
+  private final ArrayDeque<Entry<E>> stack =
+    new ArrayDeque<Entry<E>>();
+  private final HashMap<String,E> labelMap =
+    new HashMap<String, E>();
+  
+  private static class Entry<E> {
+    final /*@Nullable*/String label;
+    final E element;
+    
+    Entry(/*@Nullable*/String label, E element) {
+      this.label = label;
+      this.element = element;
+    }
+  }
+  
+  public void push(/*@Nullable*/String label, E element) {
+    stack.push(new Entry<E>(label, element));
     if (label != null) {
-      labelMap.put(label, node);
+      labelMap.put(label, element);
     }
   }
   
   public void pop() {
-    Node node = stack.pop();
-    labelMap.remove(node);  // may be there is no label to remove
+    Entry<E> entry = stack.pop();
+    /*@Nullable*/String label = entry.label;
+    if (label != null)
+      labelMap.remove(label);
+  }
+  
+  public /*@Nullable*/E current() {
+    Entry<E> entry = stack.peek();
+    if (entry == null)
+      return null;
+    return entry.element;
+  }
+  public /*@Nullable*/E lookup(String label) {
+    return labelMap.get(label);
   }
 }

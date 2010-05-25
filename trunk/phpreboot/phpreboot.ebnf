@@ -2,15 +2,16 @@ directives:
   autoalias
 
 priorities:
-  eq   = 0 left
-  to   = 1 left
-  bool = 2 left
-  plus = 3 left
-  mult = 4 left
-  unary = 5 left
-  xml = 6 left
-  ifelse = 7 right
-  xpath = 8 left
+  eq       = 0 left
+  to       = 1 left
+  question = 2 left
+  bool     = 3 left
+  plus     = 4 left
+  mult     = 5 left
+  unary    = 6 left
+  xml      = 7 left
+  ifelse   = 8 right
+  xpath    = 9 left
 
 tokens:
   let = 'let'
@@ -38,6 +39,7 @@ tokens:
   dot = '\.'
   comma = ','
   colon = ':'
+  question_mark = '\?'  [question]
   assign = '='  [eq]    // needed for xpath
   plus = '\+'   [plus]
   minus = '-'   [plus]
@@ -121,7 +123,6 @@ tokens:
   file_scheme = 'file:\/\/' 
   port_number = '[0-9]+'
   path_id = '[^/ \t\r\n?#,$)]+'
-  question_mark = '\?'
   sharp = '#'
   amp = '&'
   
@@ -308,6 +309,7 @@ productions:
        | expr 'or' expr                    [bool]     { expr_or }
        | expr 'and' expr                   [bool]     { expr_and }
        | expr 'to' type                    [to]       { expr_to_type }
+       | expr '?' expr ':' expr            [question] { expr_if }
        | 'function' parameters block                  { expr_fun }
        | xmls                                         { expr_xmls }
        ;

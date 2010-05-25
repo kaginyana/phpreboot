@@ -8,6 +8,7 @@ import com.googlecode.phpreboot.model.Type;
 
 public class BindMap {
   private int slotCount = 1;    // 0 == EvalEnv
+  private int outputVarCount = 0;
   private final ArrayList<LocalVar> bindReferences =
     new ArrayList<LocalVar>();
   
@@ -24,11 +25,19 @@ public class BindMap {
     slotCount = slot + ((type == PrimitiveType.DOUBLE)?2 :1);
     LocalVar constant = LocalVar.createConstantBound(name, isReadOnly, type, optimistic, value, slot);
     bindReferences.add(constant);
+    
+    if (!isReadOnly)
+      outputVarCount++;
+      
     return constant;
   }
   
   public int getSlotCount() {
     return slotCount;
+  }
+  
+  public int getOutputVarCount() {
+    return outputVarCount;
   }
   
   public int getReferencesCount() {

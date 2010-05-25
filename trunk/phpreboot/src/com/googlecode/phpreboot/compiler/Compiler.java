@@ -8,6 +8,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.util.List;
+import java.util.Objects;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
@@ -18,6 +19,7 @@ import org.objectweb.asm.util.CheckClassAdapter;
 import com.googlecode.phpreboot.ast.Block;
 import com.googlecode.phpreboot.ast.LabeledInstrWhile;
 import com.googlecode.phpreboot.ast.Node;
+import com.googlecode.phpreboot.compiler.LoopStack.Labels;
 import com.googlecode.phpreboot.interpreter.EvalEnv;
 import com.googlecode.phpreboot.interpreter.Profile.LoopProfile;
 import com.googlecode.phpreboot.interpreter.Scope;
@@ -43,7 +45,7 @@ public class Compiler {
      
     Block functionNode = function.getBlock();
     TypeChecker typeChecker = new TypeChecker();
-    LoopStack loopStack = new LoopStack();
+    LoopStack<Boolean> loopStack = new LoopStack<Boolean>();
     BindMap bindMap = new BindMap();
     TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, function.getReturnType(), bindMap, false);
     
@@ -64,7 +66,8 @@ public class Compiler {
     mv.visitCode();
     
     Gen gen = new Gen(mv);
-    gen.gen(functionNode, new GenEnv(bindMap.getSlotCount(), null, null));
+    LoopStack<Labels> labelLoopStack = new LoopStack<Labels>();
+    gen.gen(functionNode, new GenEnv(bindMap.getSlotCount(), null, labelLoopStack, null));
     if (liveness == LivenessType.ALIVE) {
       gen.defaultReturn(function.getReturnType());
     }
@@ -105,7 +108,7 @@ public class Compiler {
     LocalScope localScope = new LocalScope(scope);
     
     TypeChecker typeChecker = new TypeChecker();
-    LoopStack loopStack = new LoopStack();
+    LoopStack<Boolean> loopStack = new LoopStack<Boolean>();
     BindMap bindMap = new BindMap();
     TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, /*FIXME need the enclosing return type*/null, bindMap, optimisticTrace);
     
@@ -116,7 +119,6 @@ public class Compiler {
     } catch(OptimiticAssertionException e) {
       System.err.println("optimistic typecheck failed");
       // typecheck again but don't perform optimistic assumption
-      loopStack = new LoopStack();
       bindMap = new BindMap();
       localScope = new LocalScope(scope);
       typeCheckEnv = new TypeCheckEnv(localScope, loopStack, /*FIXME need the enclosing return type*/null, bindMap, false);
@@ -132,17 +134,27 @@ public class Compiler {
     cw.visitSource("script", null);
     
     MethodType methodType = asTraceMethodType(bindMap);
+    
+    //XXX ricochet not yet implemented in jdk7
+    if (methodType.parameterCount() > 10) {
+      System.err.println("trace:"+methodType);
+      System.err.println("ricochet not yet implemented, go back in interpreter mode");
+      return false;
+    }
+    
     String desc = methodType.toMethodDescriptorString();
     MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC|Opcodes.ACC_STATIC, "trace", desc, null, null);
     mv.visitCode();
     
     Gen gen = new Gen(mv);
-    gen.gen(labeledInstrWhile, new GenEnv(bindMap.getSlotCount() + bindMap.getReferencesCount(), null, null));
+    LoopStack<Labels> labelLoopStack = new LoopStack<Labels>();
+    gen.gen(labeledInstrWhile, new GenEnv(bindMap.getSlotCount() + bindMap.getReferencesCount(), null, labelLoopStack, null));
     
     // restore env vars
     List<LocalVar> references = bindMap.getReferences();
     int size = references.size();
-    Object[] args = new Object[2 * size + 1];
+    int outputVarCount = bindMap.getOutputVarCount();
+    Object[] args = new Object[size + outputVarCount + 1];
     args[0] = env;
     if (size != 0) {
       gen.restoreEnv(references, bindMap.getSlotCount() -1 /*XXX substract env slot */, scope, args);
@@ -166,6 +178,9 @@ public class Compiler {
     
     // record for reuse
     profile.recordTrace(bindMap, mh);
+    
+    // debug
+    //System.err.println("calls "+java.util.Arrays.toString(args));
     
     try {
       mh.invokeVarargs(args);
@@ -226,12 +241,13 @@ public class Compiler {
   
   private static MethodType asTraceMethodType(BindMap bindMap) {
     int count = bindMap.getReferencesCount();
-    Class<?>[] parameterArray = new Class<?>[count * 2 + 1];
+    int outputVarsCount = bindMap.getOutputVarCount();
+    Class<?>[] parameterArray = new Class<?>[count + outputVarsCount + 1];
     parameterArray[0] = /*EvalEnv.class*/ Object.class;
     for(int i=0; i<count; i++) {
       parameterArray[i + 1] = asClass(bindMap.getReferenceType(i));
     }
-    for(int i=0; i<count; i++) {
+    for(int i=0; i<outputVarsCount; i++) {
       parameterArray[i + count + 1] = Var.class;
     }
     return MethodType.methodType(void.class, parameterArray);

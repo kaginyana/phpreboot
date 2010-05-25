@@ -17,6 +17,7 @@ import com.googlecode.phpreboot.interpreter.Analyzer;
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Var;
+import com.googlecode.phpreboot.module.BitsModule;
 import com.googlecode.phpreboot.module.LangModule;
 import com.googlecode.phpreboot.module.MathModule;
 import com.googlecode.phpreboot.sql.GenericSQLConnection;
@@ -171,6 +172,7 @@ public class Main {
     // register modules
     new LangModule().registerModule(rootScope);
     new MathModule().registerModule(rootScope);
+    new BitsModule().registerModule(rootScope);
     
     try {
       Analyzer.analyze(reader, writer, rootScope);

@@ -4,10 +4,12 @@ import java.dyn.MethodHandle;
 import java.dyn.MethodHandles;
 import java.dyn.MethodHandles.Lookup;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.Function;
+import com.googlecode.phpreboot.model.IntrinsicInfo;
 import com.googlecode.phpreboot.model.Parameter;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Type;
@@ -25,13 +27,12 @@ public abstract class Module {
       MethodHandle mh = PUBLIC_LOOKUP.unreflect(method);
       
       // bind the method handles to the current module
-      mh = MethodHandles.insertArguments(mh, 0, this);
+      if (!Modifier.isStatic(method.getModifiers())) {
+        mh = MethodHandles.insertArguments(mh, 0, this);
+      }
       
       // add a unused parameter for the environment
       mh = MethodHandles.dropArguments(mh, 0, Object.class/*EvalEnv.class*/);
-      
-      // generify signature
-      mh = MethodHandles.convertArguments(mh, mh.type().generic());
       
       Function function = createFunction(method);
       function.setMethodHandle(mh);
@@ -49,7 +50,20 @@ public abstract class Module {
       parameters.add(parameter);
     }
     
-    return new Function(method.getName(), parameters, asType(method.getReturnType()), null, null);
+    // adds intrinsics link
+    
+    Class<?> declaringClass;
+    String name;
+    Intrinsic intrinsic = method.getAnnotation(Intrinsic.class);
+    if (intrinsic != null) {
+      declaringClass = intrinsic.declaringClass();
+      name = intrinsic.name();
+    } else {
+      declaringClass = method.getDeclaringClass();
+      name = method.getName();
+    }
+    IntrinsicInfo instrinsicInfo = new IntrinsicInfo(declaringClass, name);
+    return new Function(method.getName(), parameters, asType(method.getReturnType()), null, instrinsicInfo, null);
   }
   
   private static Type asType(Class<?> runtimeClass) {

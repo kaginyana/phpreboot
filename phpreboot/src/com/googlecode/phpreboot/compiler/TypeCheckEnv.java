@@ -4,12 +4,12 @@ import com.googlecode.phpreboot.model.Type;
 
 public class TypeCheckEnv {
   private final LocalScope scope;
-  private final LoopStack loopStack;
+  private final LoopStack<Boolean> loopStack;
   private final Type functionReturnType;
   private final BindMap bindMap;
   private final boolean allowOptimisticType;
   
-  public TypeCheckEnv(LocalScope scope, LoopStack loopStack, Type functionReturnType, BindMap bindMap, boolean allowOptimisticType) {
+  public TypeCheckEnv(LocalScope scope, LoopStack<Boolean> loopStack, Type functionReturnType, BindMap bindMap, boolean allowOptimisticType) {
     this.scope = scope;
     this.loopStack = loopStack;
     this.functionReturnType = functionReturnType;
@@ -20,7 +20,7 @@ public class TypeCheckEnv {
   public LocalScope getScope() {
     return scope;
   }
-  public LoopStack getLoopStack() {
+  public LoopStack<Boolean> getLoopStack() {
     return loopStack;
   }
   public Type getFunctionReturnType() {

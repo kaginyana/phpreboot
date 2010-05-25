@@ -1,0 +1,14 @@
+
+total = 0.0
+
+x = 1.0
+while(x <= 2000.0) {
+
+  result = (5.4*math_pow(x, 5.0) - 3.211*math_pow(x, 4.0) + 100.3*math_pow(x, 2.0) - 100 +
+    20*math_sin(x) - math_log(x)) * 20*math_exp(-x/100.3)
+  total = total + result / 0.0001
+  
+  x = x + 0.0001
+}
+
+echo total

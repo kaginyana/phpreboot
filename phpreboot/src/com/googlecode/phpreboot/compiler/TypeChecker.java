@@ -14,18 +14,23 @@ import com.googlecode.phpreboot.ast.ElseIfElseIf;
 import com.googlecode.phpreboot.ast.ElseIfEmpty;
 import com.googlecode.phpreboot.ast.Expr;
 import com.googlecode.phpreboot.ast.ExprId;
+import com.googlecode.phpreboot.ast.ExprIf;
 import com.googlecode.phpreboot.ast.ExprLiteral;
 import com.googlecode.phpreboot.ast.ExprPrimary;
 import com.googlecode.phpreboot.ast.FuncallCall;
+import com.googlecode.phpreboot.ast.IdToken;
 import com.googlecode.phpreboot.ast.Instr;
 import com.googlecode.phpreboot.ast.InstrAssign;
 import com.googlecode.phpreboot.ast.InstrBlock;
+import com.googlecode.phpreboot.ast.InstrBreak;
+import com.googlecode.phpreboot.ast.InstrContinue;
 import com.googlecode.phpreboot.ast.InstrDecl;
 import com.googlecode.phpreboot.ast.InstrEcho;
 import com.googlecode.phpreboot.ast.InstrFuncall;
 import com.googlecode.phpreboot.ast.InstrIf;
 import com.googlecode.phpreboot.ast.InstrLabeled;
 import com.googlecode.phpreboot.ast.InstrReturn;
+import com.googlecode.phpreboot.ast.LabelId;
 import com.googlecode.phpreboot.ast.LabeledInstrWhile;
 import com.googlecode.phpreboot.ast.LiteralArray;
 import com.googlecode.phpreboot.ast.LiteralArrayEntry;
@@ -130,6 +135,16 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     if (type == exprType)
       return true;
     return type == PrimitiveType.DOUBLE && exprType == PrimitiveType.INT;
+  }
+  
+  private static Type commonSuperType(Type type1, Type type2) {
+    if (type1 == type2)
+      return type1;
+    if ((type1 == PrimitiveType.INT && type2 == PrimitiveType.DOUBLE) ||
+        (type1 == PrimitiveType.DOUBLE && type2 == PrimitiveType.INT)) {
+      return PrimitiveType.DOUBLE;
+    }
+    return PrimitiveType.ANY;
   }
   
   // --- default visit
@@ -280,12 +295,18 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   }
   
   
-  // --- labeled instructions
+  // --- loop instructions
+  
+  static String getLoopLabel(Node loop) {
+    com.googlecode.phpreboot.ast.Label labelNode = ((InstrLabeled)loop.getParent()).getLabel();
+    if (labelNode instanceof LabelId) {
+      return ((LabelId)labelNode).getId().getValue();
+    }
+    return null;
+  }
   
   @Override
   public Type visit(InstrLabeled instr_labeled, TypeCheckEnv env) {
-    //TODO get and propagate label
-    
     return typeCheck(instr_labeled.getLabeledInstr(), env);
   }
   
@@ -294,10 +315,44 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     Expr expr = labeled_instr_while.getExpr();
     Type exprType = typeCheck(expr, env);
     isCompatible(PrimitiveType.BOOLEAN, exprType);
-    typeCheck(labeled_instr_while.getInstr(), env);
+    
+    String label = getLoopLabel(labeled_instr_while);
+    LoopStack<Boolean> loopStack = env.getLoopStack();
+    loopStack.push(label, Boolean.TRUE);
+    
+    try {
+      typeCheck(labeled_instr_while.getInstr(), env);
+    } finally {
+      loopStack.pop();
+    }
+    
     return ALIVE;
   }
   
+  private Type visitBreakOrContinue(/*@Nullable*/IdToken idToken, TypeCheckEnv env) {
+    LoopStack<Boolean> loopStack = env.getLoopStack();
+    if (idToken == null) {
+      if (loopStack.current() == null) {
+        throw RT.error("break/continue without a loop or a switch");
+      }
+    } else {
+      String label = idToken.getValue();
+      if (loopStack.lookup(label) == null) {
+        throw RT.error("no label %s is available", label);
+      }
+    }
+    return DEAD;
+  }
+  
+  @Override
+  public Type visit(InstrBreak instr_break, TypeCheckEnv env) {
+    return visitBreakOrContinue(instr_break.getIdOptional(), env);
+  }
+  
+  @Override
+  public Type visit(InstrContinue instr_continue, TypeCheckEnv env) {
+    return visitBreakOrContinue(instr_continue.getIdOptional(), env);
+  }
   
   // --- visit fun call
   
@@ -326,11 +381,16 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
       }
       
       LocalVar localVar;
-      if (var instanceof LocalVar) {
-        localVar = (LocalVar)var;
+      if (function.getIntrinsicInfo() == null) {
+        if (var instanceof LocalVar) {
+          localVar = (LocalVar)var;
+        } else {
+          localVar = env.getBindMap().bind(name, var.isReadOnly(), function, PrimitiveType.FUNCTION, false);
+          env.getScope().register(localVar);
+        }
       } else {
-        localVar = env.getBindMap().bind(name, var.isReadOnly(), function, PrimitiveType.FUNCTION, false);
-        env.getScope().register(localVar);
+        // call will be intrinsified
+        localVar = LocalVar.createConstantFoldable(function);
       }
       
       funcall_call.setSymbolAttribute(localVar);
@@ -405,6 +465,14 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   @Override
   public Type visit(ExprPrimary expr_primary, TypeCheckEnv env) {
     return typeCheck(expr_primary.getPrimary(), env);
+  }
+  
+  @Override
+  public Type visit(ExprIf expr_if, TypeCheckEnv env) {
+    isCompatible(PrimitiveType.BOOLEAN, typeCheck(expr_if.getExpr(), env));
+    return commonSuperType(
+        typeCheck(expr_if.getExpr2(), env),
+        typeCheck(expr_if.getExpr3(), env));
   }
   
   @Override

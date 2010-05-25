@@ -31,13 +31,19 @@ public interface Profile {
       // and create the trace parameter array
       List<LocalVar> references = bindMap.getReferences();
       int size = references.size();
-      Object[] args = new Object[2 * size + 1];
+      int outputVarCount = bindMap.getOutputVarCount();
+      Object[] args = new Object[size + outputVarCount + 1];
+      args[0]=env;
+      int outputVarIndex = size + 1;
       for(int i=0; i<size; i++) {
         LocalVar localVar = references.get(i);
         Var var = env.getScope().lookup(localVar.getName());
         Object value = var.getValue();
         args[i + 1] = value;
-        args[i + size + 1] = var;
+        if (!var.isReadOnly()) {
+          args[outputVarIndex++] = var;  
+        }
+        
         if (!localVar.isOptimistic()) {
           continue;
         }
@@ -49,8 +55,6 @@ public interface Profile {
           return false;
         }
       }
-      
-      args[0]=env;
       
       try {
         trace.invokeVarargs(args);

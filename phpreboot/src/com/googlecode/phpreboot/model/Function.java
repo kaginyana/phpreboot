@@ -14,13 +14,15 @@ public class Function {
   private final Type returnType;
   private final /*@Nullable*/Scope scope;
   private final Block block;
+  private final /*@Nullable*/IntrinsicInfo intrinsicInfo;
   private /*volatile*/ MethodHandle methodHandle;
   
-  public Function(String name, List<Parameter> parameters, Type returnType, /*@Nullable*/Scope scope, Block block) {
+  public Function(String name, List<Parameter> parameters, Type returnType, /*@Nullable*/Scope scope, /*@Nullable*/IntrinsicInfo intrinsicInfo, Block block) {
     this.name = name;
     this.parameters = parameters;
     this.returnType = returnType;
     this.scope = scope;
+    this.intrinsicInfo = intrinsicInfo;
     this.block = block;
   }
 
@@ -35,6 +37,9 @@ public class Function {
   }
   public /*@Nullable*/Scope getScope() {
     return scope;
+  }
+  public /*@Nullable*/IntrinsicInfo getIntrinsicInfo() {
+    return intrinsicInfo;
   }
   public Block getBlock() {
     return block;

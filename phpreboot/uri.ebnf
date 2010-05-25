@@ -24,7 +24,7 @@ productions:
       | relative_uri   { uri_relative }
       ;
       
-  absolute_uri = scheme host port? absolute_path uri_query? fragment?   { absolute_uri }
+  absolute_uri = scheme host port? absolute_path uri_query fragment?   { absolute_uri }
                ;
   
   scheme = 'http_scheme'    { scheme_http }
@@ -63,7 +63,8 @@ productions:
             | dollar_access             { path_step_dollar_access }
             ;
        
-  uri_query = '?' uri_query_pair/'amp'+    { uri_query }
+  uri_query = '?' uri_query_pair/'amp'+         { uri_query_query }
+            |                            [eq]   { ury_query_empty }  // priority eq is less than priority question 
             ;      
             
   uri_query_pair = 'id' '=' 'id'  { uri_query_pair }

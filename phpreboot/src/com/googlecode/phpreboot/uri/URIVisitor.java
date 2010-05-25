@@ -31,9 +31,10 @@ import com.googlecode.phpreboot.ast.RelativeUriStepRest;
 import com.googlecode.phpreboot.ast.SchemeFtp;
 import com.googlecode.phpreboot.ast.SchemeHttp;
 import com.googlecode.phpreboot.ast.UriAbsolute;
-import com.googlecode.phpreboot.ast.UriQuery;
 import com.googlecode.phpreboot.ast.UriQueryPair;
+import com.googlecode.phpreboot.ast.UriQueryQuery;
 import com.googlecode.phpreboot.ast.UriRelative;
+import com.googlecode.phpreboot.ast.UryQueryEmpty;
 import com.googlecode.phpreboot.ast.ValueLiteralToken;
 import com.googlecode.phpreboot.ast.Visitor;
 import com.googlecode.phpreboot.interpreter.EvalEnv;
@@ -81,8 +82,7 @@ public class URIVisitor extends Visitor<Object, URIEnv, URISyntaxException> {
     Port port = absolute_uri.getPortOptional();
     int portNumber = (port == null)?-1:port.getPortNumber().getValue();
     String path = (String)eval(absolute_uri.getAbsolutePath(), env);
-    UriQuery uriQuery = absolute_uri.getUriQueryOptional();
-    String query = uriQuery == null? null: (String)eval(uriQuery, env);
+    String query = (String)eval(absolute_uri.getUriQuery(), env);
     Fragment uriFragment = absolute_uri.getFragmentOptional();
     String fragment = (uriFragment == null)? null: uriFragment.getId().getValue();
     
@@ -96,15 +96,20 @@ public class URIVisitor extends Visitor<Object, URIEnv, URISyntaxException> {
   }
   
   @Override
-  public Object visit(UriQuery uriQuery, URIEnv env) {
+  public Object visit(UriQueryQuery uri_query_query, URIEnv env) {
     StringBuilder builder = new StringBuilder();
-    List<UriQueryPair> uriQueryPairPlus = uriQuery.getUriQueryPairPlus();
+    List<UriQueryPair> uriQueryPairPlus = uri_query_query.getUriQueryPairPlus();
     for(UriQueryPair uriQueryPair: uriQueryPairPlus) {
       builder.append(uriQueryPair.getId().getValue()).
         append('=').append(uriQueryPair.getId2().getValue()).append('&');
     }
     builder.setLength(builder.length() - 1);
     return builder.toString();
+  }
+  
+  @Override
+  public Object visit(UryQueryEmpty ury_query_empty, URIEnv env) {
+    return null;
   }
   
   @Override

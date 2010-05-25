@@ -38,6 +38,7 @@ import com.googlecode.phpreboot.ast.EoiSemi;
 import com.googlecode.phpreboot.ast.Expr;
 import com.googlecode.phpreboot.ast.ExprFun;
 import com.googlecode.phpreboot.ast.ExprId;
+import com.googlecode.phpreboot.ast.ExprIf;
 import com.googlecode.phpreboot.ast.ExprLiteral;
 import com.googlecode.phpreboot.ast.ExprPrimary;
 import com.googlecode.phpreboot.ast.ExprRegexMatch;
@@ -111,6 +112,7 @@ import com.googlecode.phpreboot.runtime.Array;
 import com.googlecode.phpreboot.runtime.RT;
 import com.googlecode.phpreboot.runtime.Sequence;
 import com.googlecode.phpreboot.runtime.XML;
+import com.googlecode.phpreboot.runtime.RT.RTError;
 import com.googlecode.phpreboot.sql.SQLConnection;
 import com.googlecode.phpreboot.uri.URIVisitor;
 
@@ -278,7 +280,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     ReturnType returnTypeNode = parametersNode.getReturnTypeOptional();
     Type returnType = (returnTypeNode == null)? PrimitiveType.ANY: (Type)eval(returnTypeNode.getType(), env);
     
-    Function function = new Function(name, parameters, returnType, filterReadOnlyVars(env.getScope()), block);
+    Function function = new Function(name, parameters, returnType, filterReadOnlyVars(env.getScope()), null, block);
     
     // try to compile it
     MethodHandle compileMH = Compiler.compile(function);
@@ -773,7 +775,11 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       if (!(value instanceof Function)) {
         throw RT.error("variable %s doesn't reference a function: %s", name, value);
       }
-      return methodHandleCall(value, exprStar, env);
+      try {
+        return methodHandleCall(value, exprStar, env);
+      } catch(RTError e) {
+        throw RT.error(funcall_call, e);
+      }
     }
     
     int size = exprStar.size();
@@ -892,6 +898,16 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   @Override
   public Object visit(ExprUri expr_uri, EvalEnv env) {
     return URIVisitor.INSTANCE.eval(expr_uri.getUri(), env);
+  }
+  
+  @Override
+  public Object visit(ExprIf expr_if, EvalEnv env) {
+    boolean condition = checkBoolean(expr_if.getExpr(), env);
+    if(condition) {
+      return eval(expr_if.getExpr2(), env);  
+    } else {
+      return eval(expr_if.getExpr3(), env);
+    }
   }
   
   @Override

@@ -37,12 +37,16 @@ import com.googlecode.phpreboot.ast.ElseIfElseIf;
 import com.googlecode.phpreboot.ast.ElseIfEmpty;
 import com.googlecode.phpreboot.ast.Expr;
 import com.googlecode.phpreboot.ast.ExprId;
+import com.googlecode.phpreboot.ast.ExprIf;
 import com.googlecode.phpreboot.ast.ExprLiteral;
 import com.googlecode.phpreboot.ast.ExprPrimary;
 import com.googlecode.phpreboot.ast.FuncallCall;
+import com.googlecode.phpreboot.ast.IdToken;
 import com.googlecode.phpreboot.ast.Instr;
 import com.googlecode.phpreboot.ast.InstrAssign;
 import com.googlecode.phpreboot.ast.InstrBlock;
+import com.googlecode.phpreboot.ast.InstrBreak;
+import com.googlecode.phpreboot.ast.InstrContinue;
 import com.googlecode.phpreboot.ast.InstrDecl;
 import com.googlecode.phpreboot.ast.InstrEcho;
 import com.googlecode.phpreboot.ast.InstrFuncall;
@@ -61,10 +65,12 @@ import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.ast.PrimaryFuncall;
 import com.googlecode.phpreboot.ast.PrimaryParens;
 import com.googlecode.phpreboot.ast.Visitor;
+import com.googlecode.phpreboot.compiler.LoopStack.Labels;
 import com.googlecode.phpreboot.interpreter.Echoer;
 import com.googlecode.phpreboot.interpreter.EvalEnv;
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.Function;
+import com.googlecode.phpreboot.model.IntrinsicInfo;
 import com.googlecode.phpreboot.model.Parameter;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Type;
@@ -212,6 +218,8 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   // prepare arguments for the first call
   void restoreEnv(List<LocalVar> references, int slotCount, Scope scope, Object[] args) {
     int size = references.size();
+    int outputVarIndex = size + 1;
+    int outputSlotIndex = slotCount + 1;
     for(int i=0; i< size; i++) {
       LocalVar localVar = references.get(i);
       args[i + 1] = localVar.getValue();
@@ -220,11 +228,10 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       //localVar.setValue(null);   // avoid a memory leak
       
       Var var = scope.lookup(localVar.getName());
-      args[i + size + 1] = var;
-      
       if (!var.isReadOnly()) {
+        args[outputVarIndex++] = var;
         Type type = localVar.getType();
-        mv.visitVarInsn(ALOAD, localVar.getSlot(slotCount));
+        mv.visitVarInsn(ALOAD, outputSlotIndex++);
         mv.visitVarInsn(asASMType(type).getOpcode(ILOAD), localVar.getSlot(0));
         insertCast(PrimitiveType.ANY, type);
         mv.visitMethodInsn(INVOKEVIRTUAL, VAR_INTERNAL_NAME, "setValue", "(Ljava/lang/Object;)V");
@@ -632,8 +639,15 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   public Type visit(LabeledInstrWhile labeled_instr_while, GenEnv env) {
     mv.visitLineNumber(labeled_instr_while.getLineNumberAttribute(), new Label());
     
-    final Instr instr = labeled_instr_while.getInstr();
+    String label = TypeChecker.getLoopLabel(labeled_instr_while);
+    LoopStack<Labels> loopStack = env.getLoopStack();
+    
     final Label start = new Label();
+    Label end = new Label();
+    loopStack.push(label, new Labels(end, start));
+    
+    final Instr instr = labeled_instr_while.getInstr();
+    
     mv.visitLabel(start);
     IfParts ifParts = new IfParts(true, new GeneratorClosure() {
       @Override
@@ -652,12 +666,43 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       }
     }, null);
     
-    Expr expr = labeled_instr_while.getExpr();
-    gen(expr, env.ifParts(ifParts));
+    try {
+      gen(labeled_instr_while.getExpr(), env.ifParts(ifParts));
+    } finally {
+      loopStack.pop();
+    }
+    mv.visitLabel(end);
     
-    return ALIVE;
+    return null;
   }
   
+  @Override
+  public Type visit(InstrBreak instr_break, GenEnv env) {
+    LoopStack<Labels> loopStack = env.getLoopStack();
+    IdToken idToken = instr_break.getIdOptional();
+    Labels labels;
+    if (idToken == null) {
+      labels = loopStack.current();
+    } else {
+      labels = loopStack.lookup(idToken.getValue());
+    }
+    mv.visitLabel(labels.breakLabel);
+    return null;
+  }
+  
+  @Override
+  public Type visit(InstrContinue instr_continue, GenEnv env) {
+    LoopStack<Labels> loopStack = env.getLoopStack();
+    IdToken idToken = instr_continue.getIdOptional();
+    Labels labels;
+    if (idToken == null) {
+      labels = loopStack.current();
+    } else {
+      labels = loopStack.lookup(idToken.getValue());
+    }
+    mv.visitLabel(labels.continueLabel);
+    return null;
+  }
   
   // --- visit fun call
   
@@ -666,30 +711,38 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     LocalVar localVar = (LocalVar)funcall_call.getSymbolAttribute();
     Function function = (Function)localVar.getValue();
     
-    mv.visitVarInsn(ALOAD, localVar.getSlot(0));
-    mv.visitMethodInsn(INVOKEVIRTUAL, FUNCTION_INTERNAL_NAME, "getMethodHandle", "()Ljava/dyn/MethodHandle;");
-    
-    mv.visitVarInsn(ALOAD, 0); // environment
+    StringBuilder desc = new StringBuilder();
+    IntrinsicInfo intrinsicInfo = function.getIntrinsicInfo();
+    if (intrinsicInfo == null) {
+      desc.append("(L").append(getInternalName(/*EvalEnv.class*/Object.class)).append(';');
+    } else {
+      desc.append('(');
+    }
     
     List<Expr> exprStar = funcall_call.getExprStar();
     List<Parameter> parameters = function.getParameters();
-    StringBuilder desc = new StringBuilder().append("(L").append(/*EvalEnv.class*/Object.class.getName().replace('.', '/')).append(';');
     for(int i=0; i<exprStar.size(); i++) {
       Expr expr = exprStar.get(i);
       Type expectedType = parameters.get(i).getType();
-      Type exprType = gen(expr, new GenEnv(env.getShift(), env.getIfParts(), expectedType));
+      Type exprType = gen(expr, env.expectedType(expectedType));
       insertCast(expectedType, exprType);
       desc.append(asASMType(expectedType).getDescriptor());
     }
-    
     desc.append(')');
     Type returnType = function.getReturnType();
-    if (returnType == PrimitiveType.ANY) {
+    if (returnType == PrimitiveType.ANY) {   //FIXME: not sure that this condition is correct !
       returnType = env.getExpectedType();
     }
     desc.append(asASMType(returnType).getDescriptor());
     
-    mv.visitMethodInsn(INVOKEVIRTUAL, "java/dyn/MethodHandle", /*"invokeExact"*/ "invoke", desc.toString());
+    if (intrinsicInfo == null) {
+      mv.visitVarInsn(ALOAD, localVar.getSlot(0));
+      mv.visitMethodInsn(INVOKEVIRTUAL, FUNCTION_INTERNAL_NAME, "getMethodHandle", "()Ljava/dyn/MethodHandle;");
+      mv.visitVarInsn(ALOAD, 0); // environment
+      mv.visitMethodInsn(INVOKEVIRTUAL, "java/dyn/MethodHandle", /*"invokeExact"*/ "invoke", desc.toString());
+    } else {
+      mv.visitMethodInsn(INVOKESTATIC, getInternalName(intrinsicInfo.getDeclaringClass()), intrinsicInfo.getName(), desc.toString());
+    }
     
     return returnType;
   }
@@ -745,6 +798,14 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   @Override
   public Type visit(ExprPrimary expr_primary, GenEnv env) {
     return gen(expr_primary.getPrimary(), env);
+  }
+  
+  @Override
+  public Type visit(ExprIf expr_if, GenEnv env) {
+    //FIXME this will not work if the two expressions don't have the same type (insert cast) 
+    IfParts ifParts = new IfParts(false, generator(expr_if.getExpr2()), generator(expr_if.getExpr3()));
+    gen(expr_if.getExpr(), env.ifParts(ifParts));
+    return expr_if.getTypeAttribute();
   }
   
   private Type visitUnaryOp(String opName, int opcode, Node exprNode, GenEnv env) {

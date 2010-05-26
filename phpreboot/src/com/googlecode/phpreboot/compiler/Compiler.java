@@ -10,7 +10,6 @@ import java.lang.reflect.UndeclaredThrowableException;
 import java.util.List;
 import java.util.Objects;
 
-import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -57,7 +56,8 @@ public class Compiler {
     }
     
     ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-    cw.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC, "GenStub$"+(counter++)+'$'+name, null, "java/lang/Object", null);
+    String className = "GenStub$"+(counter++)+'$'+name;
+    cw.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
     cw.visitSource("script", null);
     
     MethodType methodType = asMethodType(function, bindMap);
@@ -84,7 +84,7 @@ public class Compiler {
     //bindMap.dump();
     //CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
     
-    MethodHandle mh = define(name, array, methodType);
+    MethodHandle mh = define(className, name, array, methodType);
     
     List<LocalVar> bindReferences = bindMap.getReferences();
     if (!bindReferences.isEmpty()) {
@@ -130,13 +130,14 @@ public class Compiler {
     }
     
     ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-    cw.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC, "GenStub$"+(counter++)+"$trace", null, "java/lang/Object", null);
+    String className = "GenStub$"+(counter++)+"$trace";
+    cw.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
     cw.visitSource("script", null);
     
     MethodType methodType = asTraceMethodType(bindMap);
     
     //XXX ricochet not yet implemented in jdk7
-    if (methodType.parameterCount() > 10) {
+    if (!LEGACY_MODE && methodType.parameterCount() > 10) {
       System.err.println("trace:"+methodType);
       System.err.println("ricochet not yet implemented, go back in interpreter mode");
       return false;
@@ -174,7 +175,7 @@ public class Compiler {
     //bindMap.dump();
     //CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
     
-    MethodHandle mh = define("trace", array, methodType);
+    MethodHandle mh = define(className, "trace", array, methodType);
     
     // record for reuse
     profile.recordTrace(bindMap, mh);
@@ -279,26 +280,42 @@ public class Compiler {
   
   // --- define
   
-  private static MethodHandle define(String name, byte[] bytecodes, MethodType methodType) {
+  private static MethodHandle define(String className, String name, byte[] bytecodes, MethodType methodType) {
     Class<?> declaredClass;
     if (ANONYMOUS_CLASS_DEFINE != null) {
       declaredClass = AnonymousLoader.define(bytecodes);
     } else {
-      declaredClass = StandardLoader.define(bytecodes);
+      if (LEGACY_MODE) {
+        declaredClass = LegacyLoader.define(className.replace('.', '/'), bytecodes);
+      } else {
+        declaredClass = StandardLoader.define(className.replace('.', '/'), bytecodes);
+      }
     }
     return MethodHandles.lookup().findStatic(declaredClass, name, methodType);
   }
   
   static final MethodHandle ANONYMOUS_CLASS_DEFINE;
+  private static final boolean LEGACY_MODE;
   static {
+    boolean legacyMode;
     MethodHandle define;
+    
     try {
-      Class<?> anonymousClassLoaderClass = Class.forName("sun.dyn.anon.AnonymousClassLoader");
-      define = MethodHandles.publicLookup().findVirtual(anonymousClassLoaderClass, "loadClass",
-          MethodType.methodType(Class.class, byte[].class));
-    } catch(ClassNotFoundException e) {
+      Class.forName("jsr292.weaver.Agent");
+      legacyMode = true;
       define = null;
+      
+    } catch(ClassNotFoundException e2) {
+      legacyMode = false;
+      try {
+        Class<?> anonymousClassLoaderClass = Class.forName("sun.dyn.anon.AnonymousClassLoader");
+        define = MethodHandles.publicLookup().findVirtual(anonymousClassLoaderClass, "loadClass",
+            MethodType.methodType(Class.class, byte[].class));
+      } catch(ClassNotFoundException e) {
+        define = null;
+      }
     }
+    LEGACY_MODE = legacyMode;
     ANONYMOUS_CLASS_DEFINE = define;
   }
   
@@ -336,8 +353,8 @@ public class Compiler {
   static class StandardLoader extends ClassLoader {
     private static final StandardLoader STANDARD_LOADER = new StandardLoader();
     
-    static Class<?> define(byte[] bytecodes) {
-      return STANDARD_LOADER.defineClass(null, bytecodes, 0, bytecodes.length);
+    static Class<?> define(String className, byte[] bytecodes) {
+      return STANDARD_LOADER.defineClass(className, bytecodes, 0, bytecodes.length);
     }
   }
 }

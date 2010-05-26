@@ -10,6 +10,9 @@ import java.lang.reflect.UndeclaredThrowableException;
 import java.util.List;
 import java.util.Objects;
 
+import jsr292.weaver.opt.Optimizer;
+
+import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -56,13 +59,17 @@ public class Compiler {
     }
     
     ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+    ClassVisitor cv = cw;
+    if (LEGACY_MODE) {
+      cv = LegacyWeaver.weave(cw);
+    }
     String className = "GenStub$"+(counter++)+'$'+name;
-    cw.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
-    cw.visitSource("script", null);
+    cv.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+    cv.visitSource("script", null);
     
     MethodType methodType = asMethodType(function, bindMap);
     String desc = methodType.toMethodDescriptorString();
-    MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC|Opcodes.ACC_STATIC, name, desc, null, null);
+    MethodVisitor mv = cv.visitMethod(Opcodes.ACC_PUBLIC|Opcodes.ACC_STATIC, name, desc, null, null);
     mv.visitCode();
     
     Gen gen = new Gen(mv);
@@ -75,9 +82,9 @@ public class Compiler {
     mv.visitMaxs(0, 0);
     mv.visitEnd();
     
-    generateStaticInit(cw);
+    generateStaticInit(cv);
     
-    cw.visitEnd();
+    cv.visitEnd();
     
     byte[] array = cw.toByteArray();
     
@@ -130,9 +137,13 @@ public class Compiler {
     }
     
     ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+    ClassVisitor cv = cw;
+    if (LEGACY_MODE) {
+      cv = LegacyWeaver.weave(cw);
+    }
     String className = "GenStub$"+(counter++)+"$trace";
-    cw.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
-    cw.visitSource("script", null);
+    cv.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+    cv.visitSource("script", null);
     
     MethodType methodType = asTraceMethodType(bindMap);
     
@@ -144,7 +155,7 @@ public class Compiler {
     }
     
     String desc = methodType.toMethodDescriptorString();
-    MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC|Opcodes.ACC_STATIC, "trace", desc, null, null);
+    MethodVisitor mv = cv.visitMethod(Opcodes.ACC_PUBLIC|Opcodes.ACC_STATIC, "trace", desc, null, null);
     mv.visitCode();
     
     Gen gen = new Gen(mv);
@@ -166,9 +177,9 @@ public class Compiler {
     mv.visitMaxs(0, 0);
     mv.visitEnd();
     
-    generateStaticInit(cw);
+    generateStaticInit(cv);
     
-    cw.visitEnd();
+    cv.visitEnd();
     
     byte[] array = cw.toByteArray();
     
@@ -197,8 +208,8 @@ public class Compiler {
   }
   
   
-  private static void generateStaticInit(ClassWriter cw) {
-    MethodVisitor mv = cw.visitMethod(Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
+  private static void generateStaticInit(ClassVisitor cv) {
+    MethodVisitor mv = cv.visitMethod(Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
     mv.visitCode();
     
     mv.visitLdcInsn(org.objectweb.asm.Type.getType(RT.class));
@@ -285,17 +296,13 @@ public class Compiler {
     if (ANONYMOUS_CLASS_DEFINE != null) {
       declaredClass = AnonymousLoader.define(bytecodes);
     } else {
-      if (LEGACY_MODE) {
-        declaredClass = LegacyLoader.define(className.replace('.', '/'), bytecodes);
-      } else {
-        declaredClass = StandardLoader.define(className.replace('.', '/'), bytecodes);
-      }
+      declaredClass = StandardLoader.define(className.replace('.', '/'), bytecodes);
     }
     return MethodHandles.lookup().findStatic(declaredClass, name, methodType);
   }
   
   static final MethodHandle ANONYMOUS_CLASS_DEFINE;
-  private static final boolean LEGACY_MODE;
+  static final boolean LEGACY_MODE;
   static {
     boolean legacyMode;
     MethodHandle define;
@@ -354,6 +361,10 @@ public class Compiler {
     private static final StandardLoader STANDARD_LOADER = new StandardLoader();
     
     static Class<?> define(String className, byte[] bytecodes) {
+      if (LEGACY_MODE) {
+        Optimizer.registerClassDefinition(className, bytecodes);
+      }
+      
       return STANDARD_LOADER.defineClass(className, bytecodes, 0, bytecodes.length);
     }
   }

@@ -1,11 +1,9 @@
-let size = 1000
+let size = 16000
 echo "P4\n#{" + size + "} #{ " + size + "}"
 
 let ITER = 50           // Mandelbrot iterations
 let LIMIT_SQUARED = 4.0 // Presquared limit
 
-n = 0
-while(n < 1) {
   byte_acc = 0
   bit_num = 0
   count_size = size - 1   // Precomputed size
@@ -61,6 +59,3 @@ while(n < 1) {
     
     y = y + 1
   }
-  
-  n = n + 1
-}

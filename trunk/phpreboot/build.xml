@@ -4,7 +4,7 @@
   <property name="tatoo-build.dir" location="build-lib"/>
   <property name="tatoo.jar" location="${tatoo-build.dir}/tatoo.jar"/>
   <property name="lib" location="lib"/>
-  <property name="libs" value="${lib}/derby.jar:${lib}/grizzly-servlet-webserver-1.9.18-k.jar:${lib}/jaxen-1.1.2.jar:${lib}/tatoo-runtime.jar:${lib}/asm-all-3.2.jar:${lib}/hs19-b01-jsr292-patch.jar"/>
+  <property name="libs" value="${lib}/derby.jar:${lib}/grizzly-servlet-webserver-1.9.18-k.jar:${lib}/jaxen-1.1.2.jar:${lib}/tatoo-runtime.jar:${lib}/asm-all-3.2.jar:${lib}/hs19-b01-jsr292-patch.jar:${lib}/jsr292-backport.jar"/>
   <property name="phpreboot.jar" value="${lib}/phpreboot.jar"/>
 	
   <property name="src" value="src"/>
@@ -61,7 +61,7 @@
   
   <target name="all" depends="jar"/>  
 	
-  <target name="full">
+  <!-- target name="full">
   	<taskdef name="jarjar" classname="com.tonicsystems.jarjar.JarJarTask"
   	         classpath="build-lib/jarjar/jarjar-1.0.jar"/>
   	<jarjar jarfile="phpreboot-full.jar">
@@ -75,7 +75,7 @@
   		    <attribute name="Main-Class" value="com.googlecode.phpreboot.Main"/>   
   		</manifest>
   	</jarjar>
-  </target>
+  </target -->
 	
   <target name="clean">
 	<delete dir="${classes}"/>

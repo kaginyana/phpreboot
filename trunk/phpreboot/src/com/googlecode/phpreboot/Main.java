@@ -24,6 +24,7 @@ import com.googlecode.phpreboot.sql.GenericSQLConnection;
 import com.googlecode.phpreboot.webserver.WebScriptDispatcher;
 import com.sun.grizzly.http.embed.GrizzlyWebServer;
 
+// Warning ! every modifications in this class must be backported in Main16
 public class Main {
   enum Option {
     verbose(": turn on verbose mode"),

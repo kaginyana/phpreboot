@@ -19,13 +19,6 @@ class LegacyLoader extends ClassLoader {
 
       @Override
       public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
-          // commented because JRuby generate class with invoke dynamic
-          // but not with version V1_7 
-          //if (version < Opcodes.V1_7)
-          //    throw STOP_ERROR;
-          
-          //System.out.println("weave "+name+" "+version);
-          
           if (version >= Opcodes.V1_7)
               version = Opcodes.V1_5;
           

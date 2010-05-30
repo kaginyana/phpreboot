@@ -448,8 +448,6 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   @Override
   public Object visit(LabeledInstrWhile labeled_instr_while, EvalEnv env) {
-    Instr instr = labeled_instr_while.getInstr();
-    Expr expr = labeled_instr_while.getExpr();
     LoopProfile profile = (LoopProfile)labeled_instr_while.getProfileAttribute();
     if (profile == null) {
       profile = new LoopProfile();
@@ -462,6 +460,9 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
         profile.counter = 0;
       }
     }
+    
+    Instr instr = labeled_instr_while.getInstr();
+    Expr expr = labeled_instr_while.getExpr();
     
     int counter = profile.counter;
     for(;;) {

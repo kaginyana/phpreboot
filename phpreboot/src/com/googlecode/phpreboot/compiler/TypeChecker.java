@@ -120,15 +120,14 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     throw RT.error("incompatible type %s %s", type, exprType);
   }
   
-  private static void isOptimiticCompatible(Var var, Type exprType) {
+  private static boolean isOptimiticCompatible(Var var, Type exprType) {
     LocalVar localVar;
-    if (!((var instanceof LocalVar) && ((localVar = (LocalVar)var)).isOptimistic())) {
+    if ((!(var instanceof LocalVar) || (!((localVar = (LocalVar)var)).isOptimistic()))) {
       isCompatible(var.getType(), exprType);
-      return; // never reached
+      return true; // reach only if compatible
     }
     
-    if (!checkOptimisticCompatible(localVar.getType(), exprType))
-      throw OptimiticAssertionException.INSTANCE;
+    return checkOptimisticCompatible(localVar.getType(), exprType);
   }
   
   private static boolean checkOptimisticCompatible(Type type, Type exprType) {
@@ -166,7 +165,7 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   
   @Override
   public Type visit(Block block, TypeCheckEnv env) {
-    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(new LocalScope(env.getScope()), env.getLoopStack(), env.getFunctionReturnType(), env.getBindMap(), env.allowOptimisticType());
+    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(new LocalScope(env.getScope()), env.getLoopStack(), env.getFunctionReturnType(), env.getBindMap(), env.allowOptimisticType(), env.getTypeProfileMap());
     Type liveness = LivenessType.ALIVE;
     
     for(Iterator<Instr> it = block.getInstrStar().iterator(); it.hasNext();) {
@@ -256,23 +255,37 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     Var var = scope.lookup(name);
     
     LocalVar localVar;
+    TypeProfileMap typeProfileMap = env.getTypeProfileMap();
     if (var == null) {
       // auto-declaration
-      Type type = PrimitiveType.ANY;
+      Type type;
       if (env.allowOptimisticType()) {
+
         // got a profile ?
         VarProfile profile = (VarProfile)assignment_id.getProfileAttribute();
         if (profile != null) {
           type = Compiler.inferType(profile.getVar().getValue());
-          
+
           // check if inferred type is compatible otherwise revert back
           if (type != PrimitiveType.ANY && !checkOptimisticCompatible(type, exprType)) {
             type = PrimitiveType.ANY;
           }
+        } else {
+          // no profile, try optimistically to use the type of the expression
+          type = Compiler.eraseAsProfile(exprType);
+        }
+
+        typeProfileMap.register(assignment_id, type);
+      } else {
+        // already typecked ?
+        type = typeProfileMap.get(assignment_id);
+        if (type == null) {
+          type = PrimitiveType.ANY;
+          typeProfileMap.register(assignment_id, type);
         }
       }
       
-      localVar = new LocalVar(name, false, type, type != PrimitiveType.ANY, scope.nextSlot(type));
+      localVar = LocalVar.createLocalVar(name, false, type, (type != PrimitiveType.ANY)? assignment_id: null, scope.nextSlot(type));
       scope.register(localVar);
       
     } else {
@@ -280,12 +293,21 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
       if (var.isReadOnly())
         throw RT.error("try to assign a read only variable %s", name);
       
-      isOptimiticCompatible(var, exprType);
-      
+      boolean isOptimisiticCompatible = isOptimiticCompatible(var, exprType);
       if (var instanceof LocalVar) {
         localVar = (LocalVar)var;
+        if (localVar.isOptimistic() && !isOptimisiticCompatible) {
+          // optimistic assertion failed
+          // record the failure and continue with any, the typecker must be re-run
+          
+          //System.err.println("optimistic assertion failed ! "+localVar.getName() + " at "+assignment_id.getLineNumberAttribute());
+          
+          typeProfileMap.validate(false);
+          typeProfileMap.register(localVar.getDeclaringNode(), PrimitiveType.ANY);
+          localVar.setType(PrimitiveType.ANY);
+        }
       } else {
-        localVar = env.getBindMap().bind(name, var.isReadOnly(), var.getValue(), var.getType(), env.allowOptimisticType());
+        localVar = env.getBindMap().bind(name, var.isReadOnly(), var.getValue(), var.getType(), env.allowOptimisticType(), typeProfileMap, assignment_id);
         scope.register(localVar);
       }
     }
@@ -385,7 +407,7 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
         if (var instanceof LocalVar) {
           localVar = (LocalVar)var;
         } else {
-          localVar = env.getBindMap().bind(name, var.isReadOnly(), function, PrimitiveType.FUNCTION, false);
+          localVar = env.getBindMap().bind(name, var.isReadOnly(), function, PrimitiveType.FUNCTION, false, env.getTypeProfileMap(), funcall_call);
           env.getScope().register(localVar);
         }
       } else {
@@ -456,7 +478,7 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     } */
     
     // bound constant
-    LocalVar bindVar = env.getBindMap().bind(name, var.isReadOnly(), value, type, env.allowOptimisticType());
+    LocalVar bindVar = env.getBindMap().bind(name, var.isReadOnly(), value, type, env.allowOptimisticType(), env.getTypeProfileMap(), expr_id);
     env.getScope().register(bindVar);
     expr_id.setSymbolAttribute(bindVar);
     return bindVar.getType();

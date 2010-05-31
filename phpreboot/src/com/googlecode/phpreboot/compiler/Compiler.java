@@ -8,10 +8,10 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.util.List;
-import java.util.Objects;
 
 import jsr292.weaver.opt.Optimizer;
 
+import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
@@ -42,14 +42,15 @@ public class Compiler {
     localScope.register(new Var(function.getName(), true, PrimitiveType.ANY, function));
     for(Parameter parameter: function.getParameters()) {
       Type type = parameter.getType();
-      localScope.register(new LocalVar(parameter.getName(), true, type, false, localScope.nextSlot(type)));
+      localScope.register(LocalVar.createLocalVar(parameter.getName(), true, type, null, localScope.nextSlot(type)));
     }
      
     Block functionNode = function.getBlock();
     TypeChecker typeChecker = new TypeChecker();
     LoopStack<Boolean> loopStack = new LoopStack<Boolean>();
     BindMap bindMap = new BindMap();
-    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, function.getReturnType(), bindMap, false);
+    TypeProfileMap typeProfileMap = new TypeProfileMap();
+    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, function.getReturnType(), bindMap, false, typeProfileMap);
     
     Type liveness;
     try {
@@ -117,23 +118,33 @@ public class Compiler {
     TypeChecker typeChecker = new TypeChecker();
     LoopStack<Boolean> loopStack = new LoopStack<Boolean>();
     BindMap bindMap = new BindMap();
-    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, /*FIXME need the enclosing return type*/null, bindMap, optimisticTrace);
+    TypeProfileMap typeProfileMap = new TypeProfileMap();
+    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, /*FIXME need the enclosing return type*/null, bindMap, optimisticTrace, typeProfileMap);
     
     try {
       typeChecker.typeCheck(labeledInstrWhile, typeCheckEnv);
     } catch(CodeNotCompilableException e) {
       return false;
-    } catch(OptimiticAssertionException e) {
-      System.err.println("optimistic typecheck failed");
-      // typecheck again but don't perform optimistic assumption
+    }
+    
+    if (!typeProfileMap.isValid()) {
+      //System.err.println("optimistic typecheck failed");
+      typeProfileMap.validate(true);
+      
+      //System.err.println("typeProfileMap "+typeProfileMap);
+      
+      // typecheck again but use the typeProfileMap instead
       bindMap = new BindMap();
       localScope = new LocalScope(scope);
-      typeCheckEnv = new TypeCheckEnv(localScope, loopStack, /*FIXME need the enclosing return type*/null, bindMap, false);
+      typeCheckEnv = new TypeCheckEnv(localScope, loopStack, /*FIXME need the enclosing return type*/null, bindMap, false, typeProfileMap);
       try {
         typeChecker.typeCheck(labeledInstrWhile, typeCheckEnv);
       } catch(CodeNotCompilableException e2) {
         return false;
       }
+      
+      if (!typeProfileMap.isValid())
+        throw new AssertionError("second typecheck invalidated !");
     }
     
     ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
@@ -286,6 +297,18 @@ public class Compiler {
   
   public static boolean enableVarProfile(Object value) {
     return inferType(value) != PrimitiveType.ANY;
+  }
+  
+  static Type eraseAsProfile(Type type) {
+    switch((PrimitiveType)type) {
+    case BOOLEAN:
+    case INT:
+    case DOUBLE:
+    case STRING:
+      return type;
+    default:
+      return PrimitiveType.ANY;   
+    }
   }
   
   

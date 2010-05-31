@@ -3,6 +3,7 @@ package com.googlecode.phpreboot.compiler;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Type;
 
@@ -12,18 +13,23 @@ public class BindMap {
   private final ArrayList<LocalVar> bindReferences =
     new ArrayList<LocalVar>();
   
-  public LocalVar bind(String name, boolean isReadOnly, Object value, Type type, boolean allowOptimiticType) {
+  public LocalVar bind(String name, boolean isReadOnly, Object value, Type type, boolean allowOptimiticType, TypeProfileMap typeProfileMap, Node declaringNode) {
     boolean optimistic;
     if (allowOptimiticType && type == PrimitiveType.ANY) {
       type = Compiler.inferType(value);
       optimistic = !(isReadOnly || type == PrimitiveType.ANY);
+      typeProfileMap.register(declaringNode, type);
     } else {
       optimistic = false;
+      Type typeProfile = typeProfileMap.get(declaringNode);
+      if (typeProfile != null) {
+        type = typeProfile;
+      }
     }
     
     int slot = slotCount;
     slotCount = slot + ((type == PrimitiveType.DOUBLE)?2 :1);
-    LocalVar constant = LocalVar.createConstantBound(name, isReadOnly, type, optimistic, value, slot);
+    LocalVar constant = LocalVar.createConstantBound(name, isReadOnly, type, (optimistic)? declaringNode: null, value, slot);
     bindReferences.add(constant);
     
     if (!isReadOnly)

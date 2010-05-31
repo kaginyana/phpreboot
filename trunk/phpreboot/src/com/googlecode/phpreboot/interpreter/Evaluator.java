@@ -178,7 +178,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   }
   
   public static final Evaluator INSTANCE = new Evaluator();
-  private static final int LOOP_COUNTER_THRESOLD = 300;
+  private static final int LOOP_COUNTER_THRESOLD = 157;
   
   // ---
   

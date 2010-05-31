@@ -5,7 +5,7 @@ import com.googlecode.phpreboot.runtime.RT;
 public class Var {
   private final String name;
   private final boolean readOnly;
-  private final Type type;
+  private Type type;  // are readonly for Var but read-write for LocalVar
   private Object value;
   
   public Var(String name, boolean readOnly, Type type, Object value) {
@@ -26,6 +26,10 @@ public class Var {
   }
   public Object getValue() {
     return value;
+  }
+  
+  protected void setType(Type type) {
+    this.type = type;
   }
   
   @Override

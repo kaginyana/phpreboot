@@ -1,5 +1,6 @@
 package com.googlecode.phpreboot.compiler;
 
+import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.model.Type;
 import com.googlecode.phpreboot.model.Var;
 
@@ -11,19 +12,15 @@ import com.googlecode.phpreboot.model.Var;
 public class LocalVar extends Var implements Symbol {
   private final int slot;
   private final boolean bound;
-  private final boolean optimistic;
+  private final /*@Nullable*/Node declaringNode;
   
   private final static Object LOCAL_VAR_MARKER = new Object();
   
-  private LocalVar(String name, boolean readOnly, Type type, boolean optimistic, Object value, boolean bound, int slot) {
+  private LocalVar(String name, boolean readOnly, Type type, Node declaringNode, Object value, boolean bound, int slot) {
     super(name, readOnly, type, value);
-    this.optimistic = optimistic;
+    this.declaringNode = declaringNode;
     this.bound = bound;
     this.slot = slot;
-  }
-  
-  public LocalVar(String name, boolean readOnly, Type type, boolean optimistic, int slot) {
-    this(name, readOnly, type, optimistic, LOCAL_VAR_MARKER, false, slot);
   }
   
   public boolean isConstant() {
@@ -35,12 +32,21 @@ public class LocalVar extends Var implements Symbol {
   }
  
   public boolean isOptimistic() {
-    return optimistic;
+    return declaringNode != null;
+  }
+  
+  public /*@Nullable*/Node getDeclaringNode() {
+    return declaringNode;
+  }
+  
+  @Override
+  public void setType(Type type) {
+    super.setType(type);
   }
   
   @Override
   public String toString() {
-    return super.toString() + " optimistic:"+optimistic+" bound:"+bound+" slot:"+slot;
+    return super.toString() + " declaringNode:"+declaringNode+" bound:"+bound+" slot:"+slot;
   }
   
   public int getSlot(int shift) {
@@ -48,10 +54,14 @@ public class LocalVar extends Var implements Symbol {
   }
   
   public static LocalVar createConstantFoldable(Object value) {
-    return new LocalVar(null, true, null, false, value, true, -1);
+    return new LocalVar(null, true, null, /*not optimistic*/null, value, true, -1);
   }
   
-  public static LocalVar createConstantBound(String name, boolean readOnly, Type type, boolean optimistic, Object value, int slot) {
-    return new LocalVar(name, readOnly, type, optimistic, value, true, slot);
+  public static LocalVar createConstantBound(String name, boolean readOnly, Type type, Node declaringNode, Object value, int slot) {
+    return new LocalVar(name, readOnly, type, declaringNode, value, true, slot);
+  }
+  
+  public static LocalVar createLocalVar(String name, boolean readOnly, Type type, Node declaringNode, int slot) {
+    return new LocalVar(name, readOnly, type, declaringNode, LOCAL_VAR_MARKER, false, slot);
   }
 }

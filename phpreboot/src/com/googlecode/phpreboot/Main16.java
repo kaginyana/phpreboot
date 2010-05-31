@@ -135,7 +135,7 @@ public class Main16 {
     //Class.forName(driverName);
     String jdbcURL = protocolScheme + ":" + dbName + ";create=true";
 
-    boolean verbose = true || optionMap.containsKey(Option.verbose);
+    boolean verbose = true /*optionMap.containsKey(Option.verbose)*/;
     
     if (optionMap.containsKey(Option.webserver)) {
       System.err.println("option -webserver is not support in legacy mode (1.6 compatible mode)");

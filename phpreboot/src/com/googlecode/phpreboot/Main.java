@@ -136,7 +136,7 @@ public class Main {
     //Class.forName(driverName);
     String jdbcURL = protocolScheme + ":" + dbName + ";create=true";
 
-    boolean verbose = true || optionMap.containsKey(Option.verbose);
+    boolean verbose = true /*optionMap.containsKey(Option.verbose)*/;
     
     if (optionMap.containsKey(Option.webserver)) {
       GrizzlyWebServer ws = new GrizzlyWebServer(8080);

@@ -119,7 +119,7 @@ public class Compiler {
     LoopStack<Boolean> loopStack = new LoopStack<Boolean>();
     BindMap bindMap = new BindMap();
     TypeProfileMap typeProfileMap = new TypeProfileMap();
-    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, /*FIXME need the enclosing return type*/null, bindMap, optimisticTrace, typeProfileMap);
+    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, /*FIXME need the enclosing return type*/PrimitiveType.VOID, bindMap, optimisticTrace, typeProfileMap);
     
     try {
       typeChecker.typeCheck(labeledInstrWhile, typeCheckEnv);
@@ -136,7 +136,7 @@ public class Compiler {
       // typecheck again but use the typeProfileMap instead
       bindMap = new BindMap();
       localScope = new LocalScope(scope);
-      typeCheckEnv = new TypeCheckEnv(localScope, loopStack, /*FIXME need the enclosing return type*/null, bindMap, false, typeProfileMap);
+      typeCheckEnv = new TypeCheckEnv(localScope, loopStack, /*FIXME need the enclosing return type*/PrimitiveType.VOID, bindMap, false, typeProfileMap);
       try {
         typeChecker.typeCheck(labeledInstrWhile, typeCheckEnv);
       } catch(CodeNotCompilableException e2) {

@@ -1,0 +1,15 @@
+
+function fun(n) {
+  echo n * 4
+}
+
+
+i = 0;
+
+while(i<3000) {
+  fun(i)
+  i = i + 1
+}
+
+echo "i = " + i
+

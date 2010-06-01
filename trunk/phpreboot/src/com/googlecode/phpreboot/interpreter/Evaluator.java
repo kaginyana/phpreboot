@@ -274,7 +274,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
         type = (Type)eval(parameterType.getType(), env);
       }
       signature[i + 1] = type.getUnboxedRuntimeClass();
-      parameters.add(new Parameter(parameterName, type));
+      parameters.add(new Parameter(parameterName, type, parameter));
     }
     
     ReturnType returnTypeNode = parametersNode.getReturnTypeOptional();
@@ -283,7 +283,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Function function = new Function(name, parameters, returnType, filterReadOnlyVars(env.getScope()), null, block);
     
     // try to compile it
-    MethodHandle compileMH = Compiler.compile(function);
+    MethodHandle compileMH = Compiler.compileFunction(function);
     if (compileMH != null) {
       function.setMethodHandle(compileMH);
       return function;

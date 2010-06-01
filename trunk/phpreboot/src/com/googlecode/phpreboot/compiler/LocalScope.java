@@ -4,7 +4,7 @@ import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Type;
 
-public class LocalScope extends Scope {
+class LocalScope extends Scope {
   private int slotCount;
   
   public LocalScope(Scope parent) {

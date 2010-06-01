@@ -2,7 +2,7 @@ package com.googlecode.phpreboot.compiler;
 
 import com.googlecode.phpreboot.model.Type;
 
-public class TypeCheckEnv {
+class TypeCheckEnv {
   private final LocalScope scope;
   private final LoopStack<Boolean> loopStack;
   private final Type functionReturnType;

@@ -5,7 +5,7 @@ import java.util.HashMap;
 import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.model.Type;
 
-public class TypeProfileMap {
+class TypeProfileMap {
   private final HashMap<Node, Type> map =
     new HashMap<Node, Type>();
   private boolean valid = true;

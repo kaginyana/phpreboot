@@ -3,7 +3,7 @@ package com.googlecode.phpreboot.compiler;
 import com.googlecode.phpreboot.compiler.LoopStack.Labels;
 import com.googlecode.phpreboot.model.Type;
 
-public class GenEnv {
+class GenEnv {
   private final int shift;
   private final /*@Nullable*/IfParts ifParts;
   private final LoopStack<Labels> loopStack;

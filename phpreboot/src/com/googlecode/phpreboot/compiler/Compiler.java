@@ -7,6 +7,7 @@ import java.io.PrintWriter;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.UndeclaredThrowableException;
+import java.util.ArrayList;
 import java.util.List;
 
 import jsr292.weaver.opt.Optimizer;
@@ -35,26 +36,85 @@ import com.googlecode.phpreboot.runtime.RT;
 public class Compiler {
   private static int counter;
   
-  public static MethodHandle compile(Function function) {
+  public static MethodHandle compileFunction(Function function) {
     String name = function.getName();
     
     LocalScope localScope = new LocalScope(function.getScope());
-    localScope.register(new Var(function.getName(), true, PrimitiveType.ANY, function));
-    for(Parameter parameter: function.getParameters()) {
+    localScope.register(new Var(name, true, PrimitiveType.ANY, function));
+    List<Parameter> parameters = function.getParameters();
+    int size = parameters.size();
+    Type[] types = new Type[size];
+    for(int i=0; i<size; i++) {
+      Parameter parameter = parameters.get(i);
       Type type = parameter.getType();
+      types[i] = type;
       localScope.register(LocalVar.createLocalVar(parameter.getName(), true, type, null, localScope.nextSlot(type)));
     }
-     
-    Block functionNode = function.getBlock();
+    
+    return compile(function.getName(), types, function.getReturnType(), function.getBlock(), false, localScope);
+  }
+  
+  public static Function traceCompileFunction(Function function, Type[] types, Type returnType) {
+    String name = function.getName();
+    
+    LocalScope localScope = new LocalScope(function.getScope());
+    localScope.register(new Var(name, true, PrimitiveType.ANY, function));
+    List<Parameter> parameters = function.getParameters();
+    int size = parameters.size();
+    Var[] vars = new Var[size];
+    for(int i=0; i<size; i++) {
+      Parameter parameter = parameters.get(i);
+      Type type = parameter.getType();
+      Node node;
+      if (type == PrimitiveType.ANY) {
+        type = types[i];
+        node = parameter.getNode();
+      } else {
+        node = null;
+      }
+      LocalVar localVar = LocalVar.createLocalVar(parameter.getName(), true, type, node, localScope.nextSlot(type));
+      vars[i] = localVar;
+      localScope.register(localVar);
+    }
+    
+    MethodHandle mh = compile(function.getName(), types, returnType, function.getBlock(), true, localScope);
+    if (mh == null)
+      return null;
+    return freshFunction(function, vars, returnType, mh);
+  }
+  
+  private static Function freshFunction(Function unspecializedFunction, Var[] vars, Type returnType, MethodHandle mh) {
+    assert unspecializedFunction.getIntrinsicInfo() == null;
+    
+    int length = vars.length;
+    ArrayList<Parameter> parameters = new ArrayList<Parameter>();
+    List<Parameter> unspecializedParameters = unspecializedFunction.getParameters();
+    for(int i=0; i<length; i++) {
+      Parameter unspecializedParameter = unspecializedParameters.get(i);
+      Parameter parameter = new Parameter(unspecializedParameter.getName(), vars[i].getType(), unspecializedParameter.getNode());
+      parameters.add(parameter);
+    }
+    
+    Function function = new Function(unspecializedFunction.getName(),
+        parameters,
+        returnType,
+        unspecializedFunction.getScope(),
+        unspecializedFunction.getIntrinsicInfo(),  // should be always null
+        unspecializedFunction.getBlock());
+    function.setMethodHandle(mh);
+    return function;
+  }
+  
+  private static MethodHandle compile(String name, Type[] types, Type returnType, Block block, boolean allowOptimistictype, LocalScope localScope) {
     TypeChecker typeChecker = new TypeChecker();
     LoopStack<Boolean> loopStack = new LoopStack<Boolean>();
     BindMap bindMap = new BindMap();
     TypeProfileMap typeProfileMap = new TypeProfileMap();
-    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, function.getReturnType(), bindMap, false, typeProfileMap);
+    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, returnType, bindMap, allowOptimistictype, typeProfileMap);
     
     Type liveness;
     try {
-      liveness = typeChecker.typeCheck(functionNode, typeCheckEnv);
+      liveness = typeChecker.typeCheck(block, typeCheckEnv);
     } catch(CodeNotCompilableException e) {
       return null;
     }
@@ -65,19 +125,19 @@ public class Compiler {
       cv = LegacyWeaver.weave(cw);
     }
     String className = "GenStub$"+(counter++)+'$'+name;
-    cv.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+    cv.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC|Opcodes.ACC_FINAL, className, null, "java/lang/Object", null);
     cv.visitSource("script", null);
     
-    MethodType methodType = asMethodType(function, bindMap);
+    MethodType methodType = asMethodType(types, returnType, bindMap);
     String desc = methodType.toMethodDescriptorString();
     MethodVisitor mv = cv.visitMethod(Opcodes.ACC_PUBLIC|Opcodes.ACC_STATIC, name, desc, null, null);
     mv.visitCode();
     
     Gen gen = new Gen(mv);
     LoopStack<Labels> labelLoopStack = new LoopStack<Labels>();
-    gen.gen(functionNode, new GenEnv(bindMap.getSlotCount(), null, labelLoopStack, null));
+    gen.gen(block, new GenEnv(bindMap.getSlotCount(), null, labelLoopStack, null));
     if (liveness == LivenessType.ALIVE) {
-      gen.defaultReturn(function.getReturnType());
+      gen.defaultReturn(returnType);
     }
     
     mv.visitMaxs(0, 0);
@@ -153,7 +213,7 @@ public class Compiler {
       cv = LegacyWeaver.weave(cw);
     }
     String className = "GenStub$"+(counter++)+"$trace";
-    cv.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+    cv.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC|Opcodes.ACC_FINAL, className, null, "java/lang/Object", null);
     cv.visitSource("script", null);
     
     MethodType methodType = asTraceMethodType(bindMap);
@@ -248,18 +308,17 @@ public class Compiler {
     return void.class;
   }
   
-  private static MethodType asMethodType(Function function, BindMap bindMap) {
-    List<Parameter> parameters = function.getParameters();
+  private static MethodType asMethodType(Type[] types, Type returnType, BindMap bindMap) {
     int count = bindMap.getReferencesCount();
-    Class<?>[] parameterArray = new Class<?>[count + 1 + parameters.size()];
+    Class<?>[] parameterArray = new Class<?>[count + 1 + types.length];
     parameterArray[0] = /*EvalEnv.class*/ Object.class;
     for(int i=0; i<count; i++) {
       parameterArray[i + 1] = asClass(bindMap.getReferenceType(i));
     }
-    for(int i = 0; i < parameters.size(); i++) {
-      parameterArray[i + count + 1] = asClass(parameters.get(i).getType());
+    for(int i = 0; i < types.length; i++) {
+      parameterArray[i + count + 1] = asClass(types[i]);
     }
-    return MethodType.methodType(asClass(function.getReturnType()), parameterArray);
+    return MethodType.methodType(asClass(returnType), parameterArray);
   }
   
   private static MethodType asTraceMethodType(BindMap bindMap) {

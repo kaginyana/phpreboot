@@ -54,7 +54,7 @@ import com.googlecode.phpreboot.runtime.RT;
 
 import static com.googlecode.phpreboot.compiler.LivenessType.*;
 
-public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
+class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   // ---
   
   public Type typeCheck(Node node, TypeCheckEnv env) {
@@ -394,22 +394,37 @@ public class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
       List<Parameter> parameters = function.getParameters();
       
       if (size != parameters.size()) {
-        throw RT.error("argument number mismath with function %s", name);
+        throw RT.error("argument number mismatch with function %s", name);
       }
       
+      Type[] exprTypes = new Type[size];
       for(int i=0; i<size; i++) {
         Type exprType = typeCheck(exprStar.get(i), env);
+        exprTypes[i] = exprType;
         isCompatible(parameters.get(i).getType(), exprType);
       }
       
       LocalVar localVar;
       if (function.getIntrinsicInfo() == null) {
+        
+        BindMap bindMap = env.getBindMap();
+        if (env.allowOptimisticType()) {
+          // try to specialize the method
+          Function specializedFunction = Compiler.traceCompileFunction(function, exprTypes, PrimitiveType.ANY/*FIXME try to infer*/);
+          if (specializedFunction != null) {
+            function = specializedFunction;
+            var = bindMap.bind(name, var.isReadOnly(), specializedFunction, PrimitiveType.FUNCTION, false, env.getTypeProfileMap(), funcall_call);
+            // ugly hack, we already know that this is a local var but it simplifies the control flow.
+          }
+        }
+        
         if (var instanceof LocalVar) {
           localVar = (LocalVar)var;
         } else {
-          localVar = env.getBindMap().bind(name, var.isReadOnly(), function, PrimitiveType.FUNCTION, false, env.getTypeProfileMap(), funcall_call);
+          localVar = bindMap.bind(name, var.isReadOnly(), function, PrimitiveType.FUNCTION, false, env.getTypeProfileMap(), funcall_call);
           env.getScope().register(localVar);
         }
+        
       } else {
         // call will be intrinsified
         localVar = LocalVar.createConstantFoldable(function);

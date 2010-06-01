@@ -45,7 +45,7 @@ public abstract class Module {
     ArrayList<Parameter> parameters = new ArrayList<Parameter>();
     Class<?>[] parameterTypes = method.getParameterTypes();
     for(int i=0; i< parameterTypes.length; i++) {
-      Parameter parameter = new Parameter("arg"+i, asType(parameterTypes[i]));
+      Parameter parameter = new Parameter("arg"+i, asType(parameterTypes[i]), null);
       parameters.add(parameter);
     }
     

@@ -82,7 +82,7 @@ import com.googlecode.phpreboot.runtime.Sequence;
 import com.googlecode.phpreboot.runtime.URI;
 import com.googlecode.phpreboot.runtime.XML;
 
-public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
+class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   private static final String VAR_INTERNAL_NAME = getInternalName(Var.class);
   private static final String FUNCTION_INTERNAL_NAME = getInternalName(Function.class);
   private static final String ARRAY_INTERNAL_NAME = getInternalName(Array.class);
@@ -321,7 +321,15 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   @Override
   public Type visit(InstrFuncall instr_funcall, GenEnv env) {
     mv.visitLineNumber(instr_funcall.getLineNumberAttribute(), new Label());
-    return gen(instr_funcall.getFuncall(), env);
+    Type type = gen(instr_funcall.getFuncall(), env);
+    if (type != PrimitiveType.VOID) {
+      if (type == PrimitiveType.DOUBLE) {
+        mv.visitInsn(POP2);
+      } else {
+        mv.visitInsn(POP);
+      }
+    }
+    return type;
   }
   
   @Override
@@ -711,8 +719,14 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     LocalVar localVar = (LocalVar)funcall_call.getSymbolAttribute();
     Function function = (Function)localVar.getValue();
     
-    StringBuilder desc = new StringBuilder();
     IntrinsicInfo intrinsicInfo = function.getIntrinsicInfo();
+    if (intrinsicInfo == null) {
+      mv.visitVarInsn(ALOAD, localVar.getSlot(0));
+      mv.visitMethodInsn(INVOKEVIRTUAL, FUNCTION_INTERNAL_NAME, "getMethodHandle", "()Ljava/dyn/MethodHandle;");
+      mv.visitVarInsn(ALOAD, 0); // environment
+    }
+    
+    StringBuilder desc = new StringBuilder();
     if (intrinsicInfo == null) {
       desc.append("(L").append(getInternalName(/*EvalEnv.class*/Object.class)).append(';');
     } else {
@@ -730,15 +744,12 @@ public class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     }
     desc.append(')');
     Type returnType = function.getReturnType();
-    if (returnType == PrimitiveType.ANY) {   //FIXME: not sure that this condition is correct !
+    /*if (returnType == PrimitiveType.ANY) {   //FIXME: not sure that this condition is correct !
       returnType = env.getExpectedType();
-    }
+    }*/
     desc.append(asASMType(returnType).getDescriptor());
     
     if (intrinsicInfo == null) {
-      mv.visitVarInsn(ALOAD, localVar.getSlot(0));
-      mv.visitMethodInsn(INVOKEVIRTUAL, FUNCTION_INTERNAL_NAME, "getMethodHandle", "()Ljava/dyn/MethodHandle;");
-      mv.visitVarInsn(ALOAD, 0); // environment
       mv.visitMethodInsn(INVOKEVIRTUAL, "java/dyn/MethodHandle", /*"invokeExact"*/ "invoke", desc.toString());
     } else {
       mv.visitMethodInsn(INVOKESTATIC, getInternalName(intrinsicInfo.getDeclaringClass()), intrinsicInfo.getName(), desc.toString());

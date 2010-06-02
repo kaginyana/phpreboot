@@ -22,6 +22,7 @@ import static org.objectweb.asm.Opcodes.ISTORE;
 import static org.objectweb.asm.Opcodes.ISUB;
 
 import java.util.List;
+import java.util.Map;
 
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
@@ -91,18 +92,30 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   private static final String RT_INTERNAL_NAME = getInternalName(RT.class);
   
   
-  
   final MethodVisitor mv;
+  private final Map<Node, Type> typeAttributeMap;
+  private final Map<Node, Symbol> symbolAttributeMap;
   
-  public Gen(MethodVisitor mv) {
+  public Gen(MethodVisitor mv, Map<Node, Type> typeAttributeMap, Map<Node, Symbol> symbolAttributeMap) {
     this.mv = mv;
+    this.typeAttributeMap = typeAttributeMap;
+    this.symbolAttributeMap = symbolAttributeMap;
   }
-  
-  
   
   
   public Type gen(Node node, GenEnv env) {
     return node.accept(this, env);
+  }
+  
+  
+  // --- attributes accessors
+  
+  Type getTypeAttribute(Node node) {
+    return typeAttributeMap.get(node);
+  }
+  
+  private Symbol getSymbolAttribute(Node node) {
+    return symbolAttributeMap.get(node);
   }
   
   
@@ -301,11 +314,11 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   public Type visit(InstrReturn instr_return, GenEnv env) {
     mv.visitLineNumber(instr_return.getLineNumberAttribute(), new Label());
     Expr expr = instr_return.getExprOptional();
-    Type type = instr_return.getTypeAttribute();
+    Type type = getTypeAttribute(instr_return);
     
     if (expr != null) {
       gen(expr, env.expectedType(type));
-      insertCast(type, expr.getTypeAttribute());
+      insertCast(type, getTypeAttribute(expr));
     }
     
     mv.visitInsn(asASMType(type).getOpcode(IRETURN));
@@ -342,7 +355,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   
   @Override
   public Type visit(AssignmentId assignment_id, GenEnv env) {
-    LocalVar var = (LocalVar)assignment_id.getSymbolAttribute();
+    LocalVar var = (LocalVar)getSymbolAttribute(assignment_id);
     Type type = var.getType();
     Type exprType = gen(assignment_id.getExpr(), env.expectedType(type));
     insertCast(type, exprType);
@@ -366,7 +379,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       }
       @Override
       Type liveness() {
-        return node.getTypeAttribute();
+        return getTypeAttribute(node);
       }
     };
   }
@@ -445,8 +458,8 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     }
     
     GenEnv newEnv = env.expectedType(PrimitiveType.ANY).ifParts(null);
-    Type left = leftNode.getTypeAttribute();
-    Type right = rightNode.getTypeAttribute();
+    Type left = getTypeAttribute(leftNode);
+    Type right = getTypeAttribute(rightNode);
     
     switch((PrimitiveType)left) {
     case BOOLEAN:
@@ -568,8 +581,8 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     }
     
     GenEnv newEnv = env.expectedType(PrimitiveType.ANY).ifParts(null);
-    Type left = leftNode.getTypeAttribute();
-    Type right = rightNode.getTypeAttribute();
+    Type left = getTypeAttribute(leftNode);
+    Type right = getTypeAttribute(rightNode);
     
     top: switch((PrimitiveType)left) {
     case INT:
@@ -667,7 +680,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       @Override
       Type gen(GenEnv env) {
         Gen.this.gen(instr, env);
-        if (instr.getTypeAttribute() == ALIVE) {
+        if (getTypeAttribute(instr) == ALIVE) {
           mv.visitJumpInsn(GOTO, start);
         }
         return null;
@@ -716,7 +729,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   
   @Override
   public Type visit(FuncallCall funcall_call, GenEnv env) {
-    LocalVar localVar = (LocalVar)funcall_call.getSymbolAttribute();
+    LocalVar localVar = (LocalVar)getSymbolAttribute(funcall_call);
     Function function = (Function)localVar.getValue();
     
     IntrinsicInfo intrinsicInfo = function.getIntrinsicInfo();
@@ -776,7 +789,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
    
   @Override
   public Type visit(ExprId expr_id, GenEnv env) {
-    LocalVar localVar = (LocalVar)expr_id.getSymbolAttribute();
+    LocalVar localVar = (LocalVar)getSymbolAttribute(expr_id);
     if (!localVar.isConstant()) {
       Type type = localVar.getType();
       mv.visitVarInsn(asASMType(type).getOpcode(ILOAD), localVar.getSlot(env.getShift())); 
@@ -790,7 +803,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     }
     
     Object value = localVar.getValue();
-    PrimitiveType type = (PrimitiveType)expr_id.getTypeAttribute();
+    PrimitiveType type = (PrimitiveType)getTypeAttribute(expr_id);
     switch(type) {
     case BOOLEAN:
       mv.visitInsn(((Boolean)value)? ICONST_1 :ICONST_0);
@@ -816,7 +829,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     //FIXME this will not work if the two expressions don't have the same type (insert cast) 
     IfParts ifParts = new IfParts(false, generator(expr_if.getExpr2()), generator(expr_if.getExpr3()));
     gen(expr_if.getExpr(), env.ifParts(ifParts));
-    return expr_if.getTypeAttribute();
+    return getTypeAttribute(expr_if);
   }
   
   private Type visitUnaryOp(String opName, int opcode, Node exprNode, GenEnv env) {
@@ -870,7 +883,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   
   @Override
   protected Type visit(Expr expr, GenEnv env) {
-    Type type = expr.getTypeAttribute();
+    Type type = getTypeAttribute(expr);
     
     List<Node> nodeList = expr.nodeList();
     Node unaryNode = nodeList.get(0);
@@ -969,7 +982,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     } else {
       mv.visitLdcInsn(value);
     }
-    return literal_value.getTypeAttribute();
+    return getTypeAttribute(literal_value);
   }
   
   @Override

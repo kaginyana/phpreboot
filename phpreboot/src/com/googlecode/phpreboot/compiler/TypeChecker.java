@@ -1,7 +1,12 @@
 package com.googlecode.phpreboot.compiler;
 
+import static com.googlecode.phpreboot.compiler.LivenessType.ALIVE;
+import static com.googlecode.phpreboot.compiler.LivenessType.DEAD;
+
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import com.googlecode.phpreboot.ast.ArrayEntry;
 import com.googlecode.phpreboot.ast.ArrayValue;
@@ -52,17 +57,24 @@ import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.parser.ProductionEnum;
 import com.googlecode.phpreboot.runtime.RT;
 
-import static com.googlecode.phpreboot.compiler.LivenessType.*;
-
 class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
-  // ---
+  private final HashMap<Node, Type> typeAttributeMap =
+    new HashMap<Node, Type>();
+  private final HashMap<Node, Symbol> symbolAttributeMap =
+    new HashMap<Node, Symbol>();
   
   public Type typeCheck(Node node, TypeCheckEnv env) {
     Type type = node.accept(this, env);
-    node.setTypeAttribute(type);
+    typeAttributeMap.put(node, type);
     return type;
   }
   
+  public Map<Node, Type> getTypeAttributeMap() {
+    return typeAttributeMap;
+  }
+  public Map<Node, Symbol> getSymbolAttributeMap() {
+    return symbolAttributeMap;
+  }
   
   // --- helpers
   
@@ -312,7 +324,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
       }
     }
     
-    assignment_id.setSymbolAttribute(localVar);
+    symbolAttributeMap.put(assignment_id, localVar);
     return localVar.getType();
   }
   
@@ -430,7 +442,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
         localVar = LocalVar.createConstantFoldable(function);
       }
       
-      funcall_call.setSymbolAttribute(localVar);
+      symbolAttributeMap.put(funcall_call, localVar);
       return function.getReturnType();
     }
     
@@ -463,7 +475,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
       
     Type type = var.getType();
     if (var instanceof LocalVar) {
-      expr_id.setSymbolAttribute((LocalVar)var);
+      symbolAttributeMap.put(expr_id, (LocalVar)var);
       return type;
     }
     
@@ -495,7 +507,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     // bound constant
     LocalVar bindVar = env.getBindMap().bind(name, var.isReadOnly(), value, type, env.allowOptimisticType(), env.getTypeProfileMap(), expr_id);
     env.getScope().register(bindVar);
-    expr_id.setSymbolAttribute(bindVar);
+    symbolAttributeMap.put(expr_id, bindVar);
     return bindVar.getType();
   }
   

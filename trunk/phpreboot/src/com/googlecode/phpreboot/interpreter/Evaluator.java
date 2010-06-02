@@ -467,7 +467,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     int counter = profile.counter;
     for(;;) {
       if (++counter > LOOP_COUNTER_THRESOLD) {
-        if (Compiler.traceCompile(labeled_instr_while, profile, true, env)) {
+        if (Compiler.traceCompileLoop(labeled_instr_while, profile, true, env)) {
           break;
         }
         counter = Integer.MIN_VALUE;  // disable trace compilation

@@ -154,8 +154,6 @@ types:
 attributes:
   lineNumber: int
   columnNumber: int
-  symbol: com.googlecode.phpreboot.compiler.Symbol
-  type: com.googlecode.phpreboot.model.Type  
   profile: com.googlecode.phpreboot.interpreter.Profile
   
 starts:

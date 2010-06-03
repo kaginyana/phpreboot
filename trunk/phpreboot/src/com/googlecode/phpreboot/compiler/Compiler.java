@@ -33,6 +33,7 @@ import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Type;
 import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.runtime.RT;
+import com.googlecode.phpreboot.runtime.RTFlag;
 
 public class Compiler {
   private static int counter;
@@ -49,11 +50,11 @@ public class Compiler {
       localScope.register(LocalVar.createLocalVar(parameter.getName(), true, type, null, localScope.nextSlot(type)));
     }
     
-    TypeChecker typeChecker = new TypeChecker();
     BindMap bindMap = new BindMap();
+    TypeChecker typeChecker = new TypeChecker(bindMap, new TypeProfileMap(), false);
     Type liveness;
     try {
-      liveness = typecheck(typeChecker, bindMap, function.getBlock(), function.getReturnType(), false, localScope);
+      liveness = typecheck(typeChecker, function.getBlock(), function.getReturnType(), localScope);
     } catch(CodeNotCompilableException e) {
       return null;
     }
@@ -61,7 +62,7 @@ public class Compiler {
     return gen(function, bindMap, liveness, typeChecker.getTypeAttributeMap(), typeChecker.getSymbolAttributeMap());
   }
   
-  public static Function traceCompileFunction(Function function, Type[] types, Type returnType) {
+  public static Function traceTypecheckFunction(Function function, Type[] types, Type returnType) {
     String name = function.getName();
     LocalScope localScope = new LocalScope(function.getScope());
     localScope.register(new Var(name, true, PrimitiveType.ANY, function));
@@ -83,11 +84,12 @@ public class Compiler {
       localScope.register(localVar);
     }
     
-    TypeChecker typeChecker = new TypeChecker();
     BindMap bindMap = new BindMap();
+    TypeChecker typeChecker = new TypeChecker(bindMap, new TypeProfileMap(), RTFlag.COMPILER_OPTIMISTIC);
+    
     Type liveness;
     try {
-      liveness = typecheck(typeChecker, bindMap, function.getBlock(), function.getReturnType(), true, localScope);
+      liveness = typecheck(typeChecker, function.getBlock(), function.getReturnType(), localScope);
     } catch(CodeNotCompilableException e) {
       return null;
     }
@@ -115,12 +117,16 @@ public class Compiler {
       parameters.add(parameter);
     }
     
-    return new Function(unspecializedFunction.getName(),
+    Map<List<Type>, Function> signatureCache = unspecializedFunction.getSignatureCache();
+    Function function = new Function(unspecializedFunction.getName(),
         parameters,
         returnType,
         unspecializedFunction.getScope(),
         unspecializedFunction.getIntrinsicInfo(),  // should be always null
+        signatureCache,
         unspecializedFunction.getBlock());
+    function.registerSignature(function);
+    return function;
   }
   
   public static class SpecializedFunctionStub {
@@ -175,7 +181,7 @@ public class Compiler {
     mv.visitCode();
     
     Gen gen = new Gen(mv, typeAttributeMap, symbolAttributeMap);
-    gen.gen(function.getBlock(), new GenEnv(bindMap.getSlotCount(), null, new LoopStack<Labels>(), new CodeCache(), null));
+    gen.gen(function.getBlock(), new GenEnv(bindMap.getSlotCount(), null, new LoopStack<Labels>(), null));
     if (liveness == LivenessType.ALIVE) {
       gen.defaultReturn(function.getReturnType());
     }
@@ -189,8 +195,10 @@ public class Compiler {
     
     byte[] array = cw.toByteArray();
     
-    bindMap.dump();
-    CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
+    if (RTFlag.DEBUG) {
+      bindMap.dump();
+      CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
+    }
     
     MethodHandle mh = define(className, name, array, methodType);
     
@@ -211,10 +219,9 @@ public class Compiler {
   }
   
   // returns the liveness of the block 
-  private static Type typecheck(TypeChecker typeChecker, BindMap bindMap, Block block, Type returnType, boolean allowOptimisticType, LocalScope localScope) throws CodeNotCompilableException {
+  private static Type typecheck(TypeChecker typeChecker, Block block, Type returnType, LocalScope localScope) throws CodeNotCompilableException {
     LoopStack<Boolean> loopStack = new LoopStack<Boolean>();
-    TypeProfileMap typeProfileMap = new TypeProfileMap();
-    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, returnType, bindMap, allowOptimisticType, typeProfileMap);
+    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, returnType);
     return typeChecker.typeCheck(block, typeCheckEnv);
   }
   
@@ -222,11 +229,11 @@ public class Compiler {
     Scope scope = env.getScope();
     LocalScope localScope = new LocalScope(scope);
     
-    TypeChecker typeChecker = new TypeChecker();
-    LoopStack<Boolean> loopStack = new LoopStack<Boolean>();
-    BindMap bindMap = new BindMap();
     TypeProfileMap typeProfileMap = new TypeProfileMap();
-    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, /*FIXME need the enclosing return type*/PrimitiveType.VOID, bindMap, optimisticTrace, typeProfileMap);
+    BindMap bindMap = new BindMap();
+    TypeChecker typeChecker = new TypeChecker(bindMap, typeProfileMap, RTFlag.COMPILER_OPTIMISTIC && optimisticTrace);
+    LoopStack<Boolean> loopStack = new LoopStack<Boolean>();
+    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, /*FIXME need the enclosing return type*/PrimitiveType.VOID);
     
     try {
       typeChecker.typeCheck(labeledInstrWhile, typeCheckEnv);
@@ -234,16 +241,19 @@ public class Compiler {
       return false;
     }
     
+    
     if (!typeProfileMap.isValid()) {
       //System.err.println("optimistic typecheck failed");
       typeProfileMap.validate(true);
+      bindMap = new BindMap();
+      typeChecker = new TypeChecker(bindMap, typeProfileMap, false);
       
       //System.err.println("typeProfileMap "+typeProfileMap);
       
       // typecheck again but use the typeProfileMap instead
-      bindMap = new BindMap();
+      
       localScope = new LocalScope(scope);
-      typeCheckEnv = new TypeCheckEnv(localScope, loopStack, /*FIXME need the enclosing return type*/PrimitiveType.VOID, bindMap, false, typeProfileMap);
+      typeCheckEnv = new TypeCheckEnv(localScope, loopStack, /*FIXME need the enclosing return type*/PrimitiveType.VOID);
       try {
         typeChecker.typeCheck(labeledInstrWhile, typeCheckEnv);
       } catch(CodeNotCompilableException e2) {
@@ -279,7 +289,7 @@ public class Compiler {
     Gen gen = new Gen(mv, typeChecker.getTypeAttributeMap(), typeChecker.getSymbolAttributeMap());
     gen.gen(labeledInstrWhile,
         new GenEnv(bindMap.getSlotCount() + bindMap.getReferencesCount(),
-            null, new LoopStack<Labels>(), new CodeCache(), null));
+            null, new LoopStack<Labels>(), null));
     
     // restore env vars
     List<LocalVar> references = bindMap.getReferences();
@@ -302,8 +312,10 @@ public class Compiler {
     
     byte[] array = cw.toByteArray();
     
-    bindMap.dump();
-    CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
+    if (RTFlag.DEBUG) {
+      bindMap.dump();
+      CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
+    }
     
     MethodHandle mh = define(className, "trace", array, methodType);
     

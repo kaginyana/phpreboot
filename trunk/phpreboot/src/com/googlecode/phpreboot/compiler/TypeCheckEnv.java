@@ -6,17 +6,11 @@ class TypeCheckEnv {
   private final LocalScope scope;
   private final LoopStack<Boolean> loopStack;
   private final Type functionReturnType;
-  private final BindMap bindMap;
-  private final boolean allowOptimisticType;
-  private final TypeProfileMap typeProfileMap;
   
-  public TypeCheckEnv(LocalScope scope, LoopStack<Boolean> loopStack, Type functionReturnType, BindMap bindMap, boolean allowOptimisticType, TypeProfileMap typeProfileMap) {
+  public TypeCheckEnv(LocalScope scope, LoopStack<Boolean> loopStack, Type functionReturnType) {
     this.scope = scope;
     this.loopStack = loopStack;
     this.functionReturnType = functionReturnType;
-    this.bindMap = bindMap;
-    this.allowOptimisticType = allowOptimisticType;
-    this.typeProfileMap = typeProfileMap;
   }
  
   public LocalScope getScope() {
@@ -27,14 +21,5 @@ class TypeCheckEnv {
   }
   public Type getFunctionReturnType() {
     return functionReturnType;
-  }
-  public BindMap getBindMap() {
-    return bindMap;
-  }
-  public boolean allowOptimisticType() {
-    return allowOptimisticType;
-  }
-  public TypeProfileMap getTypeProfileMap() {
-    return typeProfileMap;
   }
 }

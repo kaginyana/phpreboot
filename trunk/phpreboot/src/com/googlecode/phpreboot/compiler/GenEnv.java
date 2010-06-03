@@ -7,14 +7,12 @@ class GenEnv {
   private final int shift;
   private final /*@Nullable*/IfParts ifParts;
   private final LoopStack<Labels> loopStack;
-  private final CodeCache codeCache;
   private final Type expectedType;
   
-  public GenEnv(int shift, /*@Nullable*/IfParts ifParts, LoopStack<Labels> loopStack, CodeCache codeCache, Type expectedType) {
+  public GenEnv(int shift, /*@Nullable*/IfParts ifParts, LoopStack<Labels> loopStack, Type expectedType) {
     this.shift = shift;
     this.ifParts = ifParts;
     this.loopStack = loopStack;
-    this.codeCache = codeCache;
     this.expectedType = expectedType;
   }
   
@@ -30,17 +28,14 @@ class GenEnv {
   public Type getExpectedType() {
     return expectedType;
   }
-  public CodeCache getCodeCache() {
-    return codeCache;
-  }
 
   public GenEnv expectedType(Type expectedType) {
     if (this.expectedType == expectedType)
       return this;
-    return new GenEnv(shift, ifParts, loopStack, codeCache, expectedType);
+    return new GenEnv(shift, ifParts, loopStack, expectedType);
   }
   
   public GenEnv ifParts(/*@Nullable*/IfParts ifParts) {
-    return new GenEnv(shift, ifParts, loopStack, codeCache, expectedType);
+    return new GenEnv(shift, ifParts, loopStack, expectedType);
   }
 }

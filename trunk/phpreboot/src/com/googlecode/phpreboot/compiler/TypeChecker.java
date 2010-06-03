@@ -3,6 +3,7 @@ package com.googlecode.phpreboot.compiler;
 import static com.googlecode.phpreboot.compiler.LivenessType.ALIVE;
 import static com.googlecode.phpreboot.compiler.LivenessType.DEAD;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -62,6 +63,17 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     new HashMap<Node, Type>();
   private final HashMap<Node, Symbol> symbolAttributeMap =
     new HashMap<Node, Symbol>();
+  private final HashMap<Function,LocalVar> functionToLocalMap =
+    new HashMap<Function, LocalVar>();
+  private final BindMap bindMap;
+  private final TypeProfileMap typeProfileMap;
+  private final boolean allowOptimisticType;
+  
+  public TypeChecker(BindMap bindMap, TypeProfileMap typeProfileMap, boolean allowOptimisticType) {
+    this.bindMap = bindMap;
+    this.typeProfileMap = typeProfileMap;
+    this.allowOptimisticType = allowOptimisticType;
+  }
   
   public Type typeCheck(Node node, TypeCheckEnv env) {
     Type type = node.accept(this, env);
@@ -74,6 +86,12 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   }
   public Map<Node, Symbol> getSymbolAttributeMap() {
     return symbolAttributeMap;
+  }
+  public TypeProfileMap getTypeProfileMap() {
+    return typeProfileMap;
+  }
+  public BindMap getBindMap() {
+    return bindMap;
   }
   
   // --- helpers
@@ -177,7 +195,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   
   @Override
   public Type visit(Block block, TypeCheckEnv env) {
-    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(new LocalScope(env.getScope()), env.getLoopStack(), env.getFunctionReturnType(), env.getBindMap(), env.allowOptimisticType(), env.getTypeProfileMap());
+    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(new LocalScope(env.getScope()), env.getLoopStack(), env.getFunctionReturnType());
     Type liveness = LivenessType.ALIVE;
     
     for(Iterator<Instr> it = block.getInstrStar().iterator(); it.hasNext();) {
@@ -267,11 +285,11 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     Var var = scope.lookup(name);
     
     LocalVar localVar;
-    TypeProfileMap typeProfileMap = env.getTypeProfileMap();
+    TypeProfileMap typeProfileMap = this.typeProfileMap;
     if (var == null) {
       // auto-declaration
       Type type;
-      if (env.allowOptimisticType()) {
+      if (allowOptimisticType) {
 
         // got a profile ?
         VarProfile profile = (VarProfile)assignment_id.getProfileAttribute();
@@ -319,7 +337,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
           localVar.setType(PrimitiveType.ANY);
         }
       } else {
-        localVar = env.getBindMap().bind(name, var.isReadOnly(), var.getValue(), var.getType(), env.allowOptimisticType(), typeProfileMap, assignment_id);
+        localVar = bindMap.bind(name, var.isReadOnly(), var.getValue(), var.getType(), allowOptimisticType, typeProfileMap, assignment_id);
         scope.register(localVar);
       }
     }
@@ -394,7 +412,8 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   public Type visit(FuncallCall funcall_call, TypeCheckEnv env) {
     String name = funcall_call.getId().getValue();
     List<Expr> exprStar = funcall_call.getExprStar();
-    Var var = env.getScope().lookup(name);
+    LocalScope scope = env.getScope();
+    Var var = scope.lookup(name);
     if (var != null) {
       Object value = var.getValue();
       if (!(value instanceof Function)) {
@@ -409,32 +428,43 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
         throw RT.error("argument number mismatch with function %s", name);
       }
       
-      Type[] exprTypes = new Type[size];
+      Type[] typeProfile = new Type[size];
       for(int i=0; i<size; i++) {
         Type exprType = typeCheck(exprStar.get(i), env);
-        exprTypes[i] = exprType;
+        typeProfile[i] = Compiler.eraseAsProfile(exprType);
         isCompatible(parameters.get(i).getType(), exprType);
       }
       
       LocalVar localVar;
       if (function.getIntrinsicInfo() == null) {
         
-        BindMap bindMap = env.getBindMap();
-        if (env.allowOptimisticType()) {
+        if (allowOptimisticType) {
           // try to specialize the method
-          Function specializedFunction = Compiler.traceCompileFunction(function, exprTypes, PrimitiveType.ANY/*FIXME try to infer*/);
+          
+          List<Type> typeProfileList = Arrays.asList(typeProfile);
+          Function specializedFunction = function.lookupSignature(typeProfileList);
+          if (specializedFunction == null) {
+            specializedFunction = Compiler.traceTypecheckFunction(function, typeProfile, PrimitiveType.ANY/*FIXME try to infer*/); 
+          } 
           if (specializedFunction != null) {
+            LocalVar functionVar = functionToLocalMap.get(specializedFunction);
+            if (functionVar == null) {
+              functionVar = bindMap.bind(name, var.isReadOnly(), specializedFunction, PrimitiveType.FUNCTION, false, typeProfileMap, funcall_call);
+              functionToLocalMap.put(specializedFunction, functionVar);
+            }
+            var = functionVar;
             function = specializedFunction;
-            var = bindMap.bind(name, var.isReadOnly(), specializedFunction, PrimitiveType.FUNCTION, false, env.getTypeProfileMap(), funcall_call);
-            // ugly hack, we already know that this is a local var but it simplifies the control flow.
           }
         }
         
         if (var instanceof LocalVar) {
           localVar = (LocalVar)var;
         } else {
-          localVar = bindMap.bind(name, var.isReadOnly(), function, PrimitiveType.FUNCTION, false, env.getTypeProfileMap(), funcall_call);
-          env.getScope().register(localVar);
+          localVar = functionToLocalMap.get(function);
+          if (localVar == null) {
+            localVar = bindMap.bind(name, var.isReadOnly(), function, PrimitiveType.FUNCTION, false, typeProfileMap, funcall_call);
+            functionToLocalMap.put(function, localVar);
+          }
         }
         
       } else {
@@ -505,7 +535,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     } */
     
     // bound constant
-    LocalVar bindVar = env.getBindMap().bind(name, var.isReadOnly(), value, type, env.allowOptimisticType(), env.getTypeProfileMap(), expr_id);
+    LocalVar bindVar = bindMap.bind(name, var.isReadOnly(), value, type, allowOptimisticType, typeProfileMap, expr_id);
     env.getScope().register(bindVar);
     symbolAttributeMap.put(expr_id, bindVar);
     return bindVar.getType();

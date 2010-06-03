@@ -110,6 +110,7 @@ import com.googlecode.phpreboot.parser.ProductionEnum;
 import com.googlecode.phpreboot.regex.RegexEvaluator;
 import com.googlecode.phpreboot.runtime.Array;
 import com.googlecode.phpreboot.runtime.RT;
+import com.googlecode.phpreboot.runtime.RTFlag;
 import com.googlecode.phpreboot.runtime.Sequence;
 import com.googlecode.phpreboot.runtime.XML;
 import com.googlecode.phpreboot.runtime.RT.RTError;
@@ -280,13 +281,22 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     ReturnType returnTypeNode = parametersNode.getReturnTypeOptional();
     Type returnType = (returnTypeNode == null)? PrimitiveType.ANY: (Type)eval(returnTypeNode.getType(), env);
     
-    Function function = new Function(name, parameters, returnType, filterReadOnlyVars(env.getScope()), null, block);
+    Function function = new Function(name,
+        parameters,
+        returnType,
+        filterReadOnlyVars(env.getScope()),
+        null,
+        new HashMap<List<Type>, Function>(),
+        block);
+    function.registerSignature(function);
     
     // try to compile it
-    MethodHandle compileMH = Compiler.compileFunction(function);
-    if (compileMH != null) {
-      function.setMethodHandle(compileMH);
-      return function;
+    if (RTFlag.COMPILER_ENABLE) {
+      MethodHandle compileMH = Compiler.compileFunction(function);
+      if (compileMH != null) {
+        function.setMethodHandle(compileMH);
+        return function;
+      }
     }
     
     MethodHandle mh = MethodHandles.lookup().findVirtual(Function.class, "call",
@@ -466,7 +476,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     
     int counter = profile.counter;
     for(;;) {
-      if (++counter > LOOP_COUNTER_THRESOLD) {
+      if (RTFlag.COMPILER_TRACE && ++counter > LOOP_COUNTER_THRESOLD) {
         if (Compiler.traceCompileLoop(labeled_instr_while, profile, true, env)) {
           break;
         }

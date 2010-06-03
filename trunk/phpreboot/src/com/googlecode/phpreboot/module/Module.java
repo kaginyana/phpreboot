@@ -62,7 +62,7 @@ public abstract class Module {
       name = method.getName();
     }
     IntrinsicInfo instrinsicInfo = new IntrinsicInfo(declaringClass, name);
-    return new Function(method.getName(), parameters, asType(method.getReturnType()), null, instrinsicInfo, null);
+    return new Function(method.getName(), parameters, asType(method.getReturnType()), null, instrinsicInfo, null, null);
   }
   
   private static Type asType(Class<?> runtimeClass) {

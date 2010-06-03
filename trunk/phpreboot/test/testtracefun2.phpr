@@ -1,0 +1,14 @@
+
+function fun(n) {
+  return n + 1
+}
+
+
+i = 0;
+
+while(i<300000) {
+  i = fun(i)
+}
+
+echo "i = " + i
+

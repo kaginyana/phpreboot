@@ -1,0 +1,12 @@
+//function tak(int X, int Y, int Z):int {
+
+function tak(X, Y, Z) {
+  if (Y >= X)
+    return Z
+  return tak(
+    tak(X-1, Y, Z),
+    tak(Y-1, Z, X),
+    tak(Z-1, X, Y))
+}
+
+tak(24, 16, 8)

@@ -8,6 +8,7 @@ i = 0;
 
 while(i<3000) {
   fun(i)
+  fun(i)
   i = i + 1
 }
 

@@ -37,6 +37,24 @@ public class Scope {
     varMap.put(name, var);
   }
   
+  //FIXME remove this method
+  public void replace(Var var, Var newVar) {
+    assert var.getName().equals(newVar.getName());
+    String name = var.getName();
+    
+    Var value = varMap.get(name);
+    if (var == value) {
+      varMap.put(name, newVar);
+      return;
+    } else {
+      if (value != null)
+        throw new IllegalStateException();
+    }
+    if (parent == null)
+      throw new IllegalStateException();
+    parent.replace(var, newVar);
+  }
+  
   public boolean localExists(String name) {
     return varMap.containsKey(name);
   }

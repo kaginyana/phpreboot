@@ -29,6 +29,7 @@ public interface Profile {
     boolean callTrace(EvalEnv env) {
       // check if bindMap is compatible with current env
       // and create the trace parameter array
+      BindMap bindMap = this.bindMap;
       List<LocalVar> references = bindMap.getReferences();
       int size = references.size();
       int outputVarCount = bindMap.getOutputVarCount();

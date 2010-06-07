@@ -6,7 +6,7 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
 
 class LegacyWeaver extends OnlineWeaver {
-  public LegacyWeaver(ClassVisitor cv, boolean retransform) {
+  private LegacyWeaver(ClassVisitor cv, boolean retransform) {
     super(cv, retransform);
   }
 

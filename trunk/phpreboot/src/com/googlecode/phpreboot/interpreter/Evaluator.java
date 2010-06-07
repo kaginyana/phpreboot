@@ -98,6 +98,7 @@ import com.googlecode.phpreboot.ast.Visitor;
 import com.googlecode.phpreboot.ast.XmlsEmptyTag;
 import com.googlecode.phpreboot.ast.XmlsStartEndTag;
 import com.googlecode.phpreboot.compiler.Compiler;
+import com.googlecode.phpreboot.compiler.Compiler.CompileFunctionStub;
 import com.googlecode.phpreboot.flwor.XPathExprVisitor;
 import com.googlecode.phpreboot.interpreter.Profile.LoopProfile;
 import com.googlecode.phpreboot.interpreter.Profile.VarProfile;
@@ -124,7 +125,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     ReturnError() {
       // do nothing
     }
-    
+
     static ReturnError instance(Object value) {
       ReturnError instance = INSTANCE;
       instance.value = value;
@@ -179,7 +180,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   }
   
   public static final Evaluator INSTANCE = new Evaluator();
-  private static final int LOOP_COUNTER_THRESOLD = 157;
+  
   
   // ---
   
@@ -196,7 +197,8 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     scope.register(new Var(function.getName(), true, PrimitiveType.ANY, function));
     
     List<Parameter> parameters = function.getParameters();
-    for(int i = 0; i<parameters.size(); i++) {
+    int parameterSize = parameters.size();
+    for(int i = 0; i<parameterSize; i++) {
       Parameter parameter = parameters.get(i);
       Var var = new Var(parameter.getName(), true, parameter.getType(), arguments[i]);
       scope.register(var);
@@ -290,15 +292,6 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
         block);
     function.registerSignature(function);
     
-    // try to compile it
-    if (RTFlag.COMPILER_ENABLE) {
-      MethodHandle compileMH = Compiler.compileFunction(function);
-      if (compileMH != null) {
-        function.setMethodHandle(compileMH);
-        return function;
-      }
-    }
-    
     MethodHandle mh = MethodHandles.lookup().findVirtual(Function.class, "call",
         MethodType.methodType(Object.class, /*EvalEnv.class*/ Object.class, Object[].class));
     mh = MethodHandles.insertArguments(mh, 0, function);
@@ -308,6 +301,11 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     mh = MethodHandles.convertArguments(mh, functionType);
     
     //System.err.println("create function handle "+name+" "+functionType);
+    
+    // install compiler stub
+    if (RTFlag.COMPILER_ENABLE) {
+      mh = CompileFunctionStub.compileStub(function, mh, functionType);
+    }
     
     function.setMethodHandle(mh);
     return function;
@@ -476,8 +474,8 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     
     int counter = profile.counter;
     for(;;) {
-      if (RTFlag.COMPILER_TRACE && ++counter > LOOP_COUNTER_THRESOLD) {
-        if (Compiler.traceCompileLoop(labeled_instr_while, profile, true, env)) {
+      if (RTFlag.COMPILER_TRACE && ++counter > RTFlag.COMPILER_TRACE_THRESHOLD) {
+        if (Compiler.traceCompileAndExec(labeled_instr_while, profile, true, env)) {
           break;
         }
         counter = Integer.MIN_VALUE;  // disable trace compilation

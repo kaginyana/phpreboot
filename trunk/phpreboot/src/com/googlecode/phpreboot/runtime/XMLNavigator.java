@@ -97,7 +97,7 @@ public class XMLNavigator extends DefaultNavigator {
 
   @Override
   public XPath parseXPath(String xpathExpr) throws JaxenException {
-    System.err.println("xpath expression "+xpathExpr);
+    //System.err.println("xpath expression "+xpathExpr);
     return new BaseXPath(xpathExpr, this);
   }
   

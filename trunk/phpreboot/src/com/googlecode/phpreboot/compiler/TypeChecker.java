@@ -69,7 +69,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   private final TypeProfileMap typeProfileMap;
   private final boolean allowOptimisticType;
   
-  public TypeChecker(BindMap bindMap, TypeProfileMap typeProfileMap, boolean allowOptimisticType) {
+  TypeChecker(BindMap bindMap, TypeProfileMap typeProfileMap, boolean allowOptimisticType) {
     this.bindMap = bindMap;
     this.typeProfileMap = typeProfileMap;
     this.allowOptimisticType = allowOptimisticType;
@@ -87,22 +87,16 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   public Map<Node, Symbol> getSymbolAttributeMap() {
     return symbolAttributeMap;
   }
-  public TypeProfileMap getTypeProfileMap() {
-    return typeProfileMap;
-  }
-  public BindMap getBindMap() {
-    return bindMap;
-  }
   
   // --- helpers
   
-  private Type typeCheckUnaryOp(Type type) {
+  private static Type typeCheckUnaryOp(Type type) {
     if (type == PrimitiveType.ANY ||  type == PrimitiveType.INT ||  type == PrimitiveType.DOUBLE)
       return type;
     throw RT.error("illegal type %s for unary expression", type);
   }
   
-  private Type typeCheckBinaryOp(Type left, Type right) {
+  private static Type typeCheckBinaryOp(Type left, Type right) {
     if (left == PrimitiveType.ANY || right == PrimitiveType.ANY )
       return PrimitiveType.ANY;
     if (left == PrimitiveType.INT) {
@@ -122,7 +116,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     throw RT.error("illegal types %s,%s for a binary expression", left, right);
   }
   
-  private void checkIsTestable(Type type) {
+  private static void checkIsTestable(Type type) {
     switch((PrimitiveType)type) {
     case ANY:
     case INT:
@@ -134,7 +128,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     }
   }
   
-  private Type typeCheckBinaryTest(Type left, Type right) {
+  private static Type typeCheckBinaryTest(Type left, Type right) {
     checkIsTestable(left);
     checkIsTestable(right);
     return PrimitiveType.BOOLEAN;
@@ -161,9 +155,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   }
   
   private static boolean checkOptimisticCompatible(Type type, Type exprType) {
-    if (type == exprType)
-      return true;
-    return type == PrimitiveType.DOUBLE && exprType == PrimitiveType.INT;
+    return type == exprType || (type == PrimitiveType.DOUBLE && exprType == PrimitiveType.INT);
   }
   
   private static Type commonSuperType(Type type1, Type type2) {
@@ -381,7 +373,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     return ALIVE;
   }
   
-  private Type visitBreakOrContinue(/*@Nullable*/IdToken idToken, TypeCheckEnv env) {
+  private static Type visitBreakOrContinue(/*@Nullable*/IdToken idToken, TypeCheckEnv env) {
     LoopStack<Boolean> loopStack = env.getLoopStack();
     if (idToken == null) {
       if (loopStack.current() == null) {

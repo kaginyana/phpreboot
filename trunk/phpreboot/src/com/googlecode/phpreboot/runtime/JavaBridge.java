@@ -2,6 +2,7 @@ package com.googlecode.phpreboot.runtime;
 
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 public class JavaBridge {
   public static Iterator<Object> iterator(final Sequence sequence) {
@@ -44,6 +45,9 @@ public class JavaBridge {
       
       @Override
       public Array.Entry next() {
+        if (seq == null)
+          throw new NoSuchElementException();
+        
         // no defensive copy here
         Array.Entry entry = seq; 
         seq = seq.next();

@@ -7,7 +7,7 @@ class TypeCheckEnv {
   private final LoopStack<Boolean> loopStack;
   private final Type functionReturnType;
   
-  public TypeCheckEnv(LocalScope scope, LoopStack<Boolean> loopStack, Type functionReturnType) {
+  TypeCheckEnv(LocalScope scope, LoopStack<Boolean> loopStack, Type functionReturnType) {
     this.scope = scope;
     this.loopStack = loopStack;
     this.functionReturnType = functionReturnType;

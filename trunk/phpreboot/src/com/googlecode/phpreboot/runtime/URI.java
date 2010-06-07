@@ -126,12 +126,12 @@ public class URI {
     }
     
     String newPath;
-    if (path.endsWith("/")) {  // if there is a trailing slash
-      int length = path.length() - 2;
-      if (length <= 0) {
+    int length = path.length();
+    if (length > 0 && path.charAt(length - 1) == '/') {  // if there is a trailing slash
+      if (length <= 2) {
         newPath="/"; 
       } else {
-        int index = path.lastIndexOf('/', length);
+        int index = path.lastIndexOf('/', length - 2);
         newPath = path.substring(0, index);
       }
     } else {

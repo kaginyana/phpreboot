@@ -15,7 +15,7 @@ public class Scope {
   }
   
   public Scope(Scope parent) {
-    this(new HashMap<String, Var>(), parent);
+    this(new HashMap<String, Var>(16), parent);
   }
   
   public Scope getParent() {
@@ -23,6 +23,7 @@ public class Scope {
   }
   
   public Var lookup(String name) {
+    //FIXME remove recursive tailcall
     Var symbol = varMap.get(name);
     if (symbol != null || parent == null)
       return symbol;
@@ -46,10 +47,11 @@ public class Scope {
     if (var == value) {
       varMap.put(name, newVar);
       return;
-    } else {
-      if (value != null)
-        throw new IllegalStateException();
     }
+    
+    if (value != null)
+      throw new IllegalStateException();
+
     if (parent == null)
       throw new IllegalStateException();
     parent.replace(var, newVar);

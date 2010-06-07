@@ -71,7 +71,7 @@ public class Function {
   }
   // A call to this method is only valid if intrinsicInfo is null
   public void registerSignature(Function function) {
-    signatureCache.put(function.getParameterTypes(), function);
+    signatureCache.put(function.parameterTypes, function);
   }
   
   public MethodHandle getMethodHandle() {

@@ -7,12 +7,12 @@ import com.googlecode.phpreboot.model.Type;
 class LocalScope extends Scope {
   private int slotCount;
   
-  public LocalScope(Scope parent) {
+  LocalScope(Scope parent) {
     super(parent);
     slotCount = 0;
   }
   
-  public LocalScope(LocalScope parent) {
+  LocalScope(LocalScope parent) {
     super(parent);
     slotCount = parent.slotCount;
   }

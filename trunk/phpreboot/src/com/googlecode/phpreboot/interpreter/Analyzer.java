@@ -20,6 +20,10 @@ import fr.umlv.tatoo.runtime.tools.SemanticStack;
 import fr.umlv.tatoo.runtime.tools.builder.Builder.AnalyzerParserBuilder;
 
 public class Analyzer {
+  private Analyzer() {
+    // enforce utility class
+  }
+
   static class InterpreterRuleActivator implements RuleActivator<RuleEnum> {
     private final RuleActivator<RuleEnum> ruleActivator;
     private final Interpreter interpreter;
@@ -45,10 +49,11 @@ public class Analyzer {
       return rules;
     }
     
-    private RuleEnum[] suppressLineCommentRule(RuleEnum[] activeRules) {
+    private static RuleEnum[] suppressLineCommentRule(RuleEnum[] activeRules) {
       RuleEnum[] rules = new RuleEnum[activeRules.length - 1];
       int j = 0;
-      for(int i=0; i<activeRules.length; i++) {
+      int length = activeRules.length;
+      for(int i=0; i<length; i++) {
         RuleEnum rule = activeRules[i];
         if (rule != RuleEnum.oneline_comment) {
           rules[j++] = rule;

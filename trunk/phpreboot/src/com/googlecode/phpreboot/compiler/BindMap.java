@@ -11,7 +11,7 @@ public class BindMap {
   private int slotCount = 1;    // 0 == EvalEnv
   private int outputVarCount = 0;
   private final ArrayList<LocalVar> bindReferences =
-    new ArrayList<LocalVar>();
+    new ArrayList<LocalVar>(16);
   
   public LocalVar bind(String name, boolean isReadOnly, Object value, Type type, boolean allowOptimiticType, TypeProfileMap typeProfileMap, Node declaringNode) {
     boolean optimistic;

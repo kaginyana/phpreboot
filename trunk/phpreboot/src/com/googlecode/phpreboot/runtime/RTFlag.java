@@ -11,12 +11,19 @@ public class RTFlag {
   
   private static boolean getOption(String name, boolean defaultValue) {
     Object value = getOption(name);
-    return (value != null)? true: defaultValue;
+    return (value != null) || defaultValue;
   }
+  private static int getOption(String name, int defaultValue) {
+    Object value = getOption(name);
+    return (value != null)? Integer.parseInt(value.toString()): defaultValue;
+  }
+  
+  public static final boolean DEBUG = getOption("debug", false);
   
   public static final boolean COMPILER_ENABLE = getOption("compiler.enable", true);
   public static final boolean COMPILER_OPTIMISTIC = getOption("compiler.optimistic", true);
   public static final boolean COMPILER_TRACE = getOption("compiler.trace", true);
   
-  public static final boolean DEBUG = getOption("debug", false);
+  public static final int COMPILER_FUNCTION_THRESHOLD = getOption("compiler.function.threshold", 203);
+  public static final int COMPILER_TRACE_THRESHOLD = getOption("compiler.trace.threshold", 157);
 }

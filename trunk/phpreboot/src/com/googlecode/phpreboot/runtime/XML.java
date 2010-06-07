@@ -85,8 +85,9 @@ public class XML implements /*Sequenceable,*/ ArrayAccess {
    * @return the attributs of the XML markups as an array
    */
   public Array attributes() {
+    Array attributes = this.attributes;
     if (attributes == null)
-      return attributes = new Array();
+      return this.attributes = new Array();
     return attributes;
   }
   
@@ -95,8 +96,9 @@ public class XML implements /*Sequenceable,*/ ArrayAccess {
    * @return the elements of the current XML markups.
    */
   public Array elements() {
+    Array elements = this.elements;
     if (elements == null)
-      return elements = new Array();
+      return this.elements = new Array();
     return elements;
   }
   
@@ -116,7 +118,7 @@ public class XML implements /*Sequenceable,*/ ArrayAccess {
     for(; seq != null; seq = seq.next()) {
       RT.escapeXML(builder, seq.getValue());
     }
-    builder.append("</").append(name).append(">");
+    builder.append("</").append(name).append('>');
     return builder.toString();
   }
   

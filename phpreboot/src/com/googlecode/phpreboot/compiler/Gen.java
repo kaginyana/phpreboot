@@ -390,7 +390,6 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     return (opcode % 2 == 0)? opcode - 1: opcode + 1;
   }
   
-  @SuppressWarnings({"StringEquality"})
   private static String inverseTestOpName(String opName) {
     //FIXME replace by a switch on string when eclipse supports 1.7
     if (opName == "lt")

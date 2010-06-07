@@ -174,6 +174,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   private static final org.objectweb.asm.Type ASM_URI_TYPE = org.objectweb.asm.Type.getType(URI.class);
 
   void defaultReturn(Type returnType) {
+    MethodVisitor mv = this.mv;
     switch((PrimitiveType)returnType) {
     case VOID:
       break;
@@ -182,10 +183,10 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       mv.visitInsn(ICONST_0);
       break;
     case DOUBLE:
-      mv.visitInsn(DCONST_0);
+      this.mv.visitInsn(DCONST_0);
       break;
     default:
-      mv.visitInsn(ACONST_NULL);
+      this.mv.visitInsn(ACONST_NULL);
     }
     
     mv.visitInsn(asASMType(returnType).getOpcode(IRETURN));
@@ -194,7 +195,8 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   private void insertCast(Type type, Type exprType) {
     if (type == exprType)
       return;
-    
+
+    MethodVisitor mv = this.mv;
     if (type == PrimitiveType.DOUBLE && exprType == PrimitiveType.INT) {
       mv.visitInsn(I2D);
       return;
@@ -388,6 +390,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     return (opcode % 2 == 0)? opcode - 1: opcode + 1;
   }
   
+  @SuppressWarnings({"StringEquality"})
   private static String inverseTestOpName(String opName) {
     //FIXME replace by a switch on string when eclipse supports 1.7
     if (opName == "lt")
@@ -701,12 +704,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   public Type visit(InstrBreak instr_break, GenEnv env) {
     LoopStack<Labels> loopStack = env.getLoopStack();
     IdToken idToken = instr_break.getIdOptional();
-    Labels labels;
-    if (idToken == null) {
-      labels = loopStack.current();
-    } else {
-      labels = loopStack.lookup(idToken.getValue());
-    }
+    Labels labels = (idToken == null)? loopStack.current(): loopStack.lookup(idToken.getValue());
     mv.visitLabel(labels.breakLabel);
     return null;
   }
@@ -748,7 +746,8 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     
     List<Expr> exprStar = funcall_call.getExprStar();
     List<Parameter> parameters = function.getParameters();
-    for(int i=0; i<exprStar.size(); i++) {
+    int size = exprStar.size();
+    for(int i=0; i<size; i++) {
       Expr expr = exprStar.get(i);
       Type expectedType = parameters.get(i).getType();
       Type exprType = gen(expr, env.expectedType(expectedType));
@@ -936,6 +935,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   // --- literals
   
   private  void integerConst(int value) {
+    MethodVisitor mv = this.mv;
     if (value >= -1 && value <= 5) {
       mv.visitInsn(ICONST_0 + value);
       return;
@@ -1008,6 +1008,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   
   @Override
   public Type visit(LiteralArrayEntry literal_array_entry, GenEnv env) {
+    MethodVisitor mv = this.mv;
     mv.visitTypeInsn(NEW, ARRAY_INTERNAL_NAME);
     mv.visitInsn(DUP);
     mv.visitMethodInsn(INVOKESPECIAL, ARRAY_INTERNAL_NAME, "<init>", "()V");

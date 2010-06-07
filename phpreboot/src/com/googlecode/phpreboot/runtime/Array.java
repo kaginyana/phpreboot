@@ -53,8 +53,8 @@ public final class Array implements Sequenceable, ArrayAccess {
   public Array() {
     table = new Entry[16];
     threshold = 12;
-    header = new Entry(null, null, null, null);
-    header.before = header.after = header;
+    Entry header = new Entry(null, null, null, null);
+    this.header = header.before = header.after = header;
   }
 
   public int size() {
@@ -63,10 +63,6 @@ public final class Array implements Sequenceable, ArrayAccess {
   
   public boolean isEmpty() {
     return size == 0;
-  }
-  
-  boolean isIndexedArray() {
-    return size == nextIndex;
   }
 
   private static int hashIndex(Object key, int length) {
@@ -96,7 +92,8 @@ public final class Array implements Sequenceable, ArrayAccess {
         return;
       }
     }
-    
+
+    Entry header = this.header;
     Entry e = new Entry(key, value, table[i], header);
     e.after  = header;
     e.before = header.before;
@@ -120,7 +117,8 @@ public final class Array implements Sequenceable, ArrayAccess {
         return e;
       }
     }
-    
+
+    Entry header = this.header;
     Entry e = new Entry(key, null, table[i], header);
     e.after  = header;
     e.before = header.before;
@@ -209,7 +207,7 @@ public final class Array implements Sequenceable, ArrayAccess {
         e.next = newTable[i];
         newTable[i] = e;
     }
-    table = newTable;
+    this.table = newTable;
     threshold = newCapacity + newCapacity >> 1;
   }
 
@@ -290,7 +288,7 @@ public final class Array implements Sequenceable, ArrayAccess {
       return "[]";
     
     Entry header = this.header;
-    StringBuilder builder = new StringBuilder(); 
+    StringBuilder builder = new StringBuilder(64); 
     
     // optimistic, try to print as an array, we may revert back
     if (size == nextIndex) {

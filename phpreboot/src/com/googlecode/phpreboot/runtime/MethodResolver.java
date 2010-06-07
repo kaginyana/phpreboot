@@ -31,7 +31,7 @@ class MethodResolver {
     // accessible class
     try {
       method.setAccessible(true);
-    } catch(SecurityException e) {
+    } catch(SecurityException ignored) {
       return null;
     }
     
@@ -48,14 +48,14 @@ class MethodResolver {
 
   private static ArrayList<Method> gatherMethods(Class<?> declaringClass, String name, int parameterCount) {
     ArrayList<Method> list = new ArrayList<Method>();
-    loop: for(Method method: declaringClass.getMethods()) {
+    for(Method method: declaringClass.getMethods()) {
       String methodName = method.getName();
       Class<?>[] parameterTypes = method.getParameterTypes();
       if (parameterTypes.length != parameterCount) {
-        continue loop; 
+        continue;
       }
       if (!name.equals(methodName)) {
-        continue loop;
+        continue;
       }
       
       list.add(method);

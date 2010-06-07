@@ -36,7 +36,11 @@ import com.googlecode.phpreboot.runtime.RT;
 import com.googlecode.phpreboot.runtime.RTFlag;
 
 public class Compiler {
-  private static int counter;
+  private static int COUNTER;
+
+  private Compiler() {
+    //enforce utility class
+  }
   
   public static MethodHandle compileFunction(Function function) {
     String name = function.getName();
@@ -55,7 +59,7 @@ public class Compiler {
     Type liveness;
     try {
       liveness = typecheck(typeChecker, function.getBlock(), function.getReturnType(), localScope);
-    } catch(CodeNotCompilableException e) {
+    } catch(CodeNotCompilableException ignored) {
       return null;
     }
     
@@ -90,7 +94,7 @@ public class Compiler {
     Type liveness;
     try {
       liveness = typecheck(typeChecker, function.getBlock(), function.getReturnType(), localScope);
-    } catch(CodeNotCompilableException e) {
+    } catch(CodeNotCompilableException ignored) {
       return null;
     }
     
@@ -109,7 +113,7 @@ public class Compiler {
     assert unspecializedFunction.getIntrinsicInfo() == null;
     
     int length = vars.length;
-    ArrayList<Parameter> parameters = new ArrayList<Parameter>();
+    ArrayList<Parameter> parameters = new ArrayList<Parameter>(length);
     List<Parameter> unspecializedParameters = unspecializedFunction.getParameters();
     for(int i=0; i<length; i++) {
       Parameter unspecializedParameter = unspecializedParameters.get(i);
@@ -127,6 +131,43 @@ public class Compiler {
         unspecializedFunction.getBlock());
     function.registerSignature(function);
     return function;
+  }
+  
+  public static class CompileFunctionStub {
+    private int counter;
+    
+    public static MethodHandle compileStub(Function function, MethodHandle interpreter,  MethodType methodType) {
+      CompileFunctionStub compileFunctionStub = new CompileFunctionStub();
+      MethodHandle stub = MethodHandles.insertArguments(STUB, 0, function, interpreter, compileFunctionStub);
+      return MethodHandles.collectArguments(stub, methodType);
+    }
+    
+    public static Object stub(Function function, MethodHandle interpreter, CompileFunctionStub stub, Object[] args) throws Throwable {
+      MethodHandle mh;
+      
+      int counter = stub.counter;
+      if (counter > RTFlag.COMPILER_FUNCTION_THRESHOLD) {
+        MethodHandle compileMH = Compiler.compileFunction(function);
+        if (compileMH != null) {
+          function.setMethodHandle(compileMH);
+          mh = compileMH;
+        } else {
+          mh = interpreter;
+          function.setMethodHandle(interpreter);
+        }
+      } else {
+        mh = interpreter;
+        stub.counter = counter + 1;
+      }
+      
+      return mh.invokeVarargs(args);
+    }
+    
+    static final MethodHandle STUB;
+    static {
+      STUB = MethodHandles.publicLookup().findStatic(CompileFunctionStub.class, "stub",
+          MethodType.methodType(Object.class, Function.class, MethodHandle.class, CompileFunctionStub.class, Object[].class));
+    }
   }
   
   public static class SpecializedFunctionStub {
@@ -171,7 +212,7 @@ public class Compiler {
     if (LEGACY_MODE) {
       cv = LegacyWeaver.weave(cw);
     }
-    String className = "GenStub$"+(counter++)+'$'+name;
+    String className = "GenStub$"+(COUNTER++)+'$'+name;
     cv.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC|Opcodes.ACC_FINAL, className, null, "java/lang/Object", null);
     cv.visitSource("script", null);
     
@@ -225,7 +266,7 @@ public class Compiler {
     return typeChecker.typeCheck(block, typeCheckEnv);
   }
   
-  public static boolean traceCompileLoop(LabeledInstrWhile labeledInstrWhile, LoopProfile profile, boolean optimisticTrace, EvalEnv env) {
+  public static boolean traceCompileAndExec(LabeledInstrWhile labeledInstrWhile, LoopProfile profile, boolean optimisticTrace, EvalEnv env) {
     Scope scope = env.getScope();
     LocalScope localScope = new LocalScope(scope);
     
@@ -269,7 +310,7 @@ public class Compiler {
     if (LEGACY_MODE) {
       cv = LegacyWeaver.weave(cw);
     }
-    String className = "GenStub$"+(counter++)+"$trace";
+    String className = "GenStub$"+(COUNTER++)+"$trace";
     cv.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC|Opcodes.ACC_FINAL, className, null, "java/lang/Object", null);
     cv.visitSource("script", null);
     
@@ -376,7 +417,8 @@ public class Compiler {
     for(int i=0; i<count; i++) {
       parameterArray[i + 1] = asClass(bindMap.getReferenceType(i));
     }
-    for(int i = 0; i < parameters.size(); i++) {
+    int parameterSize = parameters.size();
+    for(int i = 0; i < parameterSize; i++) {
       parameterArray[i + count + 1] = asClass(parameters.get(i).getType());
     }
     return MethodType.methodType(asClass(function.getReturnType()), parameterArray);

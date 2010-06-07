@@ -59,10 +59,6 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     this.currentScope = scope;
   }
   
-  public Echoer getEchoer() {
-    return echoer;
-  }
-  
   // --- helper methods
   
   private void eval(Node node) {
@@ -89,7 +85,7 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
     Object value;
     try {
       value = Integer.parseInt(text);
-    } catch (NumberFormatException e) {
+    } catch (NumberFormatException ignored) {
       value = Double.parseDouble(text);
     }
     return computeTokenAnnotation(new ValueLiteralToken(value));
@@ -173,7 +169,8 @@ public class Interpreter extends ASTGrammarEvaluator implements TerminalEvaluato
   protected void computeAnnotation(Node node) {
     List<Node> nodeList = node.nodeList();
     if (!nodeList.isEmpty()) {
-      for(int i=0; i<nodeList.size(); i++) {
+      int nodeListSize = nodeList.size();
+      for(int i=0; i<nodeListSize; i++) {
         Node firstNode = nodeList.get(i);
         if (firstNode == null) {
           continue;

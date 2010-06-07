@@ -4,7 +4,7 @@
   <property name="tatoo-build.dir" location="build-lib"/>
   <property name="tatoo.jar" location="${tatoo-build.dir}/tatoo.jar"/>
   <property name="lib" location="lib"/>
-  <property name="libs" value="${lib}/derby.jar:${lib}/grizzly-servlet-webserver-1.9.18-k.jar:${lib}/jaxen-1.1.2.jar:${lib}/tatoo-runtime.jar:${lib}/asm-all-3.2.jar:${lib}/hs19-b01-jsr292-patch.jar:${lib}/jsr292-backport.jar"/>
+  <property name="libs" value="${lib}/derby.jar:${lib}/grizzly-servlet-webserver-1.9.18-k.jar:${lib}/jaxen-1.1.2.jar:${lib}/tatoo-runtime.jar:${lib}/asm-all-3.2.jar:${lib}/jsr292-backport.jar"/>
   <property name="phpreboot.jar" value="${lib}/phpreboot.jar"/>
 	
   <property name="src" value="src"/>
@@ -43,7 +43,8 @@
 
 	  <javac srcdir="${src}:${gen-src}" destdir="${classes}" debug="true">
 		  <classpath path="${libs}"/>
-		  <compilerarg value="-Xlint:deprecation"/>
+      <compilerarg value="-Xlint:all"/>
+		  <compilerarg value="-Xbootclasspath/p:${lib}/hs19-b01-jsr292-patch.jar"/>
 	  </javac>
   </target>
 	

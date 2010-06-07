@@ -66,7 +66,7 @@ public enum PrimitiveType implements Type {
   static final HashMap<String, PrimitiveType> tokenMap;
   static {
     HashMap<String, PrimitiveType> map =
-      new HashMap<String, PrimitiveType>();
+      new HashMap<String, PrimitiveType>(32);
     for(PrimitiveType token: PrimitiveType.values()) {
       map.put(token.type, token);
     }

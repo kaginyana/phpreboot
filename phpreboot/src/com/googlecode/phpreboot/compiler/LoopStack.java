@@ -17,9 +17,9 @@ class LoopStack<E> {
   }
   
   private final ArrayDeque<Entry<E>> stack =
-    new ArrayDeque<Entry<E>>();
+    new ArrayDeque<Entry<E>>(8);
   private final HashMap<String,E> labelMap =
-    new HashMap<String, E>();
+    new HashMap<String, E>(16);
   
   private static class Entry<E> {
     final /*@Nullable*/String label;

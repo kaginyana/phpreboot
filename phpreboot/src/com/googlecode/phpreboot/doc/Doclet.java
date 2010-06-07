@@ -13,15 +13,26 @@ import com.googlecode.phpreboot.model.Var;
 import com.sun.javadoc.RootDoc;
 
 public class Doclet {
+  private Doclet() {
+    //enforce singleton
+  }
+
   public static boolean start(RootDoc rootDoc) throws IOException {
     Scope rootScope = new Scope(null);
     rootScope.register(new Var("ROOT_DOC", true, PrimitiveType.ANY, rootDoc));
     
     PrintWriter writer = new PrintWriter(new FileWriter("doc.html"));
-    Reader reader = new InputStreamReader(
-        Doclet.class.getResourceAsStream("doclet.phpr"));
-    
-    Analyzer.analyze(reader, writer, rootScope);
+    try {
+      Reader reader = new InputStreamReader(
+          Doclet.class.getResourceAsStream("doclet.phpr"));
+      try {
+        Analyzer.analyze(reader, writer, rootScope);
+      } finally {
+        reader.close();
+      }
+    } finally {
+      writer.close();
+    }
     return true;
   }
 }

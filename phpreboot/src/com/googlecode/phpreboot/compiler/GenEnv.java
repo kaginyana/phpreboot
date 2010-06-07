@@ -9,7 +9,7 @@ class GenEnv {
   private final LoopStack<Labels> loopStack;
   private final Type expectedType;
   
-  public GenEnv(int shift, /*@Nullable*/IfParts ifParts, LoopStack<Labels> loopStack, Type expectedType) {
+  GenEnv(int shift, /*@Nullable*/IfParts ifParts, LoopStack<Labels> loopStack, Type expectedType) {
     this.shift = shift;
     this.ifParts = ifParts;
     this.loopStack = loopStack;

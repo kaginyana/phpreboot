@@ -221,10 +221,10 @@ public class Compiler {
     MethodVisitor mv = cv.visitMethod(Opcodes.ACC_PUBLIC|Opcodes.ACC_STATIC, name, desc, null, null);
     mv.visitCode();
     
-    Gen gen = new Gen(mv, typeAttributeMap, symbolAttributeMap);
-    gen.gen(function.getBlock(), new GenEnv(bindMap.getSlotCount(), null, new LoopStack<Labels>(), null));
+    Gen gen = new Gen(typeAttributeMap, symbolAttributeMap);
+    gen.gen(function.getBlock(), new GenEnv(mv, bindMap.getSlotCount(), null, new LoopStack<Labels>(), null));
     if (liveness == LivenessType.ALIVE) {
-      gen.defaultReturn(function.getReturnType());
+      gen.defaultReturn(mv, function.getReturnType());
     }
     
     mv.visitMaxs(0, 0);
@@ -327,9 +327,10 @@ public class Compiler {
     MethodVisitor mv = cv.visitMethod(Opcodes.ACC_PUBLIC|Opcodes.ACC_STATIC, "trace", desc, null, null);
     mv.visitCode();
     
-    Gen gen = new Gen(mv, typeChecker.getTypeAttributeMap(), typeChecker.getSymbolAttributeMap());
+    Gen gen = new Gen(typeChecker.getTypeAttributeMap(), typeChecker.getSymbolAttributeMap());
     gen.gen(labeledInstrWhile,
-        new GenEnv(bindMap.getSlotCount() + bindMap.getReferencesCount(),
+        new GenEnv(mv,
+            bindMap.getSlotCount() + bindMap.getReferencesCount(),
             null, new LoopStack<Labels>(), null));
     
     // restore env vars
@@ -339,7 +340,7 @@ public class Compiler {
     Object[] args = new Object[size + outputVarCount + 1];
     args[0] = env;
     if (size != 0) {
-      gen.restoreEnv(references, bindMap.getSlotCount() -1 /*XXX substract env slot */, scope, args);
+      gen.restoreEnv(mv, references, bindMap.getSlotCount() -1 /*XXX substract env slot */, scope, args);
     }
     
     mv.visitInsn(Opcodes.RETURN);

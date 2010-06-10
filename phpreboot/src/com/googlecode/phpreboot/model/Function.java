@@ -110,13 +110,13 @@ public class Function {
       } else {
         ParameterTyped parameterType = (ParameterTyped)parameter;
         parameterName = parameterType.getId().getValue();
-        type = PrimitiveType.valueOf(parameterType.getType().getId().getValue());
+        type = PrimitiveType.lookup(parameterType.getType().getId().getValue());
       }
       parameters.add(new Parameter(parameterName, type, parameter));
     }
  
     ReturnType returnTypeNode = parametersNode.getReturnTypeOptional();
-    Type returnType = (returnTypeNode == null)? PrimitiveType.ANY: PrimitiveType.valueOf(returnTypeNode.getType().getId().getValue());
+    Type returnType = (returnTypeNode == null)? PrimitiveType.ANY: PrimitiveType.lookup(returnTypeNode.getType().getId().getValue());
     
     Function function = new Function(name,
         parameters,

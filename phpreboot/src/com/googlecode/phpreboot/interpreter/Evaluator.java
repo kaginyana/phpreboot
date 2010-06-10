@@ -3,8 +3,6 @@ package com.googlecode.phpreboot.interpreter;
 import java.dyn.MethodHandle;
 import java.dyn.MethodHandles;
 import java.dyn.MethodType;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 
 import com.googlecode.phpreboot.ast.ArrayEntry;
@@ -84,8 +82,6 @@ import com.googlecode.phpreboot.ast.LiteralSingle;
 import com.googlecode.phpreboot.ast.LiteralString;
 import com.googlecode.phpreboot.ast.LiteralValue;
 import com.googlecode.phpreboot.ast.Node;
-import com.googlecode.phpreboot.ast.ParameterAny;
-import com.googlecode.phpreboot.ast.ParameterTyped;
 import com.googlecode.phpreboot.ast.Parameters;
 import com.googlecode.phpreboot.ast.PrimaryArrayAccess;
 import com.googlecode.phpreboot.ast.PrimaryFieldAccess;
@@ -93,7 +89,6 @@ import com.googlecode.phpreboot.ast.PrimaryFuncall;
 import com.googlecode.phpreboot.ast.PrimaryParens;
 import com.googlecode.phpreboot.ast.PrimaryPrimaryArrayAccess;
 import com.googlecode.phpreboot.ast.PrimaryPrimaryFieldAccess;
-import com.googlecode.phpreboot.ast.ReturnType;
 import com.googlecode.phpreboot.ast.Visitor;
 import com.googlecode.phpreboot.ast.XmlsEmptyTag;
 import com.googlecode.phpreboot.ast.XmlsStartEndTag;
@@ -234,77 +229,32 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   // --- function definition
   
-  private static void filterReadOnlyVars(HashMap<String,Var> map, Scope scope) {
-    if (scope == null)
-      return;
-    filterReadOnlyVars(map, scope.getParent());
-    for(Var var: scope.varMap()) {
-      if (var.isReadOnly()) {
-        String name = var.getName();
-        map.put(name, new Var(name, true, var.getType(), var.getValue()));
-      }
-    }
-  }
-  
-  private static Scope filterReadOnlyVars(Scope scope) {
-    HashMap<String,Var> map = new HashMap<String, Var>();
-    filterReadOnlyVars(map, scope);
-    
-    Scope newScope = new Scope(null);
-    for(Var var: map.values()) {
-      newScope.register(var);
-    }
-    return newScope;
-  }
-  
   private Function createFunction(boolean lambda, String name, Parameters parametersNode, Block block, EvalEnv env) {
-    List<com.googlecode.phpreboot.ast.Parameter> parameterStar = parametersNode.getParameterStar();
-    int size = parameterStar.size();
-    ArrayList<Parameter> parameters = new ArrayList<Parameter>(size);
+    Function function = Function.createFunction(lambda, name, parametersNode, null, env.getScope(), block);
+    
+    //FIXME, this code is similar to Compiler.asMethodType()
+    // compute signature
+    List<Type> parameterTypes = function.getParameterTypes();
+    int size = parameterTypes.size();
     Class<?>[] signature = new Class<?>[1 + size];
     signature[0] = /*EvalEnv.class*/Object.class;
-    
     for(int i=0; i<size; i++) {
-      String parameterName;
-      Type type;
-      com.googlecode.phpreboot.ast.Parameter parameter = parameterStar.get(i);
-      if (parameter instanceof ParameterAny) {
-        parameterName = ((ParameterAny)parameter).getId().getValue();
-        type = PrimitiveType.ANY;
-      } else {
-        ParameterTyped parameterType = (ParameterTyped)parameter;
-        parameterName = parameterType.getId().getValue();
-        type = (Type)eval(parameterType.getType(), env);
-      }
-      signature[i + 1] = type.getUnboxedRuntimeClass();
-      parameters.add(new Parameter(parameterName, type, parameter));
+      signature[i + 1] = parameterTypes.get(i).getUnboxedRuntimeClass();
     }
-    
-    ReturnType returnTypeNode = parametersNode.getReturnTypeOptional();
-    Type returnType = (returnTypeNode == null)? PrimitiveType.ANY: (Type)eval(returnTypeNode.getType(), env);
-    
-    Function function = new Function(name,
-        parameters,
-        returnType,
-        filterReadOnlyVars(env.getScope()),
-        null,
-        new HashMap<List<Type>, Function>(),
-        block);
-    function.registerSignature(function);
     
     MethodHandle mh = MethodHandles.lookup().findVirtual(Function.class, "call",
         MethodType.methodType(Object.class, /*EvalEnv.class*/ Object.class, Object[].class));
     mh = MethodHandles.insertArguments(mh, 0, function);
     mh = MethodHandles.collectArguments(mh, MethodType.genericMethodType(1 + size));
     
-    MethodType functionType = MethodType.methodType(returnType.getUnboxedRuntimeClass(), signature);
+    MethodType functionType = MethodType.methodType(function.getReturnType().getUnboxedRuntimeClass(), signature);
     mh = MethodHandles.convertArguments(mh, functionType);
     
     //System.err.println("create function handle "+name+" "+functionType);
     
     // install compiler stub
     if (RTFlag.COMPILER_ENABLE) {
-      mh = CompileFunctionStub.compileStub(function, mh, functionType);
+      mh = CompileFunctionStub.compileStub(function, mh);
     }
     
     function.setMethodHandle(mh);

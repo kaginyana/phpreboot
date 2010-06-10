@@ -1,31 +1,52 @@
 package com.googlecode.phpreboot.compiler;
 
 import static com.googlecode.phpreboot.compiler.LivenessType.ALIVE;
-
-import static org.objectweb.asm.Opcodes.*;
+import static org.objectweb.asm.Opcodes.ACONST_NULL;
 import static org.objectweb.asm.Opcodes.ALOAD;
+import static org.objectweb.asm.Opcodes.BIPUSH;
+import static org.objectweb.asm.Opcodes.CHECKCAST;
+import static org.objectweb.asm.Opcodes.DCMPG;
+import static org.objectweb.asm.Opcodes.DCONST_0;
+import static org.objectweb.asm.Opcodes.DUP;
 import static org.objectweb.asm.Opcodes.GOTO;
 import static org.objectweb.asm.Opcodes.I2D;
 import static org.objectweb.asm.Opcodes.IADD;
 import static org.objectweb.asm.Opcodes.ICONST_0;
 import static org.objectweb.asm.Opcodes.ICONST_1;
 import static org.objectweb.asm.Opcodes.IDIV;
+import static org.objectweb.asm.Opcodes.IFEQ;
+import static org.objectweb.asm.Opcodes.IFNE;
+import static org.objectweb.asm.Opcodes.IF_ICMPEQ;
+import static org.objectweb.asm.Opcodes.IF_ICMPGE;
+import static org.objectweb.asm.Opcodes.IF_ICMPGT;
+import static org.objectweb.asm.Opcodes.IF_ICMPLE;
+import static org.objectweb.asm.Opcodes.IF_ICMPLT;
+import static org.objectweb.asm.Opcodes.IF_ICMPNE;
 import static org.objectweb.asm.Opcodes.ILOAD;
 import static org.objectweb.asm.Opcodes.IMUL;
 import static org.objectweb.asm.Opcodes.INEG;
 import static org.objectweb.asm.Opcodes.INVOKEDYNAMIC;
 import static org.objectweb.asm.Opcodes.INVOKEDYNAMIC_OWNER;
+import static org.objectweb.asm.Opcodes.INVOKESPECIAL;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 import static org.objectweb.asm.Opcodes.INVOKEVIRTUAL;
+import static org.objectweb.asm.Opcodes.IREM;
 import static org.objectweb.asm.Opcodes.IRETURN;
 import static org.objectweb.asm.Opcodes.ISTORE;
 import static org.objectweb.asm.Opcodes.ISUB;
+import static org.objectweb.asm.Opcodes.NEW;
+import static org.objectweb.asm.Opcodes.POP;
+import static org.objectweb.asm.Opcodes.POP2;
+import static org.objectweb.asm.Opcodes.SIPUSH;
 
+import java.dyn.MethodType;
 import java.util.List;
 import java.util.Map;
 
+import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
 
 import com.googlecode.phpreboot.ast.ArrayEntry;
 import com.googlecode.phpreboot.ast.ArrayValue;
@@ -41,6 +62,8 @@ import com.googlecode.phpreboot.ast.ExprId;
 import com.googlecode.phpreboot.ast.ExprIf;
 import com.googlecode.phpreboot.ast.ExprLiteral;
 import com.googlecode.phpreboot.ast.ExprPrimary;
+import com.googlecode.phpreboot.ast.FunNoReturnType;
+import com.googlecode.phpreboot.ast.FunReturnType;
 import com.googlecode.phpreboot.ast.FuncallCall;
 import com.googlecode.phpreboot.ast.IdToken;
 import com.googlecode.phpreboot.ast.Instr;
@@ -62,9 +85,13 @@ import com.googlecode.phpreboot.ast.LiteralNull;
 import com.googlecode.phpreboot.ast.LiteralSingle;
 import com.googlecode.phpreboot.ast.LiteralString;
 import com.googlecode.phpreboot.ast.LiteralValue;
+import com.googlecode.phpreboot.ast.MemberFun;
+import com.googlecode.phpreboot.ast.MemberInstr;
 import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.ast.PrimaryFuncall;
 import com.googlecode.phpreboot.ast.PrimaryParens;
+import com.googlecode.phpreboot.ast.ScriptMember;
+import com.googlecode.phpreboot.ast.ScriptScriptMember;
 import com.googlecode.phpreboot.ast.Visitor;
 import com.googlecode.phpreboot.compiler.LoopStack.Labels;
 import com.googlecode.phpreboot.interpreter.Echoer;
@@ -88,14 +115,17 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   private static final String FUNCTION_INTERNAL_NAME = getInternalName(Function.class);
   private static final String ARRAY_INTERNAL_NAME = getInternalName(Array.class);
   private static final String ECHOER_INTERNAL_NAME = getInternalName(Echoer.class);
-  private static final String EVAL_ENV_INTERNAL_NAME = getInternalName(EvalEnv.class);
+  static final String EVAL_ENV_INTERNAL_NAME = getInternalName(EvalEnv.class);
   private static final String RT_INTERNAL_NAME = getInternalName(RT.class);
   
-  
+  private final String internalClassName;
+  private final ClassVisitor classVisitor;
   private final Map<Node, Type> typeAttributeMap;
   private final Map<Node, Symbol> symbolAttributeMap;
   
-  public Gen(Map<Node, Type> typeAttributeMap, Map<Node, Symbol> symbolAttributeMap) {
+  public Gen(String internalClassName, ClassVisitor classVisitor, Map<Node, Type> typeAttributeMap, Map<Node, Symbol> symbolAttributeMap) {
+    this.internalClassName = internalClassName;
+    this.classVisitor = classVisitor;
     this.typeAttributeMap = typeAttributeMap;
     this.symbolAttributeMap = symbolAttributeMap;
   }
@@ -248,6 +278,62 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
         mv.visitMethodInsn(INVOKEVIRTUAL, VAR_INTERNAL_NAME, "setValue", "(Ljava/lang/Object;)V");
       }
     }
+  }
+  
+  
+  // --- visit members
+  
+  @Override
+  public Type visit(ScriptMember scriptMember, GenEnv env) {
+    return gen(scriptMember.getMember(), env);
+  }
+  @Override
+  public Type visit(ScriptScriptMember scriptScriptMember, GenEnv env) {
+    gen(scriptScriptMember.getScript(), env);
+    gen(scriptScriptMember.getMember(), env);
+    return null;
+  }
+  
+  @Override
+  public Type visit(MemberFun memberFun, GenEnv env) {
+    return gen(memberFun.getFun(), env);
+  }
+  @Override
+  public Type visit(MemberInstr memberInstr, GenEnv env) {
+    return gen(memberInstr.getInstr(), env);
+  }
+  
+  
+  // --- visit function definition
+  
+  private void visitFun(Node node) {
+    Function function = (Function)((LocalVar)symbolAttributeMap.get(node)).getValue();
+    Type liveness = typeAttributeMap.get(node);
+    
+    MethodType methodType = Compiler.asMethodType(function);
+    String desc = methodType.toMethodDescriptorString();
+    MethodVisitor mv = classVisitor.visitMethod(Opcodes.ACC_PUBLIC|Opcodes.ACC_STATIC, function.getName(), desc, null, null);
+    mv.visitCode();
+    
+    Type returnType = function.getReturnType();
+    gen(function.getBlock(), new GenEnv(mv, 1/*eval env=0*/, null, new LoopStack<Labels>(), returnType));
+    if (liveness == LivenessType.ALIVE) {
+      defaultReturn(mv, returnType);
+    }
+    
+    mv.visitMaxs(0, 0);
+    mv.visitEnd();
+  }
+  
+  @Override
+  public Type visit(FunNoReturnType funNoReturnType, GenEnv env) {
+    visitFun(funNoReturnType);
+    return null;
+  }
+  @Override
+  public Type visit(FunReturnType funReturnType, GenEnv env) {
+    visitFun(funReturnType);
+    return null;
   }
   
   
@@ -739,10 +825,14 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       mv.visitVarInsn(ALOAD, localVar.getSlot(0));
       mv.visitMethodInsn(INVOKEVIRTUAL, FUNCTION_INTERNAL_NAME, "getMethodHandle", "()Ljava/dyn/MethodHandle;");
       mv.visitVarInsn(ALOAD, 0); // environment
+    } else {
+      if (intrinsicInfo.getDeclaringClass() == null) { //self unit call
+        mv.visitVarInsn(ALOAD, 0); // environment
+      }
     }
     
     StringBuilder desc = new StringBuilder();
-    if (intrinsicInfo == null) {
+    if (intrinsicInfo == null || intrinsicInfo.getDeclaringClass() == null) {
       desc.append("(L").append(getInternalName(/*EvalEnv.class*/Object.class)).append(';');
     } else {
       desc.append('(');
@@ -768,9 +858,10 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     if (intrinsicInfo == null) {
       mv.visitMethodInsn(INVOKEVIRTUAL, "java/dyn/MethodHandle", /*"invokeExact"*/ "invoke", desc.toString());
     } else {
-      mv.visitMethodInsn(INVOKESTATIC, getInternalName(intrinsicInfo.getDeclaringClass()), intrinsicInfo.getName(), desc.toString());
+      Class<?> declaringClass = intrinsicInfo.getDeclaringClass();
+      String owner = (declaringClass == null)? internalClassName: getInternalName(declaringClass);
+      mv.visitMethodInsn(INVOKESTATIC, owner, intrinsicInfo.getName(), desc.toString());
     }
-    
     return returnType;
   }
   

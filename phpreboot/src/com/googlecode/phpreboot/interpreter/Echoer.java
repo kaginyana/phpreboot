@@ -8,6 +8,10 @@ public abstract class Echoer {
   //TODO add overloaded echo, one by primitive types
   public abstract void echo(Object value);
   
+  static Echoer defaultWriterEchoer() {
+    return writerEchoer(new PrintWriter(System.err));
+  }
+  
   public static Echoer writerEchoer(final PrintWriter writer) {
     return new Echoer() {
       @Override

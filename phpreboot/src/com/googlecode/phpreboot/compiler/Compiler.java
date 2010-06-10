@@ -20,13 +20,13 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.util.CheckClassAdapter;
 
-import com.googlecode.phpreboot.ast.Block;
 import com.googlecode.phpreboot.ast.LabeledInstrWhile;
 import com.googlecode.phpreboot.ast.Node;
+import com.googlecode.phpreboot.ast.Script;
 import com.googlecode.phpreboot.compiler.LoopStack.Labels;
 import com.googlecode.phpreboot.interpreter.EvalEnv;
-import com.googlecode.phpreboot.interpreter.Profile.LoopProfile;
 import com.googlecode.phpreboot.interpreter.Scope;
+import com.googlecode.phpreboot.interpreter.Profile.LoopProfile;
 import com.googlecode.phpreboot.model.Function;
 import com.googlecode.phpreboot.model.Parameter;
 import com.googlecode.phpreboot.model.PrimitiveType;
@@ -40,6 +40,62 @@ public class Compiler {
 
   private Compiler() {
     //enforce utility class
+  }
+  
+  public static byte[] compileScriptAheadOfTime(String scriptName, Script script, LocalScope rootScope) {
+    
+    LocalScope localScope = new LocalScope(rootScope);
+    //TODO add ARGS etc
+    
+    // typecheck
+    BindMap bindMap = new BindMap();
+    TypeChecker typeChecker = new TypeChecker(bindMap, new TypeProfileMap(), false);
+    Type liveness;
+    try {
+      liveness = typecheck(typeChecker, script, PrimitiveType.VOID, localScope);
+    } catch(CodeNotCompilableException e) {
+      return null;
+    }
+    
+    // gen
+    ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+    ClassVisitor cv = cw;
+    if (LEGACY_MODE) {
+      cv = LegacyWeaver.weave(cw);
+    }
+    cv.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC|Opcodes.ACC_FINAL, scriptName, null, "java/lang/Object", null);
+    cv.visitSource(scriptName, null);
+    
+    MethodType methodType = MethodType.methodType(void.class, String[].class);
+    String desc = methodType.toMethodDescriptorString();
+    MethodVisitor mv = cv.visitMethod(Opcodes.ACC_PUBLIC|Opcodes.ACC_STATIC, "main", desc, null, null);
+    mv.visitCode();
+    
+    // init env
+    mv.visitMethodInsn(Opcodes.INVOKESTATIC, Gen.EVAL_ENV_INTERNAL_NAME, "defaultEvalEnv", "()L"+Gen.EVAL_ENV_INTERNAL_NAME+';');
+    mv.visitVarInsn(Opcodes.ASTORE, 0);
+    
+    Gen gen = new Gen(scriptName, cv, typeChecker.getTypeAttributeMap(), typeChecker.getSymbolAttributeMap());
+    gen.gen(script, new GenEnv(mv, 2 /*ARGS + env*/, null, new LoopStack<Labels>(), null));
+    if (liveness == LivenessType.ALIVE) {
+      gen.defaultReturn(mv, PrimitiveType.VOID);
+    }
+    
+    mv.visitMaxs(0, 0);
+    mv.visitEnd();
+    
+    generateStaticInit(cv);
+    
+    cv.visitEnd();
+    
+    byte[] array = cw.toByteArray();
+    
+    if (RTFlag.DEBUG) {
+      bindMap.dump();
+      CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
+    }
+    
+    return array;
   }
   
   public static MethodHandle compileFunction(Function function) {
@@ -136,10 +192,10 @@ public class Compiler {
   public static class CompileFunctionStub {
     private int counter;
     
-    public static MethodHandle compileStub(Function function, MethodHandle interpreter,  MethodType methodType) {
+    public static MethodHandle compileStub(Function function, MethodHandle interpreter) {
       CompileFunctionStub compileFunctionStub = new CompileFunctionStub();
       MethodHandle stub = MethodHandles.insertArguments(STUB, 0, function, interpreter, compileFunctionStub);
-      return MethodHandles.collectArguments(stub, methodType);
+      return MethodHandles.collectArguments(stub, interpreter.type());
     }
     
     public static Object stub(Function function, MethodHandle interpreter, CompileFunctionStub stub, Object[] args) throws Throwable {
@@ -221,7 +277,7 @@ public class Compiler {
     MethodVisitor mv = cv.visitMethod(Opcodes.ACC_PUBLIC|Opcodes.ACC_STATIC, name, desc, null, null);
     mv.visitCode();
     
-    Gen gen = new Gen(typeAttributeMap, symbolAttributeMap);
+    Gen gen = new Gen(className, cv, typeAttributeMap, symbolAttributeMap);
     gen.gen(function.getBlock(), new GenEnv(mv, bindMap.getSlotCount(), null, new LoopStack<Labels>(), null));
     if (liveness == LivenessType.ALIVE) {
       gen.defaultReturn(mv, function.getReturnType());
@@ -260,10 +316,10 @@ public class Compiler {
   }
   
   // returns the liveness of the block 
-  private static Type typecheck(TypeChecker typeChecker, Block block, Type returnType, LocalScope localScope) throws CodeNotCompilableException {
+  private static Type typecheck(TypeChecker typeChecker, Node node, Type returnType, LocalScope localScope) throws CodeNotCompilableException {
     LoopStack<Boolean> loopStack = new LoopStack<Boolean>();
     TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, returnType);
-    return typeChecker.typeCheck(block, typeCheckEnv);
+    return typeChecker.typeCheck(node, typeCheckEnv);
   }
   
   public static boolean traceCompileAndExec(LabeledInstrWhile labeledInstrWhile, LoopProfile profile, boolean optimisticTrace, EvalEnv env) {
@@ -327,7 +383,7 @@ public class Compiler {
     MethodVisitor mv = cv.visitMethod(Opcodes.ACC_PUBLIC|Opcodes.ACC_STATIC, "trace", desc, null, null);
     mv.visitCode();
     
-    Gen gen = new Gen(typeChecker.getTypeAttributeMap(), typeChecker.getSymbolAttributeMap());
+    Gen gen = new Gen(className, cv, typeChecker.getTypeAttributeMap(), typeChecker.getSymbolAttributeMap());
     gen.gen(labeledInstrWhile,
         new GenEnv(mv,
             bindMap.getSlotCount() + bindMap.getReferencesCount(),
@@ -408,6 +464,18 @@ public class Compiler {
       }
     }
     return void.class;
+  }
+  
+  
+  static MethodType asMethodType(Function function) {
+    List<Parameter> parameters = function.getParameters();
+    int parameterSize = parameters.size();
+    Class<?>[] parameterArray = new Class<?>[1 + parameterSize];
+    parameterArray[0] = /*EvalEnv.class*/ Object.class;
+    for(int i = 0; i < parameterSize; i++) {
+      parameterArray[i + 1] = asClass(parameters.get(i).getType());
+    }
+    return MethodType.methodType(asClass(function.getReturnType()), parameterArray);
   }
   
   private static MethodType asMethodType(Function function, BindMap bindMap) {

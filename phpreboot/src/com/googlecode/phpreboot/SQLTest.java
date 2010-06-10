@@ -28,7 +28,7 @@ public class SQLTest {
       scope.register(new Var("SQL_CONNECTION", true, PrimitiveType.ANY, sqlConnection));
       
       PrintWriter writer = new PrintWriter(System.out);
-      Analyzer.analyze(reader, writer, scope);
+      Analyzer.interpret(reader, writer, scope);
       
       sqlConnection.close();
     }

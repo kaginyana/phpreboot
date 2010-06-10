@@ -26,7 +26,7 @@ public class Doclet {
       Reader reader = new InputStreamReader(
           Doclet.class.getResourceAsStream("doclet.phpr"));
       try {
-        Analyzer.analyze(reader, writer, rootScope);
+        Analyzer.interpret(reader, writer, rootScope);
       } finally {
         reader.close();
       }

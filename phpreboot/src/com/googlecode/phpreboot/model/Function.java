@@ -2,10 +2,15 @@ package com.googlecode.phpreboot.model;
 
 import java.dyn.MethodHandle;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import com.googlecode.phpreboot.ast.Block;
+import com.googlecode.phpreboot.ast.ParameterAny;
+import com.googlecode.phpreboot.ast.ParameterTyped;
+import com.googlecode.phpreboot.ast.Parameters;
+import com.googlecode.phpreboot.ast.ReturnType;
 import com.googlecode.phpreboot.interpreter.EvalEnv;
 import com.googlecode.phpreboot.interpreter.Evaluator;
 import com.googlecode.phpreboot.interpreter.Scope;
@@ -89,4 +94,40 @@ public class Function {
   public Object call(/*EvalEnv*/Object env, Object[] arguments) {
     return Evaluator.INSTANCE.evalFunction(this, arguments, (EvalEnv)env);
   }
+  
+  public static Function createFunction(boolean lambda, String name, Parameters parametersNode, IntrinsicInfo intrinsicInfo, Scope scope, Block block) {
+    List<com.googlecode.phpreboot.ast.Parameter> parameterStar = parametersNode.getParameterStar();
+    int size = parameterStar.size();
+    ArrayList<Parameter> parameters = new ArrayList<Parameter>(size);
+    
+    for(int i=0; i<size; i++) {
+      String parameterName;
+      Type type;
+      com.googlecode.phpreboot.ast.Parameter parameter = parameterStar.get(i);
+      if (parameter instanceof ParameterAny) {
+        parameterName = ((ParameterAny)parameter).getId().getValue();
+        type = PrimitiveType.ANY;
+      } else {
+        ParameterTyped parameterType = (ParameterTyped)parameter;
+        parameterName = parameterType.getId().getValue();
+        type = PrimitiveType.valueOf(parameterType.getType().getId().getValue());
+      }
+      parameters.add(new Parameter(parameterName, type, parameter));
+    }
+ 
+    ReturnType returnTypeNode = parametersNode.getReturnTypeOptional();
+    Type returnType = (returnTypeNode == null)? PrimitiveType.ANY: PrimitiveType.valueOf(returnTypeNode.getType().getId().getValue());
+    
+    Function function = new Function(name,
+        parameters,
+        returnType,
+        Scope.filterReadOnlyVars(scope),
+        intrinsicInfo,
+        new HashMap<List<Type>, Function>(),
+        block);
+    function.registerSignature(function);
+    return function;
+  }
+  
+  
 }

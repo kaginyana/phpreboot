@@ -64,4 +64,27 @@ public class Scope {
   public Collection<Var> varMap() {
     return varMap.values();
   }
+  
+  private static void filterReadOnlyVars(HashMap<String,Var> map, Scope scope) {
+    if (scope == null)
+      return;
+    filterReadOnlyVars(map, scope.getParent());
+    for(Var var: scope.varMap()) {
+      if (var.isReadOnly()) {
+        String name = var.getName();
+        map.put(name, new Var(name, true, var.getType(), var.getValue()));
+      }
+    }
+  }
+  
+  public static Scope filterReadOnlyVars(Scope scope) {
+    HashMap<String,Var> map = new HashMap<String, Var>();
+    filterReadOnlyVars(map, scope);
+    
+    Scope newScope = new Scope(null);
+    for(Var var: map.values()) {
+      newScope.register(var);
+    }
+    return newScope;
+  }
 }

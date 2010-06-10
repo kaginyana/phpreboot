@@ -21,4 +21,9 @@ public class EvalEnv {
   public /*@Nullable*/String getLabel() {
     return label;
   }
+  
+  //called by the AOT runtime
+  public static EvalEnv defaultEvalEnv() {
+    return new EvalEnv(new Scope(null), Echoer.defaultWriterEchoer(), null);
+  }
 }

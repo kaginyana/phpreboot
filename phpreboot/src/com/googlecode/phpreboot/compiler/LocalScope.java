@@ -14,7 +14,7 @@ class LocalScope extends Scope {
   
   LocalScope(LocalScope parent) {
     super(parent);
-    slotCount = parent.slotCount;
+    slotCount = (parent == null)? 0: parent.slotCount;
   }
   
   public int nextSlot(Type type) {

@@ -23,6 +23,8 @@ import com.googlecode.phpreboot.ast.ExprId;
 import com.googlecode.phpreboot.ast.ExprIf;
 import com.googlecode.phpreboot.ast.ExprLiteral;
 import com.googlecode.phpreboot.ast.ExprPrimary;
+import com.googlecode.phpreboot.ast.FunNoReturnType;
+import com.googlecode.phpreboot.ast.FunReturnType;
 import com.googlecode.phpreboot.ast.FuncallCall;
 import com.googlecode.phpreboot.ast.IdToken;
 import com.googlecode.phpreboot.ast.Instr;
@@ -45,12 +47,18 @@ import com.googlecode.phpreboot.ast.LiteralNull;
 import com.googlecode.phpreboot.ast.LiteralSingle;
 import com.googlecode.phpreboot.ast.LiteralString;
 import com.googlecode.phpreboot.ast.LiteralValue;
+import com.googlecode.phpreboot.ast.MemberFun;
+import com.googlecode.phpreboot.ast.MemberInstr;
 import com.googlecode.phpreboot.ast.Node;
+import com.googlecode.phpreboot.ast.Parameters;
 import com.googlecode.phpreboot.ast.PrimaryFuncall;
 import com.googlecode.phpreboot.ast.PrimaryParens;
+import com.googlecode.phpreboot.ast.ScriptMember;
+import com.googlecode.phpreboot.ast.ScriptScriptMember;
 import com.googlecode.phpreboot.ast.Visitor;
 import com.googlecode.phpreboot.interpreter.Profile.VarProfile;
 import com.googlecode.phpreboot.model.Function;
+import com.googlecode.phpreboot.model.IntrinsicInfo;
 import com.googlecode.phpreboot.model.Parameter;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Type;
@@ -86,6 +94,16 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   }
   public Map<Node, Symbol> getSymbolAttributeMap() {
     return symbolAttributeMap;
+  }
+  
+  
+  // --- scope helpers
+  
+  private static void checkVar(String name, LocalScope scope) {
+    Var var = scope.lookup(name);
+    if (var != null) {
+      throw RT.error("variable %s already exists", name);
+    }
   }
   
   // --- helpers
@@ -174,6 +192,81 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   protected Type visit(Node node, TypeCheckEnv env) {
     System.err.println("code is not compilable: "+node.getKind());
     throw CodeNotCompilableException.INSTANCE;
+  }
+  
+  
+  // --- visit members
+  
+  @Override
+  public Type visit(ScriptMember scriptMember, TypeCheckEnv env) {
+    return typeCheck(scriptMember.getMember(), env);
+  }
+  @Override
+  public Type visit(ScriptScriptMember scriptScriptMember, TypeCheckEnv env) {
+    Type liveness = typeCheck(scriptScriptMember.getScript(), env);
+    if (liveness != ALIVE)
+      return liveness;
+    return typeCheck(scriptScriptMember.getMember(), env);
+  }
+  
+  @Override
+  public Type visit(MemberFun memberFun, TypeCheckEnv env) {
+    return typeCheck(memberFun.getFun(), env);
+  }
+  @Override
+  public Type visit(MemberInstr memberInstr, TypeCheckEnv env) {
+    return typeCheck(memberInstr.getInstr(), env);
+  }
+  
+  
+  // --- visit function definition
+  
+  private void visitFun(Node node, String name, Parameters parametersNode, Block block, TypeCheckEnv env) {
+    assert(!allowOptimisticType);
+    
+    LocalScope scope = env.getScope();
+    checkVar(name, scope);
+    
+    IntrinsicInfo intrinsicInfo = new IntrinsicInfo(null/*current class*/, name);
+    Function function = Function.createFunction(false, name, parametersNode, intrinsicInfo, scope, block);
+    
+    LocalScope localScope = new LocalScope(function.getScope());
+    localScope.register(new Var(name, true, PrimitiveType.ANY, function));
+    List<Parameter> parameters = function.getParameters();
+    int size = parameters.size();
+    for(int i=0; i<size; i++) {
+      Parameter parameter = parameters.get(i);
+      Type type = parameter.getType();
+      localScope.register(LocalVar.createLocalVar(parameter.getName(), true, type, null, localScope.nextSlot(type)));
+    }
+    
+    LoopStack<Boolean> loopStack = new LoopStack<Boolean>();
+    Type liveness = typeCheck(block, new TypeCheckEnv(localScope, loopStack, function.getReturnType()));
+    
+    Var var = new Var(name, true, PrimitiveType.ANY, function);
+    scope.register(var);
+    
+    typeAttributeMap.put(node, liveness);
+    symbolAttributeMap.put(node, LocalVar.createConstantFoldable(function));
+  }
+  
+  @Override
+  public Type visit(FunNoReturnType funNoReturnType, TypeCheckEnv env) {
+    visitFun(funNoReturnType,
+        funNoReturnType.getId().getValue(),
+        funNoReturnType.getParameters(),
+        funNoReturnType.getBlock(),
+        env);
+    return LivenessType.ALIVE;
+  }
+  @Override
+  public Type visit(FunReturnType funReturnType, TypeCheckEnv env) {
+    visitFun(funReturnType,
+        funReturnType.getId().getValue(),
+        funReturnType.getParameters(),
+        funReturnType.getBlock(),
+        env);
+    return LivenessType.ALIVE;
   }
   
   

@@ -178,7 +178,7 @@ public class Main16 {
     new BitsModule().registerModule(rootScope);
     
     try {
-      Analyzer.analyze(reader, writer, rootScope);
+      Analyzer.interpret(reader, writer, rootScope);
     } catch(Throwable t) {
       if (verbose)
         t.printStackTrace(System.err);

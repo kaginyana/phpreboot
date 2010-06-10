@@ -156,7 +156,7 @@ public class LegacyWebScriptDispatcher extends GrizzlyAdapter {
     Reader reader = new InputStreamReader(input);
     PrintWriter writer = new PrintWriter(output);
     try {
-      Analyzer.analyze(reader, writer, new Scope(scope));
+      Analyzer.interpret(reader, writer, new Scope(scope));
     } finally {
       sqlConnection.close();
     }

@@ -1,9 +1,13 @@
 package com.googlecode.phpreboot.interpreter;
 
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Reader;
 import java.util.IdentityHashMap;
 
+import com.googlecode.phpreboot.ast.Script;
+import com.googlecode.phpreboot.compiler.Compiler;
 import com.googlecode.phpreboot.lexer.RuleEnum;
 import com.googlecode.phpreboot.parser.NonTerminalEnum;
 import com.googlecode.phpreboot.parser.ProductionEnum;
@@ -24,21 +28,21 @@ public class Analyzer {
     // enforce utility class
   }
 
-  static class InterpreterRuleActivator implements RuleActivator<RuleEnum> {
+  static class CommentSwitcherRuleActivator implements RuleActivator<RuleEnum> {
     private final RuleActivator<RuleEnum> ruleActivator;
-    private final Interpreter interpreter;
+    private final ASTHandler astHandler;
     private final IdentityHashMap<RuleEnum[], RuleEnum[]> cache =
       new IdentityHashMap<RuleEnum[], RuleEnum[]>();
     
-    InterpreterRuleActivator(RuleActivator<RuleEnum> ruleActivator, Interpreter interpreter) {
+    CommentSwitcherRuleActivator(RuleActivator<RuleEnum> ruleActivator, ASTHandler astHandler) {
       this.ruleActivator = ruleActivator;
-      this.interpreter = interpreter;
+      this.astHandler = astHandler;
     }
 
     @Override
     public RuleEnum[] activeRules() {
       RuleEnum[] activeRules = ruleActivator.activeRules();
-      if (interpreter.enableLineComment) {
+      if (astHandler.enableLineComment) {
         return activeRules;
       }
       RuleEnum[] rules = cache.get(activeRules);
@@ -63,16 +67,45 @@ public class Analyzer {
     }
   }
   
-  public static void analyze(Reader reader, PrintWriter writer, Scope rootScope) {
+  public static void interpret(Reader reader, PrintWriter writer, Scope rootScope) {
     LocationTracker locationTracker = new LocationTracker();
+    Interpreter interpreter = new Interpreter(locationTracker, writer, rootScope);
     ReaderWrapper buffer = new ReaderWrapper(reader, locationTracker);
     
-    Interpreter interpreter = new Interpreter(locationTracker, writer, rootScope);
+    parse(buffer, interpreter);
+  }
+  
+  public static void compileAheadOfTime(String scriptName, Reader reader, Scope rootScope) {
+    LocationTracker locationTracker = new LocationTracker();
+    ReaderWrapper buffer = new ReaderWrapper(reader, locationTracker);
+    ASTHandler astHandler = new ASTHandler(locationTracker);
     
-    //TerminalEvaluator<CharSequence> terminalEvaluator = Debug.createTraceProxy(TerminalEvaluator.class, interpreter);
-    //GrammarEvaluator grammarEvaluator = Debug.createTraceProxy(GrammarEvaluator.class, interpreter);
-    TerminalEvaluator<CharSequence> terminalEvaluator = interpreter;
-    GrammarEvaluator grammarEvaluator = interpreter;
+    parse(buffer, astHandler);
+    Script script = astHandler.getScript();
+    byte[] array = Compiler.compileScriptAheadOfTime(scriptName, script, null); //FIXME should be a rootScope ?
+    if (array == null) {
+      System.err.println("compilation aborted.");
+      return;
+    }
+    
+    try {
+      FileOutputStream output = new FileOutputStream(scriptName+".class");
+      try {
+        output.write(array);
+        output.flush();
+      } finally {
+        output.close();
+      }
+    } catch(IOException e) {
+      throw new RuntimeException(e.getMessage(), e);
+    }
+    
+    System.out.println(scriptName+" generated !");
+  }
+  
+  private static void parse(ReaderWrapper buffer, ASTHandler astHandler) {
+    TerminalEvaluator<CharSequence> terminalEvaluator = astHandler;
+    GrammarEvaluator grammarEvaluator = astHandler;
     AnalyzerParserBuilder<RuleEnum, ReaderWrapper, TerminalEnum, NonTerminalEnum, ProductionEnum, VersionEnum> builder =
       Analyzers.analyzerTokenBufferBuilder(buffer,
           terminalEvaluator,
@@ -80,7 +113,7 @@ public class Analyzer {
           new SemanticStack()).
         expert().
         advanced();
-    InterpreterRuleActivator ruleActivator = new InterpreterRuleActivator(builder.getDefaultActivator(), interpreter);
+    CommentSwitcherRuleActivator ruleActivator = new CommentSwitcherRuleActivator(builder.getDefaultActivator(), astHandler);
     builder.activator(ruleActivator).
       createAnalyzer().
       getLexer().

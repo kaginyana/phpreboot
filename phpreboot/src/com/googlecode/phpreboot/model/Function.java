@@ -91,8 +91,8 @@ public class Function {
     return name+parameters;
   }
   
-  public Object call(/*EvalEnv*/Object env, Object[] arguments) {
-    return Evaluator.INSTANCE.evalFunction(this, arguments, (EvalEnv)env);
+  public Object call(EvalEnv env, Object[] arguments) {
+    return Evaluator.INSTANCE.evalFunction(this, arguments, env);
   }
   
   public static Function createFunction(boolean lambda, String name, Parameters parametersNode, IntrinsicInfo intrinsicInfo, Scope scope, Block block) {

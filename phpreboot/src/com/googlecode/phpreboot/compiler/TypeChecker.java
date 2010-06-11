@@ -241,12 +241,11 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     }
     
     LoopStack<Boolean> loopStack = new LoopStack<Boolean>();
-    Type liveness = typeCheck(block, new TypeCheckEnv(localScope, loopStack, function.getReturnType()));
+    typeCheck(block, new TypeCheckEnv(localScope, loopStack, function.getReturnType()));
     
     Var var = new Var(name, true, PrimitiveType.ANY, function);
     scope.register(var);
     
-    typeAttributeMap.put(node, liveness);
     symbolAttributeMap.put(node, LocalVar.createConstantFoldable(function));
   }
   

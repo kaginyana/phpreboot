@@ -471,7 +471,7 @@ public class Compiler {
     List<Parameter> parameters = function.getParameters();
     int parameterSize = parameters.size();
     Class<?>[] parameterArray = new Class<?>[1 + parameterSize];
-    parameterArray[0] = /*EvalEnv.class*/ Object.class;
+    parameterArray[0] = EvalEnv.class;
     for(int i = 0; i < parameterSize; i++) {
       parameterArray[i + 1] = asClass(parameters.get(i).getType());
     }
@@ -482,7 +482,7 @@ public class Compiler {
     int count = bindMap.getReferencesCount();
     List<Parameter> parameters = function.getParameters();
     Class<?>[] parameterArray = new Class<?>[count + 1 + parameters.size()];
-    parameterArray[0] = /*EvalEnv.class*/ Object.class;
+    parameterArray[0] = EvalEnv.class;
     for(int i=0; i<count; i++) {
       parameterArray[i + 1] = asClass(bindMap.getReferenceType(i));
     }
@@ -497,7 +497,7 @@ public class Compiler {
     int count = bindMap.getReferencesCount();
     int outputVarsCount = bindMap.getOutputVarCount();
     Class<?>[] parameterArray = new Class<?>[count + outputVarsCount + 1];
-    parameterArray[0] = /*EvalEnv.class*/ Object.class;
+    parameterArray[0] = EvalEnv.class;
     for(int i=0; i<count; i++) {
       parameterArray[i + 1] = asClass(bindMap.getReferenceType(i));
     }

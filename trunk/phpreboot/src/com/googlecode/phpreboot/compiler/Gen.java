@@ -308,16 +308,17 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   
   private void visitFun(Node node) {
     Function function = (Function)((LocalVar)symbolAttributeMap.get(node)).getValue();
-    Type liveness = typeAttributeMap.get(node);
     
     MethodType methodType = Compiler.asMethodType(function);
     String desc = methodType.toMethodDescriptorString();
     MethodVisitor mv = classVisitor.visitMethod(Opcodes.ACC_PUBLIC|Opcodes.ACC_STATIC, function.getName(), desc, null, null);
     mv.visitCode();
     
+    Block block = function.getBlock();
     Type returnType = function.getReturnType();
-    gen(function.getBlock(), new GenEnv(mv, 1/*eval env=0*/, null, new LoopStack<Labels>(), returnType));
-    if (liveness == LivenessType.ALIVE) {
+    gen(block, new GenEnv(mv, 1/*eval env=0*/, null, new LoopStack<Labels>(), returnType));
+    
+    if (typeAttributeMap.get(block) == LivenessType.ALIVE) {
       defaultReturn(mv, returnType);
     }
     
@@ -358,7 +359,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     MethodVisitor mv = env.getMethodVisitor();
     mv.visitLineNumber(instr_echo.getLineNumberAttribute(), new Label());
     mv.visitVarInsn(ALOAD, 0); // load env
-    mv.visitTypeInsn(CHECKCAST, EVAL_ENV_INTERNAL_NAME); //FIXME remove when environment is no more an Object
+    //mv.visitTypeInsn(CHECKCAST, EVAL_ENV_INTERNAL_NAME); //FIXME remove when environment is no more an Object
     
     mv.visitMethodInsn(INVOKEVIRTUAL, EVAL_ENV_INTERNAL_NAME, "getEchoer",
         "()L"+ECHOER_INTERNAL_NAME+';');
@@ -833,7 +834,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     
     StringBuilder desc = new StringBuilder();
     if (intrinsicInfo == null || intrinsicInfo.getDeclaringClass() == null) {
-      desc.append("(L").append(getInternalName(/*EvalEnv.class*/Object.class)).append(';');
+      desc.append("(L" + EVAL_ENV_INTERNAL_NAME + ';');
     } else {
       desc.append('(');
     }

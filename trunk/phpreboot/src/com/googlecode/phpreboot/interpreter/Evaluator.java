@@ -237,13 +237,13 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     List<Type> parameterTypes = function.getParameterTypes();
     int size = parameterTypes.size();
     Class<?>[] signature = new Class<?>[1 + size];
-    signature[0] = /*EvalEnv.class*/Object.class;
+    signature[0] = EvalEnv.class;
     for(int i=0; i<size; i++) {
       signature[i + 1] = parameterTypes.get(i).getUnboxedRuntimeClass();
     }
     
     MethodHandle mh = MethodHandles.lookup().findVirtual(Function.class, "call",
-        MethodType.methodType(Object.class, /*EvalEnv.class*/ Object.class, Object[].class));
+        MethodType.methodType(Object.class, EvalEnv.class, Object[].class));
     mh = MethodHandles.insertArguments(mh, 0, function);
     mh = MethodHandles.collectArguments(mh, MethodType.genericMethodType(1 + size));
     

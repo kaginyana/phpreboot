@@ -196,7 +196,7 @@ public class XPathExprVisitor extends Visitor<Object, XPathExprEnv, JaxenExcepti
           
           int compare;
           if (key1.getClass() == key2.getClass() && key1 instanceof Comparable<?>) {  // nullcheck
-            compare = ((Comparable)key1).compareTo(key1);
+            compare = ((Comparable)key1).compareTo(key2);
           } else {
             compare = key1.toString().compareTo(key2.toString());
           }

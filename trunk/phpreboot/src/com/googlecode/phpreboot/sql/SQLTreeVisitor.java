@@ -121,16 +121,23 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException> {
     try {
       if (parameters.isEmpty()) {
         Statement statement = connection.createStatement();
-        resultSet = statement.executeQuery(sqlQuery);
+        try {
+          resultSet = statement.executeQuery(sqlQuery);
+        } finally {
+          statement.close();
+        }
         
       } else {
         PreparedStatement prepareStatement = connection.prepareStatement(sqlQuery);
-        int index = 1;
-        for(Object value: parameters) {
-          prepareStatement.setObject(index++, value);
+        try {
+          int index = 1;
+          for(Object value: parameters) {
+            prepareStatement.setObject(index++, value);
+          }
+          resultSet = prepareStatement.executeQuery();
+        } finally {
+          prepareStatement.close();
         }
-        resultSet = prepareStatement.executeQuery();
-        
       }
     
       if (!resultSet.next())  { // starts with first row, free result set if empty
@@ -162,7 +169,11 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException> {
     
     try {
       Statement statement = env.getConnection().createStatement();
-      statement.executeUpdate(sql);
+      try {
+        statement.executeUpdate(sql);
+      } finally {
+        statement.close();
+      }
     } catch (SQLException e) {
       throw (RuntimeException)new RuntimeException(sql).initCause(e);
     }
@@ -178,11 +189,15 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException> {
     List<Object> parameters = env.getParameters();
     try {
       PreparedStatement prepareStatement = connection.prepareStatement(sql);
-      int index = 1;
-      for(Object value: parameters) {
-        prepareStatement.setObject(index++, value);
+      try {
+        int index = 1;
+        for(Object value: parameters) {
+          prepareStatement.setObject(index++, value);
+        }
+        prepareStatement.executeUpdate();
+      } finally {
+        prepareStatement.close();
       }
-      prepareStatement.executeUpdate();
     } catch (SQLException e) {
       throw (RuntimeException)new RuntimeException(sql).initCause(e);
     }

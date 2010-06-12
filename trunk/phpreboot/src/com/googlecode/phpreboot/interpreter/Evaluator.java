@@ -476,13 +476,13 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     }
     try {
       if (expr == null) {
-        for(;;) {
+        for(;;) { // the only way to exit that loop is to catch a break exception
           try {
             eval(instr, env);
           } catch(ContinueError e) {
             e.mayRethrow(env);
           }
-          if (step != null) {
+          if (step != null) { 
             eval(step, env);
           }
         }

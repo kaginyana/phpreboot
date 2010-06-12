@@ -4,7 +4,6 @@ import static com.googlecode.phpreboot.compiler.LivenessType.ALIVE;
 import static org.objectweb.asm.Opcodes.ACONST_NULL;
 import static org.objectweb.asm.Opcodes.ALOAD;
 import static org.objectweb.asm.Opcodes.BIPUSH;
-import static org.objectweb.asm.Opcodes.CHECKCAST;
 import static org.objectweb.asm.Opcodes.DCMPG;
 import static org.objectweb.asm.Opcodes.DCONST_0;
 import static org.objectweb.asm.Opcodes.DUP;
@@ -720,7 +719,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     return PrimitiveType.BOOLEAN;
   }
   
-  class ConstGenerator extends GeneratorClosure {
+  static class ConstGenerator extends GeneratorClosure {
     private final boolean value;
 
     ConstGenerator(boolean value) {

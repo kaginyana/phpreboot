@@ -412,6 +412,7 @@ public class Compiler {
     
     if (RTFlag.DEBUG) {
       bindMap.dump();
+      //new ClassReader(array).accept(new TraceClassVisitor(new PrintWriter(System.err)), 0);
       CheckClassAdapter.verify(new ClassReader(array), true, new PrintWriter(System.err));
     }
     
@@ -612,7 +613,13 @@ public class Compiler {
   }
   
   static class StandardLoader extends ClassLoader {
-    private static final StandardLoader STANDARD_LOADER = new StandardLoader();
+    private static final StandardLoader STANDARD_LOADER;
+    static {
+      if (!LEGACY_MODE) {
+        registerAsParallelCapable();
+      }
+      STANDARD_LOADER = new StandardLoader();
+    }
     
     static Class<?> define(String className, byte[] bytecodes) {
       if (LEGACY_MODE) {

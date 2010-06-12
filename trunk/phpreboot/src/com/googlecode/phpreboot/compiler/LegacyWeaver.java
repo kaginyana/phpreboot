@@ -12,10 +12,7 @@ class LegacyWeaver extends OnlineWeaver {
 
   @Override
   public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
-    if (version >= Opcodes.V1_7)
-      version = Opcodes.V1_5;
-
-    super.visit(version, access, name, signature, superName, interfaces);
+    super.visit(Opcodes.V1_5, access, name, signature, superName, interfaces);
   }
 
   public static ClassVisitor weave(ClassVisitor cv) {

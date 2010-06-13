@@ -1,7 +1,7 @@
 package com.googlecode.phpreboot.compiler;
 
 import static com.googlecode.phpreboot.compiler.LivenessType.ALIVE;
-import static org.objectweb.asm.Opcodes.ACONST_NULL;
+import static org.objectweb.asm.Opcodes.*;
 import static org.objectweb.asm.Opcodes.ALOAD;
 import static org.objectweb.asm.Opcodes.BIPUSH;
 import static org.objectweb.asm.Opcodes.DCMPG;
@@ -93,8 +93,11 @@ import com.googlecode.phpreboot.ast.ScriptMember;
 import com.googlecode.phpreboot.ast.ScriptScriptMember;
 import com.googlecode.phpreboot.ast.Visitor;
 import com.googlecode.phpreboot.compiler.LoopStack.Labels;
+import com.googlecode.phpreboot.interpreter.BreakError;
+import com.googlecode.phpreboot.interpreter.ContinueError;
 import com.googlecode.phpreboot.interpreter.Echoer;
 import com.googlecode.phpreboot.interpreter.EvalEnv;
+import com.googlecode.phpreboot.interpreter.ReturnError;
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.Function;
 import com.googlecode.phpreboot.model.IntrinsicInfo;
@@ -116,13 +119,18 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   private static final String ECHOER_INTERNAL_NAME = getInternalName(Echoer.class);
   static final String EVAL_ENV_INTERNAL_NAME = getInternalName(EvalEnv.class);
   private static final String RT_INTERNAL_NAME = getInternalName(RT.class);
+  private static final String BREAK_ERROR_INTERNAL_NAME = getInternalName(BreakError.class);
+  private static final String CONTINUE_ERROR_INTERNAL_NAME = getInternalName(ContinueError.class);
+  private static final String RETURN_ERROR_INTERNAL_NAME = getInternalName(ReturnError.class);
   
+  private final boolean trace;
   private final String internalClassName;
   private final ClassVisitor classVisitor;
   private final Map<Node, Type> typeAttributeMap;
   private final Map<Node, Symbol> symbolAttributeMap;
   
-  public Gen(String internalClassName, ClassVisitor classVisitor, Map<Node, Type> typeAttributeMap, Map<Node, Symbol> symbolAttributeMap) {
+  public Gen(boolean trace, String internalClassName, ClassVisitor classVisitor, Map<Node, Type> typeAttributeMap, Map<Node, Symbol> symbolAttributeMap) {
+    this.trace = trace;
     this.internalClassName = internalClassName;
     this.classVisitor = classVisitor;
     this.typeAttributeMap = typeAttributeMap;
@@ -405,6 +413,13 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     if (expr != null) {
       gen(expr, env.expectedType(type));
       insertCast(mv, type, getTypeAttribute(expr));
+    }
+    
+    if (trace) {
+      // we are in trace mode, must generate an exception to go back into the interpreter
+      mv.visitMethodInsn(INVOKESTATIC, RETURN_ERROR_INTERNAL_NAME, "instance", "(Ljava/lang/Object;)L"+RETURN_ERROR_INTERNAL_NAME+';');
+      mv.visitInsn(ATHROW);
+      return null;
     }
     
     mv.visitInsn(asASMType(type).getOpcode(IRETURN));
@@ -791,24 +806,42 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   
   @Override
   public Type visit(InstrBreak instr_break, GenEnv env) {
+    MethodVisitor mv = env.getMethodVisitor();
     LoopStack<Labels> loopStack = env.getLoopStack();
     IdToken idToken = instr_break.getIdOptional();
+    
     Labels labels = (idToken == null)? loopStack.current(): loopStack.lookup(idToken.getValue());
-    env.getMethodVisitor().visitLabel(labels.breakLabel);
+    if (labels == null) {
+      // we are in trace mode, must generate an exception to go back into the interpreter
+      assert trace;
+      String label = (idToken == null)? null: idToken.getValue();
+      mv.visitLdcInsn(label);
+      mv.visitMethodInsn(INVOKESTATIC, BREAK_ERROR_INTERNAL_NAME, "instance", "(Ljava/lang/String;)L"+BREAK_ERROR_INTERNAL_NAME+';');
+      mv.visitInsn(ATHROW);
+      return null;
+    }
+    
+    mv.visitJumpInsn(GOTO, labels.breakLabel);
     return null;
   }
   
   @Override
   public Type visit(InstrContinue instr_continue, GenEnv env) {
+    MethodVisitor mv = env.getMethodVisitor();
     LoopStack<Labels> loopStack = env.getLoopStack();
     IdToken idToken = instr_continue.getIdOptional();
-    Labels labels;
-    if (idToken == null) {
-      labels = loopStack.current();
-    } else {
-      labels = loopStack.lookup(idToken.getValue());
+    Labels labels = (idToken == null)? loopStack.current(): loopStack.lookup(idToken.getValue());
+    if (labels == null) {
+      // we are in trace mode, must generate an exception to go back into the interpreter
+      assert trace;
+      String label = (idToken == null)? null: idToken.getValue();
+      mv.visitLdcInsn(label);
+      mv.visitMethodInsn(INVOKESTATIC, CONTINUE_ERROR_INTERNAL_NAME, "instance", "(Ljava/lang/String;)L"+CONTINUE_ERROR_INTERNAL_NAME+';');
+      mv.visitInsn(ATHROW);
+      return null;
     }
-    env.getMethodVisitor().visitLabel(labels.continueLabel);
+    
+    mv.visitJumpInsn(GOTO, labels.continueLabel);
     return null;
   }
   

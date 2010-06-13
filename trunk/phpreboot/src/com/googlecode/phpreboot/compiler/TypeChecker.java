@@ -73,11 +73,13 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     new HashMap<Node, Symbol>();
   private final HashMap<Function,LocalVar> functionToLocalMap =
     new HashMap<Function, LocalVar>();
+  private final boolean trace;
   private final BindMap bindMap;
   private final TypeProfileMap typeProfileMap;
   private final boolean allowOptimisticType;
   
-  TypeChecker(BindMap bindMap, TypeProfileMap typeProfileMap, boolean allowOptimisticType) {
+  TypeChecker(boolean trace, BindMap bindMap, TypeProfileMap typeProfileMap, boolean allowOptimisticType) {
+    this.trace = trace;
     this.bindMap = bindMap;
     this.typeProfileMap = typeProfileMap;
     this.allowOptimisticType = allowOptimisticType;
@@ -465,7 +467,11 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     return ALIVE;
   }
   
-  private static Type visitBreakOrContinue(/*@Nullable*/IdToken idToken, TypeCheckEnv env) {
+  private Type visitBreakOrContinue(/*@Nullable*/IdToken idToken, TypeCheckEnv env) {
+    if (trace) {     // mixed mode, if loopstack doesn't contains any labels 
+      return DEAD;   // gen pass will generate an exception to go back in the interpreter
+    }
+
     LoopStack<Boolean> loopStack = env.getLoopStack();
     if (idToken == null) {
       if (loopStack.current() == null) {

@@ -49,7 +49,7 @@ public class Compiler {
     
     // typecheck
     BindMap bindMap = new BindMap();
-    TypeChecker typeChecker = new TypeChecker(bindMap, new TypeProfileMap(), false);
+    TypeChecker typeChecker = new TypeChecker(false, bindMap, new TypeProfileMap(), false);
     Type liveness;
     try {
       liveness = typecheck(typeChecker, script, PrimitiveType.VOID, localScope);
@@ -75,7 +75,7 @@ public class Compiler {
     mv.visitMethodInsn(Opcodes.INVOKESTATIC, Gen.EVAL_ENV_INTERNAL_NAME, "defaultEvalEnv", "()L"+Gen.EVAL_ENV_INTERNAL_NAME+';');
     mv.visitVarInsn(Opcodes.ASTORE, 0);
     
-    Gen gen = new Gen(scriptName, cv, typeChecker.getTypeAttributeMap(), typeChecker.getSymbolAttributeMap());
+    Gen gen = new Gen(false, scriptName, cv, typeChecker.getTypeAttributeMap(), typeChecker.getSymbolAttributeMap());
     gen.gen(script, new GenEnv(mv, 2 /*ARGS + env*/, null, new LoopStack<Labels>(), null));
     if (liveness == LivenessType.ALIVE) {
       gen.defaultReturn(mv, PrimitiveType.VOID);
@@ -111,7 +111,7 @@ public class Compiler {
     }
     
     BindMap bindMap = new BindMap();
-    TypeChecker typeChecker = new TypeChecker(bindMap, new TypeProfileMap(), false);
+    TypeChecker typeChecker = new TypeChecker(false, bindMap, new TypeProfileMap(), false);
     Type liveness;
     try {
       liveness = typecheck(typeChecker, function.getBlock(), function.getReturnType(), localScope);
@@ -119,7 +119,7 @@ public class Compiler {
       return null;
     }
     
-    return gen(function, bindMap, liveness, typeChecker.getTypeAttributeMap(), typeChecker.getSymbolAttributeMap());
+    return gen(false, function, bindMap, liveness, typeChecker.getTypeAttributeMap(), typeChecker.getSymbolAttributeMap());
   }
   
   public static Function traceTypecheckFunction(Function function, Type[] types, Type returnType) {
@@ -145,7 +145,7 @@ public class Compiler {
     }
     
     BindMap bindMap = new BindMap();
-    TypeChecker typeChecker = new TypeChecker(bindMap, new TypeProfileMap(), RTFlag.COMPILER_OPTIMISTIC);
+    TypeChecker typeChecker = new TypeChecker(true, bindMap, new TypeProfileMap(), RTFlag.COMPILER_OPTIMISTIC);
     
     Type liveness;
     try {
@@ -245,7 +245,7 @@ public class Compiler {
         Map<Node, Symbol> symbolAttributeMap,
         Object[] args) throws Throwable {
 
-       MethodHandle mh = Compiler.gen(specializedFunction, bindMap, liveness, typeAttributeMap, symbolAttributeMap);
+       MethodHandle mh = Compiler.gen(false, specializedFunction, bindMap, liveness, typeAttributeMap, symbolAttributeMap);
        
        // install the compiled method handle
        specializedFunction.setMethodHandle(mh);
@@ -260,7 +260,7 @@ public class Compiler {
     }
   }
   
-  static MethodHandle gen(Function function, BindMap bindMap, Type liveness, Map<Node, Type> typeAttributeMap, Map<Node, Symbol> symbolAttributeMap) {
+  static MethodHandle gen(boolean trace, Function function, BindMap bindMap, Type liveness, Map<Node, Type> typeAttributeMap, Map<Node, Symbol> symbolAttributeMap) {
     String name = function.getName();
     
     ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
@@ -277,7 +277,7 @@ public class Compiler {
     MethodVisitor mv = cv.visitMethod(Opcodes.ACC_PUBLIC|Opcodes.ACC_STATIC, name, desc, null, null);
     mv.visitCode();
     
-    Gen gen = new Gen(className, cv, typeAttributeMap, symbolAttributeMap);
+    Gen gen = new Gen(trace, className, cv, typeAttributeMap, symbolAttributeMap);
     gen.gen(function.getBlock(), new GenEnv(mv, bindMap.getSlotCount(), null, new LoopStack<Labels>(), null));
     if (liveness == LivenessType.ALIVE) {
       gen.defaultReturn(mv, function.getReturnType());
@@ -328,9 +328,9 @@ public class Compiler {
     
     TypeProfileMap typeProfileMap = new TypeProfileMap();
     BindMap bindMap = new BindMap();
-    TypeChecker typeChecker = new TypeChecker(bindMap, typeProfileMap, RTFlag.COMPILER_OPTIMISTIC && optimisticTrace);
+    TypeChecker typeChecker = new TypeChecker(true, bindMap, typeProfileMap, RTFlag.COMPILER_OPTIMISTIC && optimisticTrace);
     LoopStack<Boolean> loopStack = new LoopStack<Boolean>();
-    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, /*FIXME need the enclosing return type*/PrimitiveType.VOID);
+    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, PrimitiveType.ANY);
     
     try {
       typeChecker.typeCheck(labeledInstrWhile, typeCheckEnv);
@@ -343,14 +343,14 @@ public class Compiler {
       //System.err.println("optimistic typecheck failed");
       typeProfileMap.validate(true);
       bindMap = new BindMap();
-      typeChecker = new TypeChecker(bindMap, typeProfileMap, false);
+      typeChecker = new TypeChecker(true, bindMap, typeProfileMap, false);
       
       //System.err.println("typeProfileMap "+typeProfileMap);
       
       // typecheck again but use the typeProfileMap instead
       
       localScope = new LocalScope(scope);
-      typeCheckEnv = new TypeCheckEnv(localScope, loopStack, /*FIXME need the enclosing return type*/PrimitiveType.VOID);
+      typeCheckEnv = new TypeCheckEnv(localScope, loopStack, PrimitiveType.ANY);
       try {
         typeChecker.typeCheck(labeledInstrWhile, typeCheckEnv);
       } catch(CodeNotCompilableException e2) {
@@ -383,7 +383,7 @@ public class Compiler {
     MethodVisitor mv = cv.visitMethod(Opcodes.ACC_PUBLIC|Opcodes.ACC_STATIC, "trace", desc, null, null);
     mv.visitCode();
     
-    Gen gen = new Gen(className, cv, typeChecker.getTypeAttributeMap(), typeChecker.getSymbolAttributeMap());
+    Gen gen = new Gen(true, className, cv, typeChecker.getTypeAttributeMap(), typeChecker.getSymbolAttributeMap());
     gen.gen(labeledInstrWhile,
         new GenEnv(mv,
             bindMap.getSlotCount() + bindMap.getReferencesCount(),

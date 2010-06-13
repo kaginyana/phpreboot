@@ -114,66 +114,6 @@ import com.googlecode.phpreboot.sql.SQLConnection;
 import com.googlecode.phpreboot.uri.URIVisitor;
 
 public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
-  @SuppressWarnings("serial")
-  static class ReturnError extends Error {
-    public Object value;
-    ReturnError() {
-      // do nothing
-    }
-
-    static ReturnError instance(Object value) {
-      ReturnError instance = INSTANCE;
-      instance.value = value;
-      return instance;
-    }
-    
-    private static final ReturnError INSTANCE = new ReturnError();
-  }
-  
-  @SuppressWarnings("serial")
-  static class BreakError extends Error {
-    String label;
-    BreakError() {
-      // do nothing
-    }
-    
-    public void mayRethrow(/*@Nullable*/String loopLabel) {
-      String label = this.label;
-      if (label != null && !label.equals(loopLabel))
-        throw this;
-    }
-    
-    static BreakError instance(String label) {
-      BreakError instance = INSTANCE;
-      instance.label = label;
-      return instance;
-    }
-    
-    private static final BreakError INSTANCE = new BreakError();
-  }
-  
-  @SuppressWarnings("serial")
-  static class ContinueError extends Error {
-    String label;
-    ContinueError() {
-      // do nothing
-    }
-    
-    public void mayRethrow(/*@Nullable*/String loopLabel) {
-      String label = this.label;
-      if (label != null && !label.equals(loopLabel))
-        throw this;
-    }
-    
-    static ContinueError instance(String label) {
-      ContinueError instance = INSTANCE;
-      instance.label = label;
-      return instance;
-    }
-    
-    private static final ContinueError INSTANCE = new ContinueError();
-  }
-  
   public static final Evaluator INSTANCE = new Evaluator();
   
   

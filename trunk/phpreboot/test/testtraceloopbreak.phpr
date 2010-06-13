@@ -1,0 +1,16 @@
+
+i = 0;
+label: while(i<10) {
+
+  j = 0
+  while(j < 100) {  // this code is hot
+    if (i == 8)
+      break label
+       
+    j = j + 1
+  }
+
+  i = i + 1 
+}
+
+echo 'ok'

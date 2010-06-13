@@ -46,7 +46,7 @@ public class Interpreter extends ASTHandler {
   // --- helper methods
   
   private void eval(Node node) {
-    Evaluator.INSTANCE.eval(node, new EvalEnv(currentScope, echoer, null));
+    Evaluator.INSTANCE.eval(node, new EvalEnv(currentScope, echoer));
   }
 
   

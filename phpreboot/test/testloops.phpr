@@ -1,0 +1,17 @@
+a = 2
+label: while(a == 2) {
+  break label
+  echo 'error'
+}
+
+label: for(;;) {
+  break label
+  echo 'error'
+}
+
+label:do {
+  break label
+  echo 'error'
+} while(a == 2)
+
+echo 'ok'

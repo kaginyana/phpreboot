@@ -92,7 +92,7 @@ public class XPathExprVisitor extends Visitor<Object, XPathExprEnv, JaxenExcepti
       throw RT.error("variable %s already exists", newVarName);
     }
     
-    EvalEnv newEnv = new EvalEnv(new Scope(evalEnv.getScope()), evalEnv.getEchoer(), evalEnv.getLabel());
+    EvalEnv newEnv = new EvalEnv(new Scope(evalEnv.getScope()), evalEnv.getEchoer());
     
     Iterator<ForOrLet> it = flwor.getForOrLetPlus().iterator();
     ArrayList<Object> arrayList = new ArrayList<Object>();
@@ -183,7 +183,7 @@ public class XPathExprVisitor extends Visitor<Object, XPathExprEnv, JaxenExcepti
     Scope scope = new Scope(env.getScope());
     final Var var = new Var(name, false, PrimitiveType.ANY, null);
     scope.register(var);
-    final EvalEnv newEnv = new EvalEnv(scope, env.getEchoer(), env.getLabel());
+    final EvalEnv newEnv = new EvalEnv(scope, env.getEchoer());
     
     Comparator<Object> comparator = new Comparator<Object>() {
       @SuppressWarnings({ "unchecked", "rawtypes" })

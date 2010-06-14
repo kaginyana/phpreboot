@@ -61,7 +61,7 @@ public class Compiler {
     ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
     ClassVisitor cv = cw;
     if (LEGACY_MODE) {
-      cv = LegacyWeaver.weave(cw);
+      cv = LegacyWeaver.weave(cw, false);
     }
     cv.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC|Opcodes.ACC_FINAL, scriptName, null, "java/lang/Object", null);
     cv.visitSource(scriptName, null);
@@ -266,7 +266,7 @@ public class Compiler {
     ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
     ClassVisitor cv = cw;
     if (LEGACY_MODE) {
-      cv = LegacyWeaver.weave(cw);
+      cv = LegacyWeaver.weave(cw, true);
     }
     String className = "GenStub$"+(COUNTER++)+'$'+name;
     cv.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC|Opcodes.ACC_FINAL, className, null, "java/lang/Object", null);
@@ -364,7 +364,7 @@ public class Compiler {
     ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
     ClassVisitor cv = cw;
     if (LEGACY_MODE) {
-      cv = LegacyWeaver.weave(cw);
+      cv = LegacyWeaver.weave(cw, true);
     }
     String className = "GenStub$"+(COUNTER++)+"$trace";
     cv.visit(Opcodes.V1_7, Opcodes.ACC_PUBLIC|Opcodes.ACC_FINAL, className, null, "java/lang/Object", null);

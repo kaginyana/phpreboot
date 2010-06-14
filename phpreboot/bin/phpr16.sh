@@ -32,4 +32,4 @@ else
 fi
 
 LIB=$PHPR_HOME/lib
-java -server -ea -javaagent:$LIB/jsr292-backport.jar -Xbootclasspath/p:$LIB/jsr292-backport.jar:$LIB/phpreboot.jar:$LIB/tatoo-runtime.jar:$LIB/grizzly-servlet-webserver-1.9.18-k.jar:$LIB/derby.jar com.googlecode.phpreboot.Main16 $@
+java -server -ea -Djsr292.backport.weaver=false -javaagent:$LIB/jsr292-backport.jar -Xbootclasspath/p:$LIB/jsr292-backport.jar:$LIB/phpreboot-backported.jar:$LIB/tatoo-runtime.jar:$LIB/grizzly-servlet-webserver-1.9.18-k.jar:$LIB/derby.jar com.googlecode.phpreboot.Main16 $@

@@ -15,7 +15,7 @@ class LegacyWeaver extends OnlineWeaver {
     super.visit(Opcodes.V1_5, access, name, signature, superName, interfaces);
   }
 
-  public static ClassVisitor weave(ClassVisitor cv) {
-    return new LegacyWeaver(cv, true);
+  public static ClassVisitor weave(ClassVisitor cv, boolean optimizer) {
+    return new LegacyWeaver(cv, optimizer);
   }
 }

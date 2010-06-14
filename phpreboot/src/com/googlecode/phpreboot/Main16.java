@@ -28,6 +28,7 @@ public class Main16 {
   enum Option {
     verbose(": turn on verbose mode"),
     webserver(": start a web server"),
+    aot(": Ahead Of Time compiler"),
     doc(": start doc") {
       @Override
       boolean parse(EnumMap<Option, Object> optionMap, Iterator<String> it) {
@@ -99,6 +100,14 @@ public class Main16 {
     }
   }
 
+  private static String trimExtension(File path) {
+    String name = path.getName().toString();
+    int index = name.lastIndexOf('.');
+    if (index<1)
+      return name;
+    return name.substring(0, index);
+  }
+  
   public static void main(String[] args) throws IOException {
     EnumMap<Option,Object> optionMap = new EnumMap<Option,Object>(Option.class);
 
@@ -159,10 +168,14 @@ public class Main16 {
     }
     
     InputStream input;
+    String scriptName;
     if (filePaths.isEmpty()) {
       input = System.in;
+      scriptName = "script";
     } else {
-      input = new FileInputStream(filePaths.get(0));
+      File path = filePaths.get(0);
+      scriptName = trimExtension(path);
+      input = new FileInputStream(path);
     }
 
     InputStreamReader reader = new InputStreamReader(input);
@@ -178,7 +191,11 @@ public class Main16 {
     new BitsModule().registerModule(rootScope);
     
     try {
-      Analyzer.interpret(reader, writer, rootScope);
+      if (optionMap.containsKey(Option.aot)) {
+        Analyzer.compileAheadOfTime(scriptName, reader, rootScope);
+      } else {
+        Analyzer.interpret(reader, writer, rootScope);  
+      }
     } catch(Throwable t) {
       if (verbose)
         t.printStackTrace(System.err);

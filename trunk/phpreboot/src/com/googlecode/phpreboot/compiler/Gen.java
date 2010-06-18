@@ -891,6 +891,13 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     if (intrinsicInfo == null) {
       mv.visitMethodInsn(INVOKEVIRTUAL, "java/dyn/MethodHandle", /*"invokeExact"*/ "invoke", desc.toString());
     } else {
+      
+      int opcode = intrinsicInfo.getOpcode();
+      if (opcode != -1) {  // method call can be reduced to an opcode
+        mv.visitInsn(opcode);
+        return returnType;
+      }
+      
       Class<?> declaringClass = intrinsicInfo.getDeclaringClass();
       String owner = (declaringClass == null)? internalClassName: getInternalName(declaringClass);
       mv.visitMethodInsn(INVOKESTATIC, owner, intrinsicInfo.getName(), desc.toString());

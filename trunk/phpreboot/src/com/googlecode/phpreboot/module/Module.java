@@ -49,11 +49,9 @@ public abstract class Module {
       parameters.add(parameter);
     }
     
-    // adds intrinsics link
-    
     Class<?> declaringClass;
     String name;
-    Intrinsic intrinsic = method.getAnnotation(Intrinsic.class);
+    IntrinsicMethod intrinsic = method.getAnnotation(IntrinsicMethod.class);
     if (intrinsic != null) {
       declaringClass = intrinsic.declaringClass();
       name = intrinsic.name();
@@ -61,7 +59,11 @@ public abstract class Module {
       declaringClass = method.getDeclaringClass();
       name = method.getName();
     }
-    IntrinsicInfo instrinsicInfo = new IntrinsicInfo(declaringClass, name);
+    
+    IntrinsicOpcode intrinsicOpcode = method.getAnnotation(IntrinsicOpcode.class);
+    int opcode = (intrinsicOpcode == null)? -1: intrinsicOpcode.value();
+    
+    IntrinsicInfo instrinsicInfo = new IntrinsicInfo(declaringClass, name, opcode);
     return new Function(method.getName(), parameters, asType(method.getReturnType()), null, instrinsicInfo, null, null);
   }
   

@@ -1,6 +1,8 @@
 
+const BAR = 3 // constant variable BAR
 foo = 3       // mutable variable foo
 let bar = 3   // read only variable bar
+
 
 foo = "foo"   // ok
 //bar = 4       // error, bar is read only

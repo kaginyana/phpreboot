@@ -25,7 +25,7 @@ public class SQLTest {
       GenericSQLConnection sqlConnection = new GenericSQLConnection(url);
       
       Scope scope = new Scope(null);
-      scope.register(new Var("SQL_CONNECTION", true, PrimitiveType.ANY, sqlConnection));
+      scope.register(new Var("SQL_CONNECTION", true, true, PrimitiveType.ANY, sqlConnection));
       
       PrintWriter writer = new PrintWriter(System.out);
       Analyzer.interpret(reader, writer, scope);

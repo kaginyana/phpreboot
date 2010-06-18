@@ -6,6 +6,7 @@ import java.util.List;
 import com.googlecode.phpreboot.ast.Action;
 import com.googlecode.phpreboot.ast.Assignment;
 import com.googlecode.phpreboot.ast.Block;
+import com.googlecode.phpreboot.ast.ConstDeclaration;
 import com.googlecode.phpreboot.ast.Declaration;
 import com.googlecode.phpreboot.ast.ElseIf;
 import com.googlecode.phpreboot.ast.Eoi;
@@ -86,7 +87,24 @@ public class Interpreter extends ASTHandler {
     return null;
   }
   @Override
+  public Member member_const(ConstDeclaration constDeclaration) {
+    return null;
+  }
+  @Override
   public Member member_fun(Fun fun) {
+    return null;
+  }
+  
+  
+  // --- const
+  
+  @Override
+  public ConstDeclaration const_declaration(IdToken id, Expr expr, Eoi eoi) {
+    ConstDeclaration const_declaration = super.const_declaration(id, expr, eoi);
+    if (interpreter != 0) {
+      return const_declaration;
+    }
+    eval(const_declaration);
     return null;
   }
   

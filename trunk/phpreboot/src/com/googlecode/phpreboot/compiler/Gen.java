@@ -937,6 +937,8 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       mv.visitInsn(((Boolean)value)? ICONST_1 :ICONST_0);
       break;
     case INT:
+      integerConst(mv, (Integer)value);
+      break;
     case DOUBLE:
     case STRING:
       mv.visitLdcInsn(value);

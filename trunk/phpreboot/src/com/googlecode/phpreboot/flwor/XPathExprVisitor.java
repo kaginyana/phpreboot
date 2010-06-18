@@ -104,7 +104,7 @@ public class XPathExprVisitor extends Visitor<Object, XPathExprEnv, JaxenExcepti
       throw RT.error("xquery 'order by' is not supported yet");
     }
     
-    Var var = new Var(newVarName, true, PrimitiveType.ARRAY, toArray(arrayList));
+    Var var = new Var(newVarName, true, false, PrimitiveType.ARRAY, toArray(arrayList));
     scope.register(var);
     return null;
   }
@@ -130,7 +130,7 @@ public class XPathExprVisitor extends Visitor<Object, XPathExprEnv, JaxenExcepti
         throw RT.error("variable %s already defined", name);
       }
       
-      Var varLoop = new Var(name, false/*FIXME*/, PrimitiveType.ANY, null); 
+      Var varLoop = new Var(name, false/*FIXME*/, false, PrimitiveType.ANY, null); 
       scope.register(varLoop);
       for(Object o: forClause(forClause, env)) {
         varLoop.setValue(o);
@@ -181,7 +181,7 @@ public class XPathExprVisitor extends Visitor<Object, XPathExprEnv, JaxenExcepti
   private void orderBy(List<Object> list, String name, Xorderby xorderby, final EvalEnv env) {
     final List<com.googlecode.phpreboot.ast.Expr> exprs = xorderby.getExprPlus();
     Scope scope = new Scope(env.getScope());
-    final Var var = new Var(name, false, PrimitiveType.ANY, null);
+    final Var var = new Var(name, false, false, PrimitiveType.ANY, null);
     scope.register(var);
     final EvalEnv newEnv = new EvalEnv(scope, env.getEchoer());
     

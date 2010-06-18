@@ -1,5 +1,5 @@
 
-let x = 3
+const x = 3
 
 function f(value) {
   return x + value

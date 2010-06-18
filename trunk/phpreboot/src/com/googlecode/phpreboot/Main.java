@@ -181,7 +181,7 @@ public class Main {
 
     GenericSQLConnection sqlConnection = new GenericSQLConnection(jdbcURL);
     Scope rootScope = new Scope(null);
-    rootScope.register(new Var("SQL_CONNECTION", true, PrimitiveType.ANY, sqlConnection));
+    rootScope.register(new Var("SQL_CONNECTION", true, true, PrimitiveType.ANY, sqlConnection));
 
     // register modules
     new LangModule().registerModule(rootScope);

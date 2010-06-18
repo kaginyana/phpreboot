@@ -101,7 +101,7 @@ public class Compiler {
   public static MethodHandle compileFunction(Function function) {
     String name = function.getName();
     LocalScope localScope = new LocalScope(function.getScope());
-    localScope.register(new Var(name, true, PrimitiveType.ANY, function));
+    localScope.register(new Var(name, true, false, PrimitiveType.ANY, function));
     List<Parameter> parameters = function.getParameters();
     int size = parameters.size();
     for(int i=0; i<size; i++) {
@@ -125,7 +125,7 @@ public class Compiler {
   public static Function traceTypecheckFunction(Function function, Type[] types, Type returnType) {
     String name = function.getName();
     LocalScope localScope = new LocalScope(function.getScope());
-    localScope.register(new Var(name, true, PrimitiveType.ANY, function));
+    localScope.register(new Var(name, true, false, PrimitiveType.ANY, function));
     List<Parameter> parameters = function.getParameters();
     int size = parameters.size();
     Var[] vars = new Var[size];

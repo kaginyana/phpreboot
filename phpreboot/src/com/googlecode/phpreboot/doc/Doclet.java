@@ -19,7 +19,7 @@ public class Doclet {
 
   public static boolean start(RootDoc rootDoc) throws IOException {
     Scope rootScope = new Scope(null);
-    rootScope.register(new Var("ROOT_DOC", true, PrimitiveType.ANY, rootDoc));
+    rootScope.register(new Var("ROOT_DOC", true, true, PrimitiveType.ANY, rootDoc));
     
     PrintWriter writer = new PrintWriter(new FileWriter("doc.html"));
     try {

@@ -16,8 +16,8 @@ public class LocalVar extends Var implements Symbol {
   
   private final static Object LOCAL_VAR_MARKER = new Object();
   
-  private LocalVar(String name, boolean readOnly, Type type, Node declaringNode, Object value, boolean bound, int slot) {
-    super(name, readOnly, type, value);
+  private LocalVar(String name, boolean readOnly, boolean constant, Type type, Node declaringNode, Object value, boolean bound, int slot) {
+    super(name, readOnly, constant, type, value);
     this.declaringNode = declaringNode;
     this.bound = bound;
     this.slot = slot;
@@ -54,14 +54,14 @@ public class LocalVar extends Var implements Symbol {
   }
   
   public static LocalVar createConstantFoldable(Object value) {
-    return new LocalVar(null, true, null, /*not optimistic*/null, value, true, -1);
+    return new LocalVar(null, true, true, null, /*not optimistic*/null, value, true, -1);
   }
   
   public static LocalVar createConstantBound(String name, boolean readOnly, Type type, Node declaringNode, Object value, int slot) {
-    return new LocalVar(name, readOnly, type, declaringNode, value, true, slot);
+    return new LocalVar(name, readOnly, false, type, declaringNode, value, true, slot);
   }
   
   public static LocalVar createLocalVar(String name, boolean readOnly, Type type, Node declaringNode, int slot) {
-    return new LocalVar(name, readOnly, type, declaringNode, LOCAL_VAR_MARKER, false, slot);
+    return new LocalVar(name, readOnly, false, type, declaringNode, LOCAL_VAR_MARKER, false, slot);
   }
 }

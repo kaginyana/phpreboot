@@ -233,7 +233,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     Function function = Function.createFunction(false, name, parametersNode, intrinsicInfo, scope, block);
     
     LocalScope localScope = new LocalScope(function.getScope());
-    localScope.register(new Var(name, true, PrimitiveType.ANY, function));
+    localScope.register(new Var(name, true, false, PrimitiveType.ANY, function));
     List<Parameter> parameters = function.getParameters();
     int size = parameters.size();
     for(int i=0; i<size; i++) {
@@ -245,7 +245,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     LoopStack<Boolean> loopStack = new LoopStack<Boolean>();
     typeCheck(block, new TypeCheckEnv(localScope, loopStack, function.getReturnType()));
     
-    Var var = new Var(name, true, PrimitiveType.ANY, function);
+    Var var = new Var(name, true, true, PrimitiveType.ANY, function);
     scope.register(var);
     
     symbolAttributeMap.put(node, LocalVar.createConstantFoldable(function));
@@ -600,29 +600,25 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     }
     
     Object value = var.getValue();
-    /*FIXME constants can be only constant for one compilation
-     *      this doesn't allow to reuse a trace.
-     *      should be only enabled in non-trace mode.
-     */
-    /*
-    if (var.isReadOnly()) {  // constants
+    
+    if (var.isReallyConstant()) {  // constant foldable
       if (value instanceof Boolean) {
-        expr_id.setSymbolAttribute(LocalVar.createConstantFoldable(value));
+        symbolAttributeMap.put(expr_id, LocalVar.createConstantFoldable(value));
         return PrimitiveType.BOOLEAN;
       }
       if (value instanceof Integer) {
-        expr_id.setSymbolAttribute(LocalVar.createConstantFoldable(value));
+        symbolAttributeMap.put(expr_id, LocalVar.createConstantFoldable(value));
         return PrimitiveType.INT;
       }
       if (value instanceof Double) {
-        expr_id.setSymbolAttribute(LocalVar.createConstantFoldable(value));
+        symbolAttributeMap.put(expr_id, LocalVar.createConstantFoldable(value));
         return PrimitiveType.DOUBLE;
       }
       if (value instanceof String) {
-        expr_id.setSymbolAttribute(LocalVar.createConstantFoldable(value));
+        symbolAttributeMap.put(expr_id, LocalVar.createConstantFoldable(value));
         return PrimitiveType.STRING;
       }
-    } */
+    }
     
     // bound constant
     LocalVar bindVar = bindMap.bind(name, var.isReadOnly(), value, type, allowOptimisticType, typeProfileMap, expr_id);

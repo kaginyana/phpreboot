@@ -16,7 +16,6 @@ tokens:
 // where = 'where'
 // order = 'order'
 // by = 'by'
-// --- common with primary language ---
 // let = 'let'
 
 types:
@@ -33,7 +32,7 @@ productions:
         
   for_or_let = for_clause         { for_or_let_for }
              | let_declaration    { for_or_let_let }
-             ;                       
+             ;                                   
                     
   for_clause = 'for' 'id' 'in' disable_line_comment 'id' location_path enable_line_comment   { for_clause }
              ;

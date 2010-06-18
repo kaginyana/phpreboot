@@ -154,7 +154,7 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException> {
     Scope scope = env.getEvalEnv().getScope();
     Var scriptVar = scope.lookup(name);
     if (scriptVar == null) {
-      scriptVar = new Var(name, false, PrimitiveType.ANY, cursor);
+      scriptVar = new Var(name, false, false, PrimitiveType.ANY, cursor);
       scope.register(scriptVar);
     } else {
       scriptVar.setValue(cursor);

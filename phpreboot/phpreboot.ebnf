@@ -15,6 +15,7 @@ priorities:
 
 tokens:
   let = 'let'
+  _const = 'const'
   _if = 'if'
   _else = 'else'     [ifelse]
   elseif = 'elseif'  [ifelse]
@@ -167,8 +168,9 @@ productions:
          | member            { script_member }
          ; 
          
-  member = fun      { member_fun } 
-         | instr    { member_instr }
+  member = fun                { member_fun } 
+         | const_declaration  { member_const }
+         | instr              { member_instr }
          ;
          
   fun = 'function' 'id' parameters block             { fun_no_return_type }
@@ -187,6 +189,9 @@ productions:
          
   block = '{' instr* '}'            { block }
         ;
+             
+  const_declaration = 'const' 'id' '=' expr  eoi  { const_declaration }
+                    ;               
              
   action =      { action }
          ;           
@@ -223,10 +228,10 @@ productions:
   declaration = type 'id'              { declaration_type_empty }
               | type 'id' '=' expr     { declaration_type_init }
               | let_declaration        { declaration_let }
-              ;
+              ;       
               
-  let_declaration = 'let' 'id' '=' expr    { let_declaration }
-                  ;                      
+  let_declaration = 'let' 'id' '=' expr   { let_declaration }
+                  ;                       
      
   funcall = 'id' '(' expr/'comma'* ')'     { funcall_call }
           | primary '(' expr/'comma'* ')'  { funcall_apply }  

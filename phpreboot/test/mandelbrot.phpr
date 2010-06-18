@@ -1,12 +1,12 @@
-let size = 16000
-echo "P4\n#{" + size + "} #{ " + size + "}"
+  const size = 4000
+  echo "P4\n#{" + size + "} #{ " + size + "}"
 
-let ITER = 50           // Mandelbrot iterations
-let LIMIT_SQUARED = 4.0 // Presquared limit
+  const ITER = 50           // Mandelbrot iterations
+  const LIMIT_SQUARED = 4.0 // Presquared limit
 
   byte_acc = 0
   bit_num = 0
-  count_size = size - 1   // Precomputed size
+  const count_size = size - 1   // Precomputed size
  
   y = 0
   while (y < size) {

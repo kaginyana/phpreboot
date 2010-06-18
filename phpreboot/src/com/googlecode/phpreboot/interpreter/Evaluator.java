@@ -18,6 +18,7 @@ import com.googlecode.phpreboot.ast.AttrsDollarAccess;
 import com.googlecode.phpreboot.ast.AttrsEmpty;
 import com.googlecode.phpreboot.ast.AttrsStringLiteral;
 import com.googlecode.phpreboot.ast.Block;
+import com.googlecode.phpreboot.ast.ConstDeclaration;
 import com.googlecode.phpreboot.ast.ContentBlock;
 import com.googlecode.phpreboot.ast.ContentDollarAccess;
 import com.googlecode.phpreboot.ast.ContentEmpty;
@@ -129,13 +130,13 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   public Object evalFunction(Function function, Object[] arguments, EvalEnv env) {
     Scope scope = new Scope(function.getScope());
-    scope.register(new Var(function.getName(), true, PrimitiveType.ANY, function));
+    scope.register(new Var(function.getName(), true, false, PrimitiveType.ANY, function));
     
     List<Parameter> parameters = function.getParameters();
     int parameterSize = parameters.size();
     for(int i = 0; i<parameterSize; i++) {
       Parameter parameter = parameters.get(i);
-      Var var = new Var(parameter.getName(), true, parameter.getType(), arguments[i]);
+      Var var = new Var(parameter.getName(), true, false, parameter.getType(), arguments[i]);
       scope.register(var);
     }
     
@@ -206,7 +207,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     checkVar(name, scope);
     
     Function function = createFunction(false, name, parameters, block, env);
-    Var var = new Var(name, true, PrimitiveType.ANY, function);
+    Var var = new Var(name, true, true, PrimitiveType.ANY, function);
     scope.register(var);
   }
   @Override
@@ -491,7 +492,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       while(sequence != null) {
         Scope foreachScope = new Scope(env.getScope());
         EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getEchoer());
-        foreachScope.register(new Var(name, true, PrimitiveType.ANY, sequence.getValue()));
+        foreachScope.register(new Var(name, true, false, PrimitiveType.ANY, sequence.getValue()));
         
         try {
           eval(instr, foreachEnv);
@@ -523,8 +524,8 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       while(sequence != null) {
         Scope foreachScope = new Scope(env.getScope());
         EvalEnv foreachEnv = new EvalEnv(foreachScope, env.getEchoer());
-        foreachScope.register(new Var(keyName, true, PrimitiveType.ANY, sequence.getKey()));
-        foreachScope.register(new Var(valueName, true, PrimitiveType.ANY, sequence.getValue()));
+        foreachScope.register(new Var(keyName, true, false, PrimitiveType.ANY, sequence.getKey()));
+        foreachScope.register(new Var(valueName, true, false, PrimitiveType.ANY, sequence.getValue()));
         
         try {
           eval(instr, foreachEnv);
@@ -543,26 +544,23 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   
   @Override
-  public Object visit(LetDeclaration let_declaration, EvalEnv env) {
-    String name = let_declaration.getId().getValue();
+  public Object visit(ConstDeclaration const_declaration, EvalEnv env) {
+    String name = const_declaration.getId().getValue();
     Scope scope = env.getScope();
     checkVar(name, scope);
-    Object value = eval(let_declaration.getExpr(), env);
-    Var var = new Var(name, true, PrimitiveType.ANY, value);
+    Object value = eval(const_declaration.getExpr(), env);
+    Var var = new Var(name, true, true, PrimitiveType.ANY, value);
     scope.register(var);
     return null;
   }
-  @Override
-  public Object visit(DeclarationLet declaration_let, EvalEnv env) {
-    return eval(declaration_let.getLetDeclaration(), env);
-  }
+  
   @Override
   public Object visit(DeclarationTypeEmpty declaration_type_empty, EvalEnv env) {
     String name = declaration_type_empty.getId().getValue();
     Scope scope = env.getScope();
     checkVar(name, scope);
     PrimitiveType type = (PrimitiveType)eval(declaration_type_empty.getType(), env);
-    Var var = new Var(name, false, type, type.getDefaultValue());
+    Var var = new Var(name, false, false, type, type.getDefaultValue());
     scope.register(var);
     return null;
   }
@@ -574,11 +572,26 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Object value = eval(declaration_type_init.getExpr(), env);
     PrimitiveType type = (PrimitiveType)eval(declaration_type_init.getType(), env);
     
-    Var var = new Var(name, false, type, value);
+    Var var = new Var(name, false, false, type, value);
     scope.register(var);
     return null;
-    
   }
+  
+  @Override
+  public Object visit(LetDeclaration let_declaration, EvalEnv env) {
+    String name = let_declaration.getId().getValue();
+    Scope scope = env.getScope();
+    checkVar(name, scope);
+    Object value = eval(let_declaration.getExpr(), env);
+    Var var = new Var(name, true, true, PrimitiveType.ANY, value);
+    scope.register(var);
+    return null;
+  }
+  @Override
+  public Object visit(DeclarationLet declaration_let, EvalEnv env) {
+    return eval(declaration_let.getLetDeclaration(), env);
+  }
+  
   
   @Override
   public Object visit(AssignmentId assignment_id, EvalEnv env) {
@@ -589,7 +602,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Object value = eval(assignment_id.getExpr(), env);
     if (var == null) {
       // auto declaration
-      var = new Var(name, false, PrimitiveType.ANY, value);
+      var = new Var(name, false, false, PrimitiveType.ANY, value);
       scope.register(var);
       
       // profile

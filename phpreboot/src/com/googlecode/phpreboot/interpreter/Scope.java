@@ -72,7 +72,7 @@ public class Scope {
     for(Var var: scope.varMap()) {
       if (var.isReadOnly()) {
         String name = var.getName();
-        map.put(name, new Var(name, true, var.getType(), var.getValue()));
+        map.put(name, new Var(name, true, true, var.getType(), var.getValue()));
       }
     }
   }

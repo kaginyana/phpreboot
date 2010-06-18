@@ -36,7 +36,7 @@ public abstract class Module {
       Function function = createFunction(method);
       function.setMethodHandle(mh);
       
-      Var var = new Var(method.getName(), true, PrimitiveType.ANY, function);
+      Var var = new Var(method.getName(), true, true, PrimitiveType.ANY, function);
       scope.register(var);
     }
   }
@@ -75,6 +75,8 @@ public abstract class Module {
       return PrimitiveType.DOUBLE;
     if (runtimeClass == String.class)
       return PrimitiveType.STRING;
+    if (runtimeClass == void.class)
+      return PrimitiveType.VOID;
     return PrimitiveType.ANY;
   }
 }

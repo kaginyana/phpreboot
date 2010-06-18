@@ -9,8 +9,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 @Documented
-public @interface Intrinsic {
+public @interface IntrinsicMethod {
   Class<?> declaringClass();
   String name();
-  //Class<?>[] signature() default {};
 }

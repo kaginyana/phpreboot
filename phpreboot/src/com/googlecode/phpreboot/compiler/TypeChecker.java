@@ -229,7 +229,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     LocalScope scope = env.getScope();
     checkVar(name, scope);
     
-    IntrinsicInfo intrinsicInfo = new IntrinsicInfo(null/*current class*/, name);
+    IntrinsicInfo intrinsicInfo = new IntrinsicInfo(null/*current class*/, name, -1);
     Function function = Function.createFunction(false, name, parametersNode, intrinsicInfo, scope, block);
     
     LocalScope localScope = new LocalScope(function.getScope());

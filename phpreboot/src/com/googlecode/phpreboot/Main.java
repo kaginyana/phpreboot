@@ -14,17 +14,14 @@ import java.util.Iterator;
 
 import com.googlecode.phpreboot.doc.Doclet;
 import com.googlecode.phpreboot.interpreter.Analyzer;
-import com.googlecode.phpreboot.interpreter.Scope;
+import com.googlecode.phpreboot.interpreter.RootScope;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Var;
-import com.googlecode.phpreboot.module.BitsModule;
-import com.googlecode.phpreboot.module.LangModule;
-import com.googlecode.phpreboot.module.MathModule;
 import com.googlecode.phpreboot.sql.GenericSQLConnection;
 import com.googlecode.phpreboot.webserver.WebScriptDispatcher;
 import com.sun.grizzly.http.embed.GrizzlyWebServer;
 
-// Warning ! every modifications in this class must be backported in Main16
+// Warning ! every modifications in this class must be backported into Main16
 public class Main {
   enum Option {
     verbose(": turn on verbose mode"),
@@ -180,13 +177,8 @@ public class Main {
     PrintWriter writer = new PrintWriter(System.out);
 
     GenericSQLConnection sqlConnection = new GenericSQLConnection(jdbcURL);
-    Scope rootScope = new Scope(null);
+    RootScope rootScope = new RootScope();
     rootScope.register(new Var("SQL_CONNECTION", true, true, PrimitiveType.ANY, sqlConnection));
-
-    // register modules
-    new LangModule().registerModule(rootScope);
-    new MathModule().registerModule(rootScope);
-    new BitsModule().registerModule(rootScope);
     
     try {
       if (optionMap.containsKey(Option.aot)) {

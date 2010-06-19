@@ -9,12 +9,10 @@ import com.googlecode.phpreboot.interpreter.EvalEnv;
 
 public class GenericSQLConnection implements SQLConnection {
   private final String connectionURL;
-  private final SQLTreeVisitor sqlTreeVisitor;
   private Connection connection; 
   
   public GenericSQLConnection(String connectionURL) {
     this.connectionURL = connectionURL;
-    this.sqlTreeVisitor = new SQLTreeVisitor();
   }
   
   @Override
@@ -26,7 +24,7 @@ public class GenericSQLConnection implements SQLConnection {
         throw new RuntimeException(e);
       }
     }
-    sqlTreeVisitor.executeQuery(sql, connection, evalEnv);
+    SQLTreeVisitor.INSTANCE.executeQuery(sql, connection, evalEnv);
   }
 
   public void close() {

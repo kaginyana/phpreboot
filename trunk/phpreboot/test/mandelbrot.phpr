@@ -1,4 +1,4 @@
-  const size = 4000
+  const size = 1000
   echo "P4\n#{" + size + "} #{ " + size + "}"
 
   const ITER = 50           // Mandelbrot iterations

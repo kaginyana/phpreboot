@@ -63,6 +63,8 @@ import com.googlecode.phpreboot.parser.ProductionEnum;
 import com.googlecode.phpreboot.runtime.SQLCursor;
 
 public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException> {
+  static final SQLTreeVisitor INSTANCE = new SQLTreeVisitor();
+  
   public void executeQuery(Sql sql, Connection connection, EvalEnv evalEnv) {
     SQLEnv env = new SQLEnv(connection, evalEnv);
     tree(sql, env);

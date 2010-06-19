@@ -9,38 +9,69 @@ import com.googlecode.phpreboot.runtime.URI;
 import com.googlecode.phpreboot.runtime.XML;
 
 public enum PrimitiveType implements Type {
-  ANY(Object.class, Object.class, null),
-  VOID(Object.class, void.class, null),
-  BOOLEAN(Boolean.class, boolean.class, false),
-  INT(Integer.class, int.class, 0),
-  DOUBLE(Double.class, double.class, 0.0),
-  STRING(String.class, String.class, ""),
-  ARRAY(Array.class, Array.class, null),
-  SEQUENCE(Sequence.class, Sequence.class, null),
-  XML(XML.class, XML.class, null),
-  URI(URI.class, URI.class, null),
-  FUNCTION(Function.class, Function.class, null)
+  ANY(null),
+  VOID(null),
+  BOOLEAN(false),
+  INT(0),
+  DOUBLE(0.0),
+  STRING(""),
+  ARRAY(null),
+  SEQUENCE(null),
+  XML(null),
+  URI(null),
+  FUNCTION(null)
   ;
   
   private final String type;
-  private final Class<?> runtimeClass;
-  private final Class<?> unboxedRuntimeClass;
   private final Object defaultValue;
   
-  private PrimitiveType(Class<?> runtimeClass, Class<?> unboxedRuntimeClass, Object defaultValue) {
+  private PrimitiveType(Object defaultValue) {
     type = name().toLowerCase();
-    this.runtimeClass = runtimeClass;
-    this.unboxedRuntimeClass = unboxedRuntimeClass;
     this.defaultValue = defaultValue;
   }
   
   @Override
   public Class<?> getRuntimeClass() {
-    return runtimeClass;
+    switch(this) {
+    case ANY:
+    case VOID:
+      return Object.class;
+    case BOOLEAN:
+      return Boolean.class;
+    case INT:
+      return Integer.class;
+    case DOUBLE:
+      return Double.class;
+    case STRING:
+      return String.class;
+    case ARRAY:
+      return Array.class;
+    case SEQUENCE:
+      return Sequence.class;
+    case XML:
+      return XML.class;
+    case URI:
+      return URI.class;
+    case FUNCTION:
+      return Function.class;
+    default:
+      throw new AssertionError();
+    }
   }
   @Override
   public Class<?> getUnboxedRuntimeClass() {
-    return unboxedRuntimeClass;
+    switch(this) {
+    case VOID:
+      return void.class;
+    case BOOLEAN:
+      return boolean.class;
+    case INT:
+      return int.class;
+    case DOUBLE:
+      return double.class;
+    default:
+      return getRuntimeClass();
+    }
   }
   public Object getDefaultValue() {
     return defaultValue;

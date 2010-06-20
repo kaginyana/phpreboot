@@ -151,7 +151,6 @@ public class Main {
       ws.addGrizzlyAdapter(webDispatcher, new String[]{"/"});
       ws.start();
       return;
-      
     }
     
     if (optionMap.containsKey(Option.doc)) {

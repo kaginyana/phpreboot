@@ -4,15 +4,15 @@ import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Type;
 
-class LocalScope extends Scope {
+public class LocalScope extends Scope {
   private int slotCount;
   
-  LocalScope(Scope parent) {
+  public LocalScope(Scope parent) {
     super(parent);
     slotCount = 0;
   }
   
-  LocalScope(LocalScope parent) {
+  public LocalScope(LocalScope parent) {
     super(parent);
     slotCount = (parent == null)? 0: parent.slotCount;
   }

@@ -15,6 +15,7 @@ import com.googlecode.phpreboot.ast.ArrayValueEntry;
 import com.googlecode.phpreboot.ast.ArrayValueSingle;
 import com.googlecode.phpreboot.ast.AssignmentId;
 import com.googlecode.phpreboot.ast.Block;
+import com.googlecode.phpreboot.ast.ConstDeclaration;
 import com.googlecode.phpreboot.ast.ElseIfElse;
 import com.googlecode.phpreboot.ast.ElseIfElseIf;
 import com.googlecode.phpreboot.ast.ElseIfEmpty;
@@ -47,6 +48,7 @@ import com.googlecode.phpreboot.ast.LiteralNull;
 import com.googlecode.phpreboot.ast.LiteralSingle;
 import com.googlecode.phpreboot.ast.LiteralString;
 import com.googlecode.phpreboot.ast.LiteralValue;
+import com.googlecode.phpreboot.ast.MemberConst;
 import com.googlecode.phpreboot.ast.MemberFun;
 import com.googlecode.phpreboot.ast.MemberInstr;
 import com.googlecode.phpreboot.ast.Node;
@@ -192,7 +194,8 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   
   @Override
   protected Type visit(Node node, TypeCheckEnv env) {
-    System.err.println("code is not compilable: "+node.getKind());
+    System.err.println("code is not compilable: "+node.getKind()+
+        " at "+node.getLineNumberAttribute()+':'+node.getColumnNumberAttribute());
     throw CodeNotCompilableException.INSTANCE;
   }
   
@@ -214,6 +217,10 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   @Override
   public Type visit(MemberFun memberFun, TypeCheckEnv env) {
     return typeCheck(memberFun.getFun(), env);
+  }
+  @Override
+  public Type visit(MemberConst memberConst, TypeCheckEnv env) {
+    return typeCheck(memberConst.getConstDeclaration(), env);
   }
   @Override
   public Type visit(MemberInstr memberInstr, TypeCheckEnv env) {
@@ -361,6 +368,24 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     return ALIVE;
   }
   
+  
+  // --- declaration 
+  
+  @Override
+  public Type visit(ConstDeclaration const_declaration, TypeCheckEnv env) {
+    String name = const_declaration.getId().getValue();
+    LocalScope scope = env.getScope();
+    Var var = scope.lookup(name);
+    if (var != null) {
+      throw RT.error("var %s already defined", name);
+    }
+    
+    Type type = typeCheck(const_declaration.getExpr(), env);
+    LocalVar localVar = LocalVar.createLocalVar(name, true, type, const_declaration, scope.nextSlot(type));
+    scope.register(localVar);
+    symbolAttributeMap.put(const_declaration, localVar);
+    return ALIVE;
+  }
   
   @Override
   public Type visit(AssignmentId assignment_id, TypeCheckEnv env) {
@@ -566,8 +591,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
       return function.getReturnType();
     }
     
-    System.err.println("code is not compilable: "+funcall_call.getKind());
-    throw CodeNotCompilableException.INSTANCE;
+    return super.visit(funcall_call, env);
   }
   
   

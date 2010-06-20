@@ -53,6 +53,7 @@ import com.googlecode.phpreboot.ast.ArrayValueEntry;
 import com.googlecode.phpreboot.ast.ArrayValueSingle;
 import com.googlecode.phpreboot.ast.AssignmentId;
 import com.googlecode.phpreboot.ast.Block;
+import com.googlecode.phpreboot.ast.ConstDeclaration;
 import com.googlecode.phpreboot.ast.ElseIfElse;
 import com.googlecode.phpreboot.ast.ElseIfElseIf;
 import com.googlecode.phpreboot.ast.ElseIfEmpty;
@@ -84,6 +85,7 @@ import com.googlecode.phpreboot.ast.LiteralNull;
 import com.googlecode.phpreboot.ast.LiteralSingle;
 import com.googlecode.phpreboot.ast.LiteralString;
 import com.googlecode.phpreboot.ast.LiteralValue;
+import com.googlecode.phpreboot.ast.MemberConst;
 import com.googlecode.phpreboot.ast.MemberFun;
 import com.googlecode.phpreboot.ast.MemberInstr;
 import com.googlecode.phpreboot.ast.Node;
@@ -306,6 +308,10 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     return gen(memberFun.getFun(), env);
   }
   @Override
+  public Type visit(MemberConst memberConst, GenEnv env) {
+    return gen(memberConst.getConstDeclaration(), env);
+  }
+  @Override
   public Type visit(MemberInstr memberInstr, GenEnv env) {
     return gen(memberInstr.getInstr(), env);
   }
@@ -454,6 +460,18 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   }
   
   
+  // --- visit declaration & assignation
+  
+  @Override
+  public Type visit(ConstDeclaration constDeclaration, GenEnv env) {
+    LocalVar var = (LocalVar)getSymbolAttribute(constDeclaration);
+    Type type = var.getType();
+    Type exprType = gen(constDeclaration.getExpr(), env.expectedType(type));
+    MethodVisitor mv = env.getMethodVisitor();
+    insertCast(mv, type, exprType);
+    mv.visitVarInsn(asASMType(type).getOpcode(ISTORE), var.getSlot(env.getShift()));
+    return null;
+  }
   
   @Override
   public Type visit(AssignmentId assignment_id, GenEnv env) {

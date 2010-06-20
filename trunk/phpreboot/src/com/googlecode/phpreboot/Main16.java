@@ -145,16 +145,12 @@ public class Main16 {
     boolean verbose = true /*optionMap.containsKey(Option.verbose)*/;
     
     if (optionMap.containsKey(Option.webserver)) {
-      System.err.println("option -webserver is not support in legacy mode (1.6 compatible mode)");
-      
       GrizzlyWebServer ws = new GrizzlyWebServer(8080);
       File rootPath = new File(get(optionMap, Option.documentRoot, String.class, "www"));
       LegacyWebScriptDispatcher webDispatcher = new LegacyWebScriptDispatcher(rootPath, jdbcURL);
       ws.addGrizzlyAdapter(webDispatcher, new String[]{"/"});
       ws.start();
-      
       return;
-      
     }
     
     if (optionMap.containsKey(Option.doc)) {

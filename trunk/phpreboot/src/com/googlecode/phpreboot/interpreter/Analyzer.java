@@ -8,6 +8,7 @@ import java.util.IdentityHashMap;
 
 import com.googlecode.phpreboot.ast.Script;
 import com.googlecode.phpreboot.compiler.Compiler;
+import com.googlecode.phpreboot.compiler.LocalScope;
 import com.googlecode.phpreboot.lexer.RuleEnum;
 import com.googlecode.phpreboot.parser.NonTerminalEnum;
 import com.googlecode.phpreboot.parser.ProductionEnum;
@@ -82,7 +83,7 @@ public class Analyzer {
     
     parse(buffer, astHandler);
     Script script = astHandler.getScript();
-    byte[] array = Compiler.compileScriptAheadOfTime(scriptName, script, null); //FIXME should be a rootScope ?
+    byte[] array = Compiler.compileScriptAheadOfTime(scriptName, script, new LocalScope(rootScope));
     if (array == null) {
       System.err.println("compilation aborted.");
       return;

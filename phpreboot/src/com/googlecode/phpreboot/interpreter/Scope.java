@@ -1,7 +1,7 @@
 package com.googlecode.phpreboot.interpreter;
 
-import java.util.Collection;
 import java.util.HashMap;
+import java.util.Map;
 
 import com.googlecode.phpreboot.model.Var;
 
@@ -20,6 +20,10 @@ public class Scope {
   
   public Scope getParent() {
     return parent;
+  }
+  
+  public Map<String, Var> getVarMap() {
+    return varMap;
   }
   
   public Var lookup(String name) {
@@ -61,15 +65,11 @@ public class Scope {
     return varMap.containsKey(name);
   }
   
-  public Collection<Var> varMap() {
-    return varMap.values();
-  }
-  
   private static void filterReadOnlyVars(HashMap<String,Var> map, Scope scope) {
     if (scope == null)
       return;
     filterReadOnlyVars(map, scope.getParent());
-    for(Var var: scope.varMap()) {
+    for(Var var: scope.varMap.values()) {
       if (var.isReadOnly()) {
         String name = var.getName();
         map.put(name, new Var(name, true, true, var.getType(), var.getValue()));

@@ -314,7 +314,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     return ALIVE;
   }
   
-  private Type visitIf(Node nodeIf, Expr expr, Instr instr, ElseIf elseIf, TypeCheckEnv env) {
+  private Type visitIf(Expr expr, Instr instr, ElseIf elseIf, TypeCheckEnv env) {
     Type exprType = typeCheck(expr, env);
     isCompatible(PrimitiveType.BOOLEAN, exprType);
     Type leftLiveness = typeCheck(instr, env);
@@ -323,11 +323,11 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   }
   @Override
   public Type visit(InstrIf instr_if, TypeCheckEnv env) {
-    return visitIf(instr_if, instr_if.getExpr(), instr_if.getInstr(), instr_if.getElseIf(), env);
+    return visitIf(instr_if.getExpr(), instr_if.getInstr(), instr_if.getElseIf(), env);
   }
   @Override
   public Type visit(ElseIfElseIf else_if_else_if, TypeCheckEnv env) {
-    return visitIf(else_if_else_if, else_if_else_if.getExpr(), else_if_else_if.getInstr(), else_if_else_if.getElseIf(), env);
+    return visitIf(else_if_else_if.getExpr(), else_if_else_if.getInstr(), else_if_else_if.getElseIf(), env);
   }
   @Override
   public Type visit(ElseIfElse else_if_else, TypeCheckEnv env) {

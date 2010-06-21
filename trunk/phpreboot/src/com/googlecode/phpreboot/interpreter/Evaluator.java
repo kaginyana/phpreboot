@@ -29,6 +29,7 @@ import com.googlecode.phpreboot.ast.DeclarationTypeEmpty;
 import com.googlecode.phpreboot.ast.DeclarationTypeInit;
 import com.googlecode.phpreboot.ast.DollarAccessExpr;
 import com.googlecode.phpreboot.ast.DollarAccessId;
+import com.googlecode.phpreboot.ast.ElseIf;
 import com.googlecode.phpreboot.ast.ElseIfElse;
 import com.googlecode.phpreboot.ast.ElseIfElseIf;
 import com.googlecode.phpreboot.ast.ElseIfEmpty;
@@ -301,42 +302,31 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     return (Boolean)value;
   }
   
-  @Override
-  public Object visit(InstrIf instr_if, EvalEnv env) {
-    boolean condition = checkBoolean(instr_if.getExpr(), env);
+  private Object visitIf(Expr expr, Instr instr, ElseIf elseIf, EvalEnv env) {
+    boolean condition = checkBoolean(expr, env);    
     if(condition) {
-      eval(instr_if.getInstr(), env);  
+      eval(instr, env);  
     } else {
-      eval(instr_if.getElseIf(), env);
+      eval(elseIf, env);
     }
     return null;
   }
-  
+  @Override
+  public Object visit(InstrIf instr_if, EvalEnv env) {
+    return visitIf(instr_if.getExpr(), instr_if.getInstr(), instr_if.getElseIf(), env);
+  }
+  @Override
+  public Object visit(ElseIfElseIf else_if_else_if, EvalEnv env) {
+    return visitIf(else_if_else_if.getExpr(), else_if_else_if.getInstr(), else_if_else_if.getElseIf(), env);
+  }
   @Override
   public Object visit(ElseIfEmpty else_if_empty, EvalEnv env) {
     return null;
   }
-  
   @Override
   public Object visit(ElseIfElse else_if_else, EvalEnv env) {
     return eval(else_if_else.getInstr(), env);
   }
-  
-  @Override
-  public Object visit(ElseIfElseIf else_if_else_if, EvalEnv env) {
-    Object value = eval(else_if_else_if.getExpr(), env);
-    if (!(value instanceof Boolean)) {
-      throw RT.error("condition must be a boolean: %s", value);
-    }
-    
-    if((Boolean)value) {
-      eval(else_if_else_if.getInstr(), env);  
-    } else {
-      eval(else_if_else_if.getElseIf(), env);
-    }
-    return null;
-  }
-  
   
   // --- labeled instructions
   
@@ -755,17 +745,6 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   public Object visit(PrimaryFuncall primary_funcall, EvalEnv env) {
     return eval(primary_funcall.getFuncall(), env);
   }
-  /*
-  private static Object arrayGet(Object array, Object key, boolean keyMustExist) {
-    if (!(array instanceof ArrayAccess)) {
-      throw RT.error("value is not as an array or a cursor: %s", array);
-    }
-    Object value = ((ArrayAccess)array).get(key);
-    if (keyMustExist && value == null) {
-      throw RT.error("member %s doesn't exist for array/cursor: %s", key, array);
-    }
-    return value;
-  }*/
   
   @Override
   public Object visit(PrimaryArrayAccess primary_array_access, EvalEnv env) {

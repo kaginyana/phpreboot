@@ -1,8 +1,9 @@
 package com.googlecode.phpreboot.compiler;
 
 import static com.googlecode.phpreboot.compiler.LivenessType.ALIVE;
-import static org.objectweb.asm.Opcodes.*;
+import static org.objectweb.asm.Opcodes.ACONST_NULL;
 import static org.objectweb.asm.Opcodes.ALOAD;
+import static org.objectweb.asm.Opcodes.ATHROW;
 import static org.objectweb.asm.Opcodes.BIPUSH;
 import static org.objectweb.asm.Opcodes.DCMPG;
 import static org.objectweb.asm.Opcodes.DCONST_0;
@@ -54,6 +55,7 @@ import com.googlecode.phpreboot.ast.ArrayValueSingle;
 import com.googlecode.phpreboot.ast.AssignmentId;
 import com.googlecode.phpreboot.ast.Block;
 import com.googlecode.phpreboot.ast.ConstDeclaration;
+import com.googlecode.phpreboot.ast.ElseIf;
 import com.googlecode.phpreboot.ast.ElseIfElse;
 import com.googlecode.phpreboot.ast.ElseIfElseIf;
 import com.googlecode.phpreboot.ast.ElseIfEmpty;
@@ -383,22 +385,23 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     return null;
   }
   
-  @Override
-  public Type visit(InstrIf instr_if, GenEnv env) {
-    env.getMethodVisitor().visitLineNumber(instr_if.getLineNumberAttribute(), new Label());
-    Node elseIf = instr_if.getElseIf();
+  
+  // --- if instruction
+  
+  private Type visitIf(Node nodeIf, Expr expr, Instr instr, ElseIf elseIf, GenEnv env) {
+    env.getMethodVisitor().visitLineNumber(nodeIf.getLineNumberAttribute(), new Label());
     elseIf = (elseIf instanceof ElseIfEmpty)? null: elseIf;
-    IfParts ifParts = new IfParts(true, generator(instr_if.getInstr()), generator(elseIf));
-    gen(instr_if.getExpr(), env.ifParts(ifParts));
+    IfParts ifParts = new IfParts(true, generator(instr), generator(elseIf));
+    gen(expr, env.ifParts(ifParts));
     return null;
   }
   @Override
+  public Type visit(InstrIf instr_if, GenEnv env) {
+    return visitIf(instr_if, instr_if.getExpr(), instr_if.getInstr(), instr_if.getElseIf(), env);
+  }
+  @Override
   public Type visit(ElseIfElseIf else_if_else_if, GenEnv env) {
-    Node elseIf = else_if_else_if.getElseIf();
-    elseIf = (elseIf instanceof ElseIfEmpty)? null: elseIf;
-    IfParts ifParts = new IfParts(true, generator(else_if_else_if.getInstr()), generator(elseIf));
-    gen(else_if_else_if.getExpr(), env.ifParts(ifParts));
-    return null;
+    return visitIf(else_if_else_if, else_if_else_if.getExpr(), else_if_else_if.getInstr(), else_if_else_if.getElseIf(), env);
   }
   @Override
   public Type visit(ElseIfElse else_if_else, GenEnv env) {

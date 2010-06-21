@@ -16,6 +16,7 @@ import com.googlecode.phpreboot.ast.ArrayValueSingle;
 import com.googlecode.phpreboot.ast.AssignmentId;
 import com.googlecode.phpreboot.ast.Block;
 import com.googlecode.phpreboot.ast.ConstDeclaration;
+import com.googlecode.phpreboot.ast.ElseIf;
 import com.googlecode.phpreboot.ast.ElseIfElse;
 import com.googlecode.phpreboot.ast.ElseIfElseIf;
 import com.googlecode.phpreboot.ast.ElseIfEmpty;
@@ -313,23 +314,20 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     return ALIVE;
   }
   
-  @Override
-  public Type visit(InstrIf instr_if, TypeCheckEnv env) {
-    Type exprType = typeCheck(instr_if.getExpr(), env);
+  private Type visitIf(Node nodeIf, Expr expr, Instr instr, ElseIf elseIf, TypeCheckEnv env) {
+    Type exprType = typeCheck(expr, env);
     isCompatible(PrimitiveType.BOOLEAN, exprType);
-    
-    Type leftLiveness = typeCheck(instr_if.getInstr(), env);
-    Type rightLiveness = typeCheck(instr_if.getElseIf(), env);
+    Type leftLiveness = typeCheck(instr, env);
+    Type rightLiveness = typeCheck(elseIf, env);
     return (leftLiveness == ALIVE || rightLiveness == ALIVE)? ALIVE: DEAD;
   }
   @Override
+  public Type visit(InstrIf instr_if, TypeCheckEnv env) {
+    return visitIf(instr_if, instr_if.getExpr(), instr_if.getInstr(), instr_if.getElseIf(), env);
+  }
+  @Override
   public Type visit(ElseIfElseIf else_if_else_if, TypeCheckEnv env) {
-    Type exprType = typeCheck(else_if_else_if.getExpr(), env);
-    isCompatible(PrimitiveType.BOOLEAN, exprType);
-    
-    Type leftLiveness = typeCheck(else_if_else_if.getInstr(), env);
-    Type rightLiveness = typeCheck(else_if_else_if.getElseIf(), env);
-    return (leftLiveness == ALIVE || rightLiveness == ALIVE)? ALIVE: DEAD;
+    return visitIf(else_if_else_if, else_if_else_if.getExpr(), else_if_else_if.getInstr(), else_if_else_if.getElseIf(), env);
   }
   @Override
   public Type visit(ElseIfElse else_if_else, TypeCheckEnv env) {

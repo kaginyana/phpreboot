@@ -15,7 +15,7 @@
   
   <target name="tasks">
     <taskdef name="ebnf" classname="fr.umlv.tatoo.cc.ebnf.main.EBNFTask" classpath="${tatoo.jar}"/>
-  	<taskdef name="jsr292-backport" classname="jsr292.weaver.BackportTask" classpath="${lib}/jsr292-backport.jar"/>
+  	<taskdef name="jsr292-backport" classname="jsr292.weaver.BackportTask" classpath="${lib}/jsr292-backport.jar:${lib}/asm-all-3.2.jar"/>
   </target>
   	
   <target name="ebnf" depends="tasks">
@@ -53,7 +53,7 @@
     <jar destfile="${phpreboot.jar}">
 	  <fileset dir="${classes}"/>
 	  <manifest>
-	    <attribute name="Class-Path" value="derby.jar grizzly-servlet-webserver-1.9.18-k.jar jaxen-1.1.2.jar tatoo-runtime.jar asm-all-3.2.jar hs19-b01-jsr292-patch.jar"/>   
+	    <!-- attribute name="Class-Path" value="tatoo-runtime.jar asm-all-3.2.jar derby.jar grizzly-servlet-webserver-1.9.18-k.jar jaxen-1.1.2.jar hs19-b01-jsr292-patch.jar"/ -->   
 	    <attribute name="Main-Class" value="com.googlecode.phpreboot.Main"/>   
 	  </manifest>
 	</jar>

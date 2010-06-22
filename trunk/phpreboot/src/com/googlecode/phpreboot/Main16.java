@@ -204,7 +204,7 @@ public class Main16 {
   
   private static void printHelp() {
     System.err.println("phpreboot [options] [file]\n" +
-                       "  interpret the file or stdin\n\n" +
+                       "  interpret the file or stdin (legacy mode for 1.6 VM)\n\n" +
                        "  Options:\n");
     
     for(Option option: Option.values()) {

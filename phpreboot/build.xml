@@ -15,7 +15,7 @@
   
   <target name="tasks">
     <taskdef name="ebnf" classname="fr.umlv.tatoo.cc.ebnf.main.EBNFTask" classpath="${tatoo.jar}"/>
-  	<taskdef name="jsr292-backport" classname="jsr292.weaver.BackportTask" classpath="${lib}/jsr292-backport.jar:${lib}/asm-all-3.2.jar"/>
+  	<taskdef name="jsr292-backport" classname="jsr292.weaver.BackportTask" classpath="${lib}/jsr292-backport.jar:${lib}/asm-all-3.2.jar" />
   </target>
   	
   <target name="ebnf" depends="tasks">
@@ -44,8 +44,7 @@
 
 	  <javac srcdir="${src}:${gen-src}" destdir="${classes}" debug="true">
 		  <classpath path="${libs}"/>
-      <compilerarg value="-Xlint:all"/>
-		  <compilerarg value="-Xbootclasspath/p:${lib}/hs19-b01-jsr292-patch.jar"/>
+          <compilerarg value="-Xlint:all"/>
 	  </javac>
   </target>
 	
@@ -58,7 +57,7 @@
 	  </manifest>
 	</jar>
   	
-  	<jsr292-backport file="${phpreboot.jar}"/>
+  	<jsr292-backport file="${phpreboot.jar}" dependency="${lib}/asm-all-3.2.jar"/>
   </target>
 	
   <target name="jar" depends="compile, jar-nocompile"/>

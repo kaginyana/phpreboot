@@ -1,0 +1,24 @@
+echo true
+echo 1
+echo 1.0
+echo "foo"
+echo <bar/>
+
+a = <text>
+     {
+       echo true
+       echo 1
+       echo 1.0
+       echo "foo"
+       echo <bar/>
+     }
+    </text>
+    
+echo a
+
+function f(xml) {
+  echo xml
+}
+
+f(<foo> { echo "text"; } </foo>)
+

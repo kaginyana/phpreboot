@@ -64,6 +64,7 @@ import com.googlecode.phpreboot.ast.ExprId;
 import com.googlecode.phpreboot.ast.ExprIf;
 import com.googlecode.phpreboot.ast.ExprLiteral;
 import com.googlecode.phpreboot.ast.ExprPrimary;
+import com.googlecode.phpreboot.ast.ExprXmls;
 import com.googlecode.phpreboot.ast.FunNoReturnType;
 import com.googlecode.phpreboot.ast.FunReturnType;
 import com.googlecode.phpreboot.ast.FuncallCall;
@@ -374,14 +375,13 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     MethodVisitor mv = env.getMethodVisitor();
     mv.visitLineNumber(instr_echo.getLineNumberAttribute(), new Label());
     mv.visitVarInsn(ALOAD, 0); // load env
-    //mv.visitTypeInsn(CHECKCAST, EVAL_ENV_INTERNAL_NAME); //FIXME remove when environment is no more an Object
-    
     mv.visitMethodInsn(INVOKEVIRTUAL, EVAL_ENV_INTERNAL_NAME, "getEchoer",
         "()L"+ECHOER_INTERNAL_NAME+';');
     Type exprType = gen(instr_echo.getExpr(), env.expectedType(PrimitiveType.ANY));
-    insertCast(mv, PrimitiveType.ANY, exprType);
+    
+    exprType = Compiler.eraseAsProfile(exprType);
     mv.visitMethodInsn(INVOKEVIRTUAL, ECHOER_INTERNAL_NAME, "echo",
-        "(Ljava/lang/Object;)V");
+        "("+asASMType(exprType).getDescriptor()+")V");
     return null;
   }
   
@@ -990,6 +990,12 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     return getTypeAttribute(expr_if);
   }
   
+  @Override
+  public Type visit(ExprXmls expr_xmls, GenEnv env) {
+    return gen(expr_xmls.getXmls(), env);
+  }
+  
+  
   private Type visitUnaryOp(String opName, int opcode, Node exprNode, GenEnv env) {
     MethodVisitor mv = env.getMethodVisitor();
     Type exprType = gen(exprNode, env.expectedType(PrimitiveType.ANY));
@@ -1094,7 +1100,8 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   
   // --- literals
   
-  private  void integerConst(MethodVisitor mv, int value) {
+  private static void integerConst(MethodVisitor mv, Integer boxValue) {
+    int value = boxValue;
     if (value >= -1 && value <= 5) {
       mv.visitInsn(ICONST_0 + value);
       return;
@@ -1107,7 +1114,16 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       mv.visitIntInsn(SIPUSH, value);
       return;
     }
-    mv.visitLdcInsn(value);
+    mv.visitLdcInsn(boxValue);
+  }
+  
+  private static void doubleConst(MethodVisitor mv, Double boxValue) {
+    double value = boxValue;
+    if (value == 0.0) {
+      mv.visitInsn(DCONST_0);
+      return;
+    }
+    mv.visitLdcInsn(boxValue);  
   }
   
   @Override
@@ -1140,7 +1156,11 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     if (value instanceof Integer) {
       integerConst(mv, (Integer)value);
     } else {
-      mv.visitLdcInsn(value);
+      if (value instanceof Double) {
+        doubleConst(mv, (Double)value);
+      } else {
+        mv.visitLdcInsn(value);
+      }
     }
     return getTypeAttribute(literal_value);
   }

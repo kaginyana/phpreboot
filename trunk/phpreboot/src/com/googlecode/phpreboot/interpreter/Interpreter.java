@@ -185,6 +185,12 @@ public class Interpreter extends ASTHandler {
     eval(instr_xmls);
     return null;
   }
+  @Override
+  public Expr expr_xmls(Action action, Xmls xmls) {
+    Expr expr_xmls = super.expr_xmls(action, xmls);
+    interpreter--;     // match with action()
+    return expr_xmls;
+  }
   
   @Override
   public Label label_empty() {

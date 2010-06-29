@@ -58,7 +58,7 @@ public class Compiler {
     }
     
     // gen
-    ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+    ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS|ClassWriter.COMPUTE_FRAMES);
     ClassVisitor cv = cw;
     if (LEGACY_MODE) {
       cv = LegacyWeaver.weave(cw, false);
@@ -263,7 +263,7 @@ public class Compiler {
   static MethodHandle gen(boolean trace, Function function, BindMap bindMap, Type liveness, Map<Node, Type> typeAttributeMap, Map<Node, Symbol> symbolAttributeMap) {
     String name = function.getName();
     
-    ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+    ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS | ((ANONYMOUS_CLASS_DEFINE == null)?ClassWriter.COMPUTE_FRAMES:0));
     ClassVisitor cv = cw;
     if (LEGACY_MODE) {
       cv = LegacyWeaver.weave(cw, true);
@@ -361,7 +361,7 @@ public class Compiler {
         throw new AssertionError("second typecheck invalidated !");
     }
     
-    ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+    ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS| ((ANONYMOUS_CLASS_DEFINE == null)?ClassWriter.COMPUTE_FRAMES:0));
     ClassVisitor cv = cw;
     if (LEGACY_MODE) {
       cv = LegacyWeaver.weave(cw, true);

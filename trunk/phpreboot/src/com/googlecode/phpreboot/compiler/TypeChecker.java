@@ -25,6 +25,7 @@ import com.googlecode.phpreboot.ast.ExprId;
 import com.googlecode.phpreboot.ast.ExprIf;
 import com.googlecode.phpreboot.ast.ExprLiteral;
 import com.googlecode.phpreboot.ast.ExprPrimary;
+import com.googlecode.phpreboot.ast.ExprXmls;
 import com.googlecode.phpreboot.ast.FunNoReturnType;
 import com.googlecode.phpreboot.ast.FunReturnType;
 import com.googlecode.phpreboot.ast.FuncallCall;
@@ -661,6 +662,11 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
         typeCheck(expr_if.getExpr2(), env),
         typeCheck(expr_if.getExpr3(), env));
   }
+   
+  @Override
+  public Type visit(ExprXmls expr_xmls, TypeCheckEnv env) {
+    return typeCheck(expr_xmls.getXmls(), env);
+  }
   
   @Override
   protected Type visit(Expr expr, TypeCheckEnv env) {
@@ -749,7 +755,6 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   public Type visit(LiteralString literal_string, TypeCheckEnv env) {
     return PrimitiveType.STRING;
   }
-  
   
   // --- array literal
   

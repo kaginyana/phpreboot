@@ -314,7 +314,7 @@ productions:
        | expr 'to' type                    [to]       { expr_to_type }
        | expr '?' expr ':' expr            [question] { expr_if }
        | 'function' parameters block                  { expr_fun }
-       | xmls                                         { expr_xmls }
+       | action xmls                                  { expr_xmls }
        ;
        
    dollar_access = '$' 'id'                { dollar_access_id }

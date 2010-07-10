@@ -44,12 +44,12 @@
       // Code is very similar for these cases, but using separate blocks
       // ensures we skip the shifting when it's unnecessary, which is most cases.
       if (bit_num == 8) {
-        echo_char(byte_acc)
+        echo_byte(byte_acc)
         byte_acc = 0
         bit_num = 0
       } elseif (x == count_size) {
         byte_acc = bits_shl(byte_acc, (8 - bit_num))
-        echo_char(byte_acc)
+        echo_byte(byte_acc)
         byte_acc = 0
         bit_num = 0
       }

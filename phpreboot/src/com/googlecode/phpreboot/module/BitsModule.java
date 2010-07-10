@@ -41,7 +41,7 @@ public class BitsModule extends Module {
   }
   
   @Export
-  public static void echo_char(int a) {
-    System.out.print((char)a);
+  public static void echo_byte(int a) {
+    System.out.write(a);
   }
 }

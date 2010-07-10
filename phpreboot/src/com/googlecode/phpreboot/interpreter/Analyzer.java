@@ -18,8 +18,11 @@ import com.googlecode.phpreboot.tools.Analyzers;
 import com.googlecode.phpreboot.tools.GrammarEvaluator;
 import com.googlecode.phpreboot.tools.TerminalEvaluator;
 
+import fr.umlv.tatoo.runtime.buffer.LexerBuffer;
+import fr.umlv.tatoo.runtime.buffer.TokenBuffer;
 import fr.umlv.tatoo.runtime.buffer.impl.LocationTracker;
 import fr.umlv.tatoo.runtime.buffer.impl.ReaderWrapper;
+import fr.umlv.tatoo.runtime.lexer.Lexer;
 import fr.umlv.tatoo.runtime.lexer.RuleActivator;
 import fr.umlv.tatoo.runtime.tools.SemanticStack;
 import fr.umlv.tatoo.runtime.tools.builder.Builder.AnalyzerParserBuilder;
@@ -29,7 +32,7 @@ public class Analyzer {
     // enforce utility class
   }
 
-  static class CommentSwitcherRuleActivator implements RuleActivator<RuleEnum> {
+  private static class CommentSwitcherRuleActivator implements RuleActivator<RuleEnum> {
     private final RuleActivator<RuleEnum> ruleActivator;
     private final ASTHandler astHandler;
     private final IdentityHashMap<RuleEnum[], RuleEnum[]> cache =
@@ -73,7 +76,7 @@ public class Analyzer {
     Interpreter interpreter = new Interpreter(locationTracker, writer, rootScope);
     ReaderWrapper buffer = new ReaderWrapper(reader, locationTracker);
     
-    parse(buffer, interpreter);
+    createAnalyzer(buffer, interpreter).run();
   }
   
   public static void compileAheadOfTime(String scriptName, Reader reader, Scope rootScope) {
@@ -81,7 +84,7 @@ public class Analyzer {
     ReaderWrapper buffer = new ReaderWrapper(reader, locationTracker);
     ASTHandler astHandler = new ASTHandler(locationTracker);
     
-    parse(buffer, astHandler);
+    createAnalyzer(buffer, astHandler).run();
     Script script = astHandler.getScript();
     byte[] array = Compiler.compileScriptAheadOfTime(scriptName, script, new LocalScope(rootScope));
     if (array == null) {
@@ -104,10 +107,10 @@ public class Analyzer {
     System.out.println(scriptName+" generated !");
   }
   
-  private static void parse(ReaderWrapper buffer, ASTHandler astHandler) {
+  public static <B extends TokenBuffer<CharSequence> & LexerBuffer> Lexer<B> createAnalyzer(B buffer, ASTHandler astHandler) {
     TerminalEvaluator<CharSequence> terminalEvaluator = astHandler;
     GrammarEvaluator grammarEvaluator = astHandler;
-    AnalyzerParserBuilder<RuleEnum, ReaderWrapper, TerminalEnum, NonTerminalEnum, ProductionEnum, VersionEnum> builder =
+    AnalyzerParserBuilder<RuleEnum, B, TerminalEnum, NonTerminalEnum, ProductionEnum, VersionEnum> builder =
       Analyzers.analyzerTokenBufferBuilder(buffer,
           terminalEvaluator,
           grammarEvaluator,
@@ -115,9 +118,8 @@ public class Analyzer {
         expert().
         advanced();
     CommentSwitcherRuleActivator ruleActivator = new CommentSwitcherRuleActivator(builder.getDefaultActivator(), astHandler);
-    builder.activator(ruleActivator).
+    return builder.activator(ruleActivator).
       createAnalyzer().
-      getLexer().
-      run();
+      getLexer();
   }
 }

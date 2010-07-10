@@ -885,7 +885,7 @@ public class RT {
     Class<?> refClass = refValue.getClass(); // also nullcheck
     
     String name;
-    if (key instanceof String && (!(name = (String)key).isEmpty())) {
+    if (key instanceof String && ((name = (String)key).length() != 0)) {
       MethodHandle mh = MethodResolver.findSetter(refClass, name);
       if (mh != null) {
         mh = MethodHandles.convertArguments(mh,  
@@ -961,7 +961,7 @@ public class RT {
     Class<?> refClass = refValue.getClass(); // also nullcheck
     
     String name;
-    if (key instanceof String && (!(name = (String)key).isEmpty())) {
+    if (key instanceof String && ((name = (String)key).length() != 0)) {
       MethodHandle mh = MethodResolver.findGetter(refClass, name);
       if (mh == null) {
         mh = MethodResolver.findMethodHandle(refClass, name, 0);

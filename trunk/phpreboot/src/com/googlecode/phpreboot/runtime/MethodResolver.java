@@ -10,7 +10,7 @@ class MethodResolver {
   private static final Lookup PUBLIC_LOOKUP = MethodHandles.publicLookup();
 
   private static String capitalize(String s) {
-    assert !s.isEmpty();
+    assert s.length() != 0;
     return Character.toUpperCase(s.charAt(0)) + s.substring(1);
   }
   

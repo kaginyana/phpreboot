@@ -563,7 +563,12 @@ public class Compiler {
     MethodHandle define;
     
     try {
-      Class.forName("jsr292.weaver.Agent");
+      try {
+        Class.forName("jsr292.weaver.Agent");
+      } catch(Error e) {
+        // weaver agent exists but java.lang.instrumentation doesn't exist
+        // android platform => go in legacy mode
+      }
       legacyMode = true;
       define = null;
       

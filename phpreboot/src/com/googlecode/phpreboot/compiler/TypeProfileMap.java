@@ -6,17 +6,17 @@ import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.model.Type;
 
 class TypeProfileMap {
-  private final HashMap<Node, Type> map =
+  private final HashMap<Node, Type> typeMap =
     new HashMap<Node, Type>(32);
   private boolean valid = true;
   
-  public void register(Node node, Type type) {
-    assert !map.containsKey(node);
-    map.put(node, type);
+  public void registerType(Node node, Type type) {
+    assert !typeMap.containsKey(node);
+    typeMap.put(node, type);
   }
   
-  public /*@Nullable*/Type get(Node node) {
-    return map.get(node);
+  public /*@Nullable*/Type getType(Node node) {
+    return typeMap.get(node);
   }
   
   public boolean isValid() {
@@ -28,6 +28,6 @@ class TypeProfileMap {
   
   @Override
   public String toString() {
-    return map.toString();
+    return typeMap.toString();
   }
 }

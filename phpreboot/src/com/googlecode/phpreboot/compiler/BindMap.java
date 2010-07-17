@@ -18,10 +18,10 @@ public class BindMap {
     if (allowOptimiticType && type == PrimitiveType.ANY) {
       type = Compiler.inferType(value);
       optimistic = !(isReadOnly || type == PrimitiveType.ANY);
-      typeProfileMap.register(declaringNode, type);
+      typeProfileMap.registerType(declaringNode, type);
     } else {
       optimistic = false;
-      Type typeProfile = typeProfileMap.get(declaringNode);
+      Type typeProfile = typeProfileMap.getType(declaringNode);
       if (typeProfile != null) {
         type = typeProfile;
       }

@@ -6,6 +6,7 @@ import static com.googlecode.phpreboot.compiler.LivenessType.DEAD;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -60,6 +61,8 @@ import com.googlecode.phpreboot.ast.PrimaryParens;
 import com.googlecode.phpreboot.ast.ScriptMember;
 import com.googlecode.phpreboot.ast.ScriptScriptMember;
 import com.googlecode.phpreboot.ast.Visitor;
+import com.googlecode.phpreboot.interpreter.Scope;
+import com.googlecode.phpreboot.interpreter.Profile.IfProfile;
 import com.googlecode.phpreboot.interpreter.Profile.VarProfile;
 import com.googlecode.phpreboot.model.Function;
 import com.googlecode.phpreboot.model.IntrinsicInfo;
@@ -77,13 +80,17 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     new HashMap<Node, Symbol>();
   private final HashMap<Function,LocalVar> functionToLocalMap =
     new HashMap<Function, LocalVar>();
-  private final boolean trace;
+  private final boolean inTrace;
+  private final /*@Nullable*/Node rootTraceNode;  // null if not in trace mode
+  private final /*@Nullable*/Scope rootScope;     // null if not in trace mode
   private final BindMap bindMap;
   private final TypeProfileMap typeProfileMap;
   private final boolean allowOptimisticType;
   
-  TypeChecker(boolean trace, BindMap bindMap, TypeProfileMap typeProfileMap, boolean allowOptimisticType) {
-    this.trace = trace;
+  TypeChecker(boolean inTrace, /*@Nullable*/Node rootTraceNode, /*@Nullable*/Scope rootScope, BindMap bindMap, TypeProfileMap typeProfileMap, boolean allowOptimisticType) {
+    this.inTrace = inTrace;
+    this.rootTraceNode = rootTraceNode;
+    this.rootScope = rootScope;
     this.bindMap = bindMap;
     this.typeProfileMap = typeProfileMap;
     this.allowOptimisticType = allowOptimisticType;
@@ -198,7 +205,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   protected Type visit(Node node, TypeCheckEnv env) {
     System.err.println("code is not compilable: "+node.getKind()+
         " at "+node.getLineNumberAttribute()+':'+node.getColumnNumberAttribute());
-    throw CodeNotCompilableException.INSTANCE;
+    throw CodeNotCompilableTypeCheckException.INSTANCE;
   }
   
   
@@ -252,7 +259,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     }
     
     LoopStack<Boolean> loopStack = new LoopStack<Boolean>();
-    typeCheck(block, new TypeCheckEnv(localScope, loopStack, function.getReturnType()));
+    typeCheck(block, new TypeCheckEnv(localScope, loopStack, false, function.getReturnType()));
     
     Var var = new Var(name, true, true, PrimitiveType.ANY, function);
     scope.register(var);
@@ -290,7 +297,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   
   @Override
   public Type visit(Block block, TypeCheckEnv env) {
-    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(new LocalScope(env.getScope()), env.getLoopStack(), env.getFunctionReturnType());
+    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(new LocalScope(env.getScope()), env.getLoopStack(), env.isUntakenBranch(), env.getFunctionReturnType());
     Type liveness = LivenessType.ALIVE;
     
     for(Iterator<Instr> it = block.getInstrStar().iterator(); it.hasNext();) {
@@ -315,20 +322,84 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     return ALIVE;
   }
   
-  private Type visitIf(Expr expr, Instr instr, ElseIf elseIf, TypeCheckEnv env) {
+  private Type visitIf(Node ifNode, Expr expr, Instr instr, ElseIf elseIf, TypeCheckEnv env) {
     Type exprType = typeCheck(expr, env);
     isCompatible(PrimitiveType.BOOLEAN, exprType);
-    Type leftLiveness = typeCheck(instr, env);
-    Type rightLiveness = typeCheck(elseIf, env);
+    
+    BranchSymbol branchSymbol = (BranchSymbol)symbolAttributeMap.get(ifNode);
+    if (branchSymbol == null) {
+      branchSymbol = new BranchSymbol();
+      symbolAttributeMap.put(ifNode, branchSymbol);
+    }
+    
+    TypeCheckEnv leftPartEnv = env;
+    TypeCheckEnv rightPartEnv = env;
+    Scope reconstructedScope = null;
+    LinkedHashMap<LocalVar,Var> varMapAssoc = null;
+    
+    boolean currentBranchUntaken = env.isUntakenBranch();
+    IfProfile ifProfile = (IfProfile)ifNode.getProfileAttribute();
+    if (ifProfile != null && !currentBranchUntaken) {
+      //System.out.println("ifProfile "+ifProfile.isLeftPartTaken()+" "+ifProfile.isRightPartTaken());
+      
+      if (!ifProfile.isLeftPartTaken()) {  
+        leftPartEnv = new TypeCheckEnv(env.getScope(), env.getLoopStack(), true, env.getFunctionReturnType());
+        varMapAssoc = new LinkedHashMap<LocalVar, Var>();
+        reconstructedScope = env.getScope().reconstructScope(varMapAssoc);
+      } else
+        if (!ifProfile.isRightPartTaken()) {
+          rightPartEnv = new TypeCheckEnv(env.getScope(), env.getLoopStack(), true, env.getFunctionReturnType());
+          varMapAssoc = new LinkedHashMap<LocalVar, Var>();
+          reconstructedScope = env.getScope().reconstructScope(varMapAssoc);
+        }
+    }
+    
+    if (varMapAssoc != null) {         // need to restore values of bind vars
+      for(LocalVar localVar: bindMap.getReferences()) {
+        if (localVar.isReadOnly())
+          continue;
+        varMapAssoc.put(localVar, rootScope.lookup(localVar.getName()));
+      }
+      //System.out.println("reconstructed varMapAssoc "+varMapAssoc);
+    }
+    
+    Type leftLiveness = DEAD;
+    if (branchSymbol.leftPartActivated) {  // may be de-activated by previous typechecking pass
+      try {
+        leftLiveness = typeCheck(instr, leftPartEnv);
+      } catch(UntakenBranchTypeCheckException e) {
+        if (currentBranchUntaken)  // re-propagate if current branch is not taken
+          throw e;
+        
+        assert varMapAssoc != null;
+        branchSymbol.leftPartActivated = false;
+        branchSymbol.localVarsToRestore = varMapAssoc.keySet();
+        branchSymbol.escapeFunctionVar = EscapeTraceEvaluator.createEscapeTraceLocalVar(bindMap, typeProfileMap, instr, rootTraceNode, reconstructedScope, varMapAssoc);
+      }
+    }
+    Type rightLiveness = DEAD;
+    if (branchSymbol.rightPartActivated) {  // may be de-activated by previous typechecking pass
+      try {
+        rightLiveness = typeCheck(elseIf, rightPartEnv);
+      } catch(UntakenBranchTypeCheckException e) {
+        if (currentBranchUntaken)  // re-propagate if current branch is not taken
+          throw e;
+        
+        assert varMapAssoc != null;
+        branchSymbol.rightPartActivated = false;
+        branchSymbol.localVarsToRestore = varMapAssoc.keySet();
+        branchSymbol.escapeFunctionVar = EscapeTraceEvaluator.createEscapeTraceLocalVar(bindMap, typeProfileMap, elseIf, rootTraceNode, reconstructedScope, varMapAssoc);
+      }
+    }
     return (leftLiveness == ALIVE || rightLiveness == ALIVE)? ALIVE: DEAD;
   }
   @Override
   public Type visit(InstrIf instr_if, TypeCheckEnv env) {
-    return visitIf(instr_if.getExpr(), instr_if.getInstr(), instr_if.getElseIf(), env);
+    return visitIf(instr_if, instr_if.getExpr(), instr_if.getInstr(), instr_if.getElseIf(), env);
   }
   @Override
   public Type visit(ElseIfElseIf else_if_else_if, TypeCheckEnv env) {
-    return visitIf(else_if_else_if.getExpr(), else_if_else_if.getInstr(), else_if_else_if.getElseIf(), env);
+    return visitIf(else_if_else_if, else_if_else_if.getExpr(), else_if_else_if.getInstr(), else_if_else_if.getElseIf(), env);
   }
   @Override
   public Type visit(ElseIfElse else_if_else, TypeCheckEnv env) {
@@ -411,17 +482,18 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
             type = PrimitiveType.ANY;
           }
         } else {
-          // no profile, try optimistically to use the type of the expression
+          // no profile, in general this mean that the branch was untaken
+          // try optimistically to use the type of the expression
           type = Compiler.eraseAsProfile(exprType);
         }
 
-        typeProfileMap.register(assignment_id, type);
+        typeProfileMap.registerType(assignment_id, type);
       } else {
         // already typecked ?
-        type = typeProfileMap.get(assignment_id);
+        type = typeProfileMap.getType(assignment_id);
         if (type == null) {
           type = PrimitiveType.ANY;
-          typeProfileMap.register(assignment_id, type);
+          typeProfileMap.registerType(assignment_id, type);
         }
       }
       
@@ -437,13 +509,16 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
       if (var instanceof LocalVar) {
         localVar = (LocalVar)var;
         if (localVar.isOptimistic() && !isOptimisiticCompatible) {
-          // optimistic assertion failed
-          // record the failure and continue with any, the typecker must be re-run
-          
           //System.err.println("optimistic assertion failed ! "+localVar.getName() + " at "+assignment_id.getLineNumberAttribute());
           
+          // optimistic assertion failed
+          // if this branch was not taken, de-activate it, stop type-checking and generator will generate an escape code
+          // if this branch was taken, record the failure and continue with any, the typecker must be re-run
+          if (env.isUntakenBranch()) {  
+            throw UntakenBranchTypeCheckException.INSTANCE;
+          } 
           typeProfileMap.validate(false);
-          typeProfileMap.register(localVar.getDeclaringNode(), PrimitiveType.ANY);
+          typeProfileMap.registerType(localVar.getDeclaringNode(), PrimitiveType.ANY);
           localVar.setType(PrimitiveType.ANY);
         }
       } else {
@@ -492,7 +567,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   }
   
   private Type visitBreakOrContinue(/*@Nullable*/IdToken idToken, TypeCheckEnv env) {
-    if (trace) {     // mixed mode, if loopstack doesn't contains any labels 
+    if (inTrace) {   // mixed mode, if loopstack doesn't contains any labels 
       return DEAD;   // gen pass will generate an exception to go back in the interpreter
     }
 

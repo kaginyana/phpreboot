@@ -128,6 +128,4 @@ public class Function {
     function.registerSignature(function);
     return function;
   }
-  
-  
 }

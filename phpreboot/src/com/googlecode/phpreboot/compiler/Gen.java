@@ -1,6 +1,7 @@
 package com.googlecode.phpreboot.compiler;
 
 import static com.googlecode.phpreboot.compiler.LivenessType.ALIVE;
+import static com.googlecode.phpreboot.compiler.LivenessType.DEAD;
 import static org.objectweb.asm.Opcodes.ACONST_NULL;
 import static org.objectweb.asm.Opcodes.ALOAD;
 import static org.objectweb.asm.Opcodes.ATHROW;
@@ -119,7 +120,7 @@ import com.googlecode.phpreboot.runtime.XML;
 
 class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   private static final String VAR_INTERNAL_NAME = getInternalName(Var.class);
-  private static final String FUNCTION_INTERNAL_NAME = getInternalName(Function.class);
+  static final String FUNCTION_INTERNAL_NAME = getInternalName(Function.class);
   private static final String ARRAY_INTERNAL_NAME = getInternalName(Array.class);
   private static final String ECHOER_INTERNAL_NAME = getInternalName(Echoer.class);
   static final String EVAL_ENV_INTERNAL_NAME = getInternalName(EvalEnv.class);
@@ -175,7 +176,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   
   // --- ASM helper
   
-  private static org.objectweb.asm.Type asASMType(Type type) {
+  static org.objectweb.asm.Type asASMType(Type type) {
     if (type instanceof PrimitiveType) {
       switch((PrimitiveType)type) {
       case ANY:
@@ -281,7 +282,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       //localVar.setValue(null);   // avoid a memory leak
       
       Var var = scope.lookup(localVar.getName());
-      if (!var.isReadOnly()) {
+      if (var !=null && !var.isReadOnly()) {   // var may be null for trace escape function
         args[outputVarIndex++] = var;
         Type type = localVar.getType();
         mv.visitVarInsn(ALOAD, outputSlotIndex++);
@@ -390,8 +391,23 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   
   private Type visitIf(Node nodeIf, Expr expr, Instr instr, ElseIf elseIf, GenEnv env) {
     env.getMethodVisitor().visitLineNumber(nodeIf.getLineNumberAttribute(), new Label());
-    elseIf = (elseIf instanceof ElseIfEmpty)? null: elseIf;
-    IfParts ifParts = new IfParts(true, generator(instr), generator(elseIf));
+    BranchSymbol branchSymbol = (BranchSymbol)symbolAttributeMap.get(nodeIf);
+    Generator leftGenerator, rightGenerator;
+    if (branchSymbol.leftPartActivated) {
+      leftGenerator = generator(instr);
+    } else {
+      leftGenerator = generatorEscapeToInterpreter(branchSymbol);
+    }
+    if (branchSymbol.rightPartActivated) {
+      if (elseIf instanceof ElseIfEmpty) {
+        rightGenerator = null;
+      } else {
+        rightGenerator = generator(elseIf);
+      }
+    } else {
+      rightGenerator = generatorEscapeToInterpreter(branchSymbol);
+    }
+    IfParts ifParts = new IfParts(true, leftGenerator, rightGenerator);
     gen(expr, env.ifParts(ifParts));
     return null;
   }
@@ -483,7 +499,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     Type exprType = gen(assignment_id.getExpr(), env.expectedType(type));
     MethodVisitor mv = env.getMethodVisitor();
     insertCast(mv, type, exprType);
-    int shift = (var.isConstant())?0:env.getShift();
+    int shift = (var.isBound())?0:env.getShift();
     mv.visitVarInsn(asASMType(type).getOpcode(ISTORE), var.getSlot(shift));
     return null;
   }
@@ -492,14 +508,11 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   
   // --- visit test condition
   
-  private /*@Nullable*/GeneratorClosure generator(final /*@Nullable*/Node node) {
-    if (node == null)
-      return null;
-    
-    return new GeneratorClosure() {
+  private Generator generator(final Node node) {
+    return new Generator() {
       @Override
-      Type gen(GenEnv env) {
-        return Gen.this.gen(node, env);
+      void gen(GenEnv env) {
+        Gen.this.gen(node, env);
       }
       @Override
       Type liveness() {
@@ -507,6 +520,40 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       }
     };
   }
+  
+  private Generator generatorEscapeToInterpreter(final BranchSymbol branchSymbol) {
+    return new Generator() {
+      @Override
+      void gen(GenEnv env) {
+        MethodVisitor mv = env.getMethodVisitor();
+        
+        
+        mv.visitVarInsn(ALOAD, branchSymbol.escapeFunctionVar.getSlot(0)); // method handle
+        mv.visitVarInsn(ALOAD, 0); // environment
+        
+        StringBuilder desc = new StringBuilder();
+        desc.append("(L" + EVAL_ENV_INTERNAL_NAME + ';');
+        for(LocalVar localVar: branchSymbol.localVarsToRestore) {
+          org.objectweb.asm.Type asmType = asASMType(localVar.getType());
+          int shift = (localVar.isBound())?0:env.getShift();
+          mv.visitVarInsn(asmType.getOpcode(ILOAD), localVar.getSlot(shift)); 
+          desc.append(asmType.getDescriptor());
+        }
+        desc.append(")V");
+        mv.visitMethodInsn(INVOKEVIRTUAL, "java/dyn/MethodHandle", /*"invokeExact"*/ "invoke", desc.toString());
+        
+        mv.visitInsn(ICONST_0);
+        mv.visitInsn(IRETURN);   // return false, trace escape
+      }
+      
+      @Override
+      Type liveness() {
+        return DEAD;
+      }
+    };
+  }
+  
+  
   
   private static int inverseTestOpcode(int opcode) {
     return (opcode % 2 == 0)? opcode - 1: opcode + 1;
@@ -535,9 +582,9 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       if (lastInstrIsAMethodCall) {
         mv.visitJumpInsn(IFNE, trueLabel);
       }
-      GeneratorClosure falsePart = ifParts.falsePart;
+      Generator falsePart = ifParts.falsePart;
       falsePart.gen(env);
-      GeneratorClosure truePart = ifParts.truePart;
+      Generator truePart = ifParts.truePart;
       if (truePart != null) {
         // don't generate a goto if false part is an instruction that doesn't live anymore
         boolean live = /*!ifParts.inCondition ||*/ falsePart.liveness() == LivenessType.ALIVE;
@@ -560,7 +607,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     if (opcode == IF_ICMPEQ) {
       ifParts.falsePart.gen(env);
     } else {
-      GeneratorClosure truePart = ifParts.truePart;
+      Generator truePart = ifParts.truePart;
       if (truePart != null) {
         truePart.gen(env);
       }
@@ -755,7 +802,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     return PrimitiveType.BOOLEAN;
   }
   
-  static class ConstGenerator extends GeneratorClosure {
+  static class ConstGenerator extends Generator {
     private final boolean value;
 
     ConstGenerator(boolean value) {
@@ -767,9 +814,8 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     }
 
     @Override
-    Type gen(GenEnv env) {
+    void gen(GenEnv env) {
       env.getMethodVisitor().visitInsn((value)?ICONST_1: ICONST_0);
-      return PrimitiveType.BOOLEAN;
     }
   }
   private final ConstGenerator trueGenerator = new ConstGenerator(true);
@@ -798,7 +844,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     final Instr instr = labeled_instr_while.getInstr();
     
     mv.visitLabel(start);
-    IfParts ifParts = new IfParts(true, new GeneratorClosure() {
+    IfParts ifParts = new IfParts(true, new Generator() {
       @Override
       Type liveness() {
         // liveness is not needed because there is no true part
@@ -806,12 +852,11 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       }
       
       @Override
-      Type gen(GenEnv env) {
+      void gen(GenEnv env) {
         Gen.this.gen(instr, env);
         if (getTypeAttribute(instr) == ALIVE) {
           env.getMethodVisitor().visitJumpInsn(GOTO, start);
         }
-        return null;
       }
     }, null);
     
@@ -946,7 +991,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   public Type visit(ExprId expr_id, GenEnv env) {
     MethodVisitor mv = env.getMethodVisitor();
     LocalVar localVar = (LocalVar)getSymbolAttribute(expr_id);
-    if (!localVar.isConstant()) {
+    if (!localVar.isBound()) {
       Type type = localVar.getType();
       mv.visitVarInsn(asASMType(type).getOpcode(ILOAD), localVar.getSlot(env.getShift())); 
       return type;

@@ -97,6 +97,7 @@ import com.googlecode.phpreboot.ast.XmlsStartEndTag;
 import com.googlecode.phpreboot.compiler.Compiler;
 import com.googlecode.phpreboot.compiler.Compiler.CompileFunctionStub;
 import com.googlecode.phpreboot.flwor.XPathExprVisitor;
+import com.googlecode.phpreboot.interpreter.Profile.IfProfile;
 import com.googlecode.phpreboot.interpreter.Profile.LoopProfile;
 import com.googlecode.phpreboot.interpreter.Profile.VarProfile;
 import com.googlecode.phpreboot.model.Function;
@@ -302,22 +303,29 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     return (Boolean)value;
   }
   
-  private Object visitIf(Expr expr, Instr instr, ElseIf elseIf, EvalEnv env) {
+  private Object visitIf(Node ifNode, Expr expr, Instr instr, ElseIf elseIf, EvalEnv env) {
     boolean condition = checkBoolean(expr, env);    
+    IfProfile profile = (IfProfile)ifNode.getProfileAttribute();
+    if (profile == null) {
+      profile = new IfProfile();
+      ifNode.setProfileAttribute(profile);
+    }
     if(condition) {
+      profile.leftPartTaken = true;
       eval(instr, env);  
     } else {
+      profile.rightPartTaken = true;
       eval(elseIf, env);
     }
     return null;
   }
   @Override
   public Object visit(InstrIf instr_if, EvalEnv env) {
-    return visitIf(instr_if.getExpr(), instr_if.getInstr(), instr_if.getElseIf(), env);
+    return visitIf(instr_if, instr_if.getExpr(), instr_if.getInstr(), instr_if.getElseIf(), env);
   }
   @Override
   public Object visit(ElseIfElseIf else_if_else_if, EvalEnv env) {
-    return visitIf(else_if_else_if.getExpr(), else_if_else_if.getInstr(), else_if_else_if.getElseIf(), env);
+    return visitIf(else_if_else_if, else_if_else_if.getExpr(), else_if_else_if.getInstr(), else_if_else_if.getElseIf(), env);
   }
   @Override
   public Object visit(ElseIfEmpty else_if_empty, EvalEnv env) {
@@ -347,9 +355,9 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     } else {
       if (profile.hasATrace()) {       // try to reuse previous trace if available
         if (profile.callTrace(env)) {  
-          return null;  // shortcut
+          return null;        // trace ok
         }
-        profile.counter = 0;
+        profile.counter = 0;  // trace escape
       }
     }
     
@@ -360,10 +368,16 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     int counter = profile.counter;
     for(;;) {
       if (RTFlag.COMPILER_TRACE && ++counter > RTFlag.COMPILER_TRACE_THRESHOLD) {
-        if (Compiler.traceCompileAndExec(labeled_instr_while, profile, true, env)) {
-          break;
+        Boolean result = Compiler.traceCompileAndExec(labeled_instr_while, profile, true, env);
+        if (result == Boolean.TRUE) {
+          break;       // trace ok
+        } else {
+          if (result == null) {
+            counter = Integer.MIN_VALUE;  // disable trace compilation  
+          } else {
+            counter = 0; // trace escape 
+          } 
         }
-        counter = Integer.MIN_VALUE;  // disable trace compilation
       }
 
       if (!checkBoolean(expr, env))
@@ -801,6 +815,8 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   @Override
   public Object visit(ExprIf expr_if, EvalEnv env) {
+    // no need to profile expression if because an expression
+    // is not able to define a variable
     boolean condition = checkBoolean(expr_if.getExpr(), env);
     if(condition) {
       return eval(expr_if.getExpr2(), env);  

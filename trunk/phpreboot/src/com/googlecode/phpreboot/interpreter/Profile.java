@@ -49,7 +49,7 @@ public interface Profile {
           continue;
         }
         
-        // check is optimistic type is still valid
+        // check if optimistic type is still valid
         if (!localVar.getType().getRuntimeClass().isInstance(value)) {
           bindMap = null;
           trace = null;
@@ -58,13 +58,24 @@ public interface Profile {
       }
       
       try {
-        trace.invokeVarargs(args);
+        return (Boolean)trace.invokeVarargs(args);
       } catch(Error e) {
         throw e;
       } catch (Throwable e) {
         throw RT.error((Node)null, e);
       }
-      return true;
+    }
+  }
+  
+  public class IfProfile implements Profile {
+    boolean leftPartTaken;
+    boolean rightPartTaken;
+    
+    public boolean isLeftPartTaken() {
+      return leftPartTaken;
+    }
+    public boolean isRightPartTaken() {
+      return rightPartTaken;
     }
   }
   

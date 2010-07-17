@@ -1,8 +1,9 @@
 package com.googlecode.phpreboot.interpreter;
 
 import java.util.HashMap;
-import java.util.Map;
+import java.util.LinkedHashMap;
 
+import com.googlecode.phpreboot.compiler.LocalVar;
 import com.googlecode.phpreboot.model.Var;
 
 public class Scope {
@@ -20,10 +21,6 @@ public class Scope {
   
   public Scope getParent() {
     return parent;
-  }
-  
-  public Map<String, Var> getVarMap() {
-    return varMap;
   }
   
   public Var lookup(String name) {
@@ -86,5 +83,24 @@ public class Scope {
       newScope.register(var);
     }
     return newScope;
+  }
+  
+  // reconstruct a scope of Scope from a scope of LocalScope
+  // association between old LocalVar and new scope var is store in varMap
+  // because varMap *must* have a stable order, varMap is declared
+  // as a LinkedHashMap and not as a Map
+  public Scope reconstructScope(LinkedHashMap<LocalVar,Var> varMap) {
+    Class<?> clazz = getClass();
+    if (getClass() == Scope.class || clazz == RootScope.class) {
+      return this;
+    }
+    
+    HashMap<String,Var> map = new HashMap<String, Var>();
+    for(Var var: varMap.values()) {
+      Var newVar = new Var(var.getName(), var.isReadOnly(), var.isReallyConstant(), var.getType(), null);
+      varMap.put((LocalVar)var, newVar);
+      map.put(var.getName(), newVar);
+    }
+    return new Scope(map, parent.reconstructScope(varMap));
   }
 }

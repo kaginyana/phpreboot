@@ -49,11 +49,11 @@ public class Compiler {
     
     // typecheck
     BindMap bindMap = new BindMap();
-    TypeChecker typeChecker = new TypeChecker(false, bindMap, new TypeProfileMap(), false);
+    TypeChecker typeChecker = new TypeChecker(false, null, null, bindMap, new TypeProfileMap(), false);
     Type liveness;
     try {
       liveness = typecheck(typeChecker, script, PrimitiveType.VOID, localScope);
-    } catch(CodeNotCompilableException e) {
+    } catch(CodeNotCompilableTypeCheckException e) {
       return null;
     }
     
@@ -111,11 +111,11 @@ public class Compiler {
     }
     
     BindMap bindMap = new BindMap();
-    TypeChecker typeChecker = new TypeChecker(false, bindMap, new TypeProfileMap(), false);
+    TypeChecker typeChecker = new TypeChecker(false, null, null, bindMap, new TypeProfileMap(), false);
     Type liveness;
     try {
       liveness = typecheck(typeChecker, function.getBlock(), function.getReturnType(), localScope);
-    } catch(CodeNotCompilableException ignored) {
+    } catch(CodeNotCompilableTypeCheckException ignored) {
       return null;
     }
     
@@ -145,12 +145,12 @@ public class Compiler {
     }
     
     BindMap bindMap = new BindMap();
-    TypeChecker typeChecker = new TypeChecker(true, bindMap, new TypeProfileMap(), RTFlag.COMPILER_OPTIMISTIC);
+    TypeChecker typeChecker = new TypeChecker(false, function.getBlock(), localScope, bindMap, new TypeProfileMap(), RTFlag.COMPILER_OPTIMISTIC);
     
     Type liveness;
     try {
       liveness = typecheck(typeChecker, function.getBlock(), function.getReturnType(), localScope);
-    } catch(CodeNotCompilableException ignored) {
+    } catch(CodeNotCompilableTypeCheckException ignored) {
       return null;
     }
     
@@ -316,26 +316,27 @@ public class Compiler {
   }
   
   // returns the liveness of the block 
-  private static Type typecheck(TypeChecker typeChecker, Node node, Type returnType, LocalScope localScope) throws CodeNotCompilableException {
+  private static Type typecheck(TypeChecker typeChecker, Node node, Type returnType, LocalScope localScope) throws CodeNotCompilableTypeCheckException {
     LoopStack<Boolean> loopStack = new LoopStack<Boolean>();
-    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, returnType);
+    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, false, returnType);
     return typeChecker.typeCheck(node, typeCheckEnv);
   }
   
-  public static boolean traceCompileAndExec(LabeledInstrWhile labeledInstrWhile, LoopProfile profile, boolean optimisticTrace, EvalEnv env) {
-    Scope scope = env.getScope();
-    LocalScope localScope = new LocalScope(scope);
+  // @return null -> never compile, true -> trace ends, false -> trace escape
+  public static Boolean traceCompileAndExec(LabeledInstrWhile labeledInstrWhile, LoopProfile profile, boolean optimisticTrace, EvalEnv env) {
+    Scope rootScope = env.getScope();
+    LocalScope localScope = new LocalScope(rootScope);
     
     TypeProfileMap typeProfileMap = new TypeProfileMap();
     BindMap bindMap = new BindMap();
-    TypeChecker typeChecker = new TypeChecker(true, bindMap, typeProfileMap, RTFlag.COMPILER_OPTIMISTIC && optimisticTrace);
+    TypeChecker typeChecker = new TypeChecker(true, labeledInstrWhile, rootScope, bindMap, typeProfileMap, RTFlag.COMPILER_OPTIMISTIC && optimisticTrace);
     LoopStack<Boolean> loopStack = new LoopStack<Boolean>();
-    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, PrimitiveType.ANY);
+    TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, false, PrimitiveType.ANY);
     
     try {
       typeChecker.typeCheck(labeledInstrWhile, typeCheckEnv);
-    } catch(CodeNotCompilableException e) {
-      return false;
+    } catch(CodeNotCompilableTypeCheckException e) {
+      return null;
     }
     
     
@@ -343,18 +344,18 @@ public class Compiler {
       //System.err.println("optimistic typecheck failed");
       typeProfileMap.validate(true);
       bindMap = new BindMap();
-      typeChecker = new TypeChecker(true, bindMap, typeProfileMap, false);
+      typeChecker = new TypeChecker(true, labeledInstrWhile, rootScope, bindMap, typeProfileMap, false);
       
       //System.err.println("typeProfileMap "+typeProfileMap);
       
       // typecheck again but use the typeProfileMap instead
       
-      localScope = new LocalScope(scope);
-      typeCheckEnv = new TypeCheckEnv(localScope, loopStack, PrimitiveType.ANY);
+      localScope = new LocalScope(rootScope);
+      typeCheckEnv = new TypeCheckEnv(localScope, loopStack, false, PrimitiveType.ANY);
       try {
         typeChecker.typeCheck(labeledInstrWhile, typeCheckEnv);
-      } catch(CodeNotCompilableException e2) {
-        return false;
+      } catch(CodeNotCompilableTypeCheckException e) {
+        return null;
       }
       
       if (!typeProfileMap.isValid())
@@ -376,7 +377,7 @@ public class Compiler {
     if (!LEGACY_MODE && methodType.parameterCount() > 10) {
       System.err.println("trace:"+methodType);
       System.err.println("ricochet not yet implemented, go back in interpreter mode");
-      return false;
+      return null;
     }
     
     String desc = methodType.toMethodDescriptorString();
@@ -387,7 +388,9 @@ public class Compiler {
     gen.gen(labeledInstrWhile,
         new GenEnv(mv,
             bindMap.getSlotCount() + bindMap.getReferencesCount(),
-            null, new LoopStack<Labels>(), null));
+            null,   //ifparts
+            new LoopStack<Labels>(),
+            null));
     
     // restore env vars
     List<LocalVar> references = bindMap.getReferences();
@@ -396,10 +399,11 @@ public class Compiler {
     Object[] args = new Object[size + outputVarCount + 1];
     args[0] = env;
     if (size != 0) {
-      gen.restoreEnv(mv, references, bindMap.getSlotCount() -1 /*XXX substract env slot */, scope, args);
+      gen.restoreEnv(mv, references, bindMap.getSlotCount() -1 /*XXX substract env slot */, rootScope, args);
     }
     
-    mv.visitInsn(Opcodes.RETURN);
+    mv.visitInsn(Opcodes.ICONST_1);
+    mv.visitInsn(Opcodes.IRETURN);   // return true, trace ends
     
     mv.visitMaxs(0, 0);
     mv.visitEnd();
@@ -425,18 +429,13 @@ public class Compiler {
     //System.err.println("calls "+java.util.Arrays.toString(args));
     
     try {
-      mh.invokeVarargs(args);
+      return (Boolean)mh.invokeVarargs(args);
     } catch(Error e) {
       throw e;
     } catch (Throwable e) {
       throw RT.error((Node)null, e);
     }
-    
-    //System.err.println("compiled method "+mh.type());
-    
-    return true;
   }
-  
   
   private static void generateStaticInit(ClassVisitor cv) {
     MethodVisitor mv = cv.visitMethod(Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
@@ -451,22 +450,10 @@ public class Compiler {
     mv.visitEnd();
   }
 
-  private static Class<?> asClass(Type type) {
-    if (type instanceof PrimitiveType) {
-      switch((PrimitiveType)type) { // use primitive type instead of their wrapper
-      case BOOLEAN:
-        return boolean.class;
-      case INT:
-        return int.class;
-      case DOUBLE:
-        return double.class;
-      default:
-        return type.getRuntimeClass();
-      }
-    }
-    return void.class;
+  static Class<?> asClass(Type type) {
+    Class<?> clazz = type.getUnboxedRuntimeClass();         // use primitive type if possible
+    return (clazz == null)? type.getRuntimeClass(): clazz;
   }
-  
   
   static MethodType asMethodType(Function function) {
     List<Parameter> parameters = function.getParameters();
@@ -505,7 +492,7 @@ public class Compiler {
     for(int i=0; i<outputVarsCount; i++) {
       parameterArray[i + count + 1] = Var.class;
     }
-    return MethodType.methodType(void.class, parameterArray);
+    return MethodType.methodType(boolean.class, parameterArray);
   }
   
   

@@ -23,7 +23,7 @@ public class LocalVar extends Var implements Symbol {
     this.slot = slot;
   }
   
-  public boolean isConstant() {
+  public boolean isBound() {
     return bound;
   }
   

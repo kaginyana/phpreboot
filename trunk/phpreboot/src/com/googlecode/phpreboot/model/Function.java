@@ -95,7 +95,7 @@ public class Function {
     return Evaluator.INSTANCE.evalFunction(this, arguments, env);
   }
   
-  public static Function createFunction(boolean lambda, String name, Parameters parametersNode, IntrinsicInfo intrinsicInfo, Scope scope, Block block) {
+  public static Function createFunction(String name, Parameters parametersNode, IntrinsicInfo intrinsicInfo, Scope scope, Block block) {
     List<com.googlecode.phpreboot.ast.Parameter> parameterStar = parametersNode.getParameterStar();
     int size = parameterStar.size();
     ArrayList<Parameter> parameters = new ArrayList<Parameter>(size);

@@ -1,0 +1,11 @@
+
+function identity(x) {
+  return x
+}
+
+i = 0
+while (i < 20000) {
+  i = identity(i + 1)
+  echo i
+}
+echo 'end'

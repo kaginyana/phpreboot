@@ -172,8 +172,8 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   // --- function definition
   
-  private Function createFunction(boolean lambda, String name, Parameters parametersNode, Block block, EvalEnv env) {
-    Function function = Function.createFunction(lambda, name, parametersNode, null, env.getScope(), block);
+  private Function createFunction(String name, Parameters parametersNode, Block block, EvalEnv env) {
+    Function function = Function.createFunction(name, parametersNode, null, env.getScope(), block);
     
     //FIXME, this code is similar to Compiler.asMethodType()
     // compute signature
@@ -208,7 +208,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Scope scope = env.getScope();
     checkVar(name, scope);
     
-    Function function = createFunction(false, name, parameters, block, env);
+    Function function = createFunction(name, parameters, block, env);
     Var var = new Var(name, true, true, PrimitiveType.ANY, function);
     scope.register(var);
   }
@@ -827,7 +827,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   @Override
   public Object visit(ExprFun expr_fun, EvalEnv env) {
-    return createFunction(true, "it", expr_fun.getParameters(), expr_fun.getBlock(), env);
+    return createFunction("it", expr_fun.getParameters(), expr_fun.getBlock(), env);
   }
 
   @Override

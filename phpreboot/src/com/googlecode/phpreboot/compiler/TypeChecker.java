@@ -80,15 +80,15 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     new HashMap<Node, Symbol>();
   private final HashMap<Function,LocalVar> functionToLocalMap =
     new HashMap<Function, LocalVar>();
-  private final boolean inTrace;
+  private final boolean breakOrContinueAsException;
   private final /*@Nullable*/Node rootTraceNode;  // null if not in trace mode
   private final /*@Nullable*/Scope rootScope;     // null if not in trace mode
   private final BindMap bindMap;
   private final TypeProfileMap typeProfileMap;
   private final boolean allowOptimisticType;
   
-  TypeChecker(boolean inTrace, /*@Nullable*/Node rootTraceNode, /*@Nullable*/Scope rootScope, BindMap bindMap, TypeProfileMap typeProfileMap, boolean allowOptimisticType) {
-    this.inTrace = inTrace;
+  TypeChecker(boolean breakOrContinueAsException, /*@Nullable*/Node rootTraceNode, /*@Nullable*/Scope rootScope, BindMap bindMap, TypeProfileMap typeProfileMap, boolean allowOptimisticType) {
+    this.breakOrContinueAsException = breakOrContinueAsException;
     this.rootTraceNode = rootTraceNode;
     this.rootScope = rootScope;
     this.bindMap = bindMap;
@@ -240,13 +240,13 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   // --- visit function definition
   
   private void visitFun(Node node, String name, Parameters parametersNode, Block block, TypeCheckEnv env) {
-    assert(!allowOptimisticType);
+    assert(!allowOptimisticType);  // this method is only called by AOT compiler
     
     LocalScope scope = env.getScope();
     checkVar(name, scope);
     
     IntrinsicInfo intrinsicInfo = new IntrinsicInfo(null/*current class*/, name, -1);
-    Function function = Function.createFunction(false, name, parametersNode, intrinsicInfo, scope, block);
+    Function function = Function.createFunction(name, parametersNode, intrinsicInfo, scope, block);
     
     LocalScope localScope = new LocalScope(function.getScope());
     localScope.register(new Var(name, true, false, PrimitiveType.ANY, function));
@@ -567,7 +567,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   }
   
   private Type visitBreakOrContinue(/*@Nullable*/IdToken idToken, TypeCheckEnv env) {
-    if (inTrace) {   // mixed mode, if loopstack doesn't contains any labels 
+    if (breakOrContinueAsException) {   // mixed mode, if loopstack doesn't contains any labels 
       return DEAD;   // gen pass will generate an exception to go back in the interpreter
     }
 
@@ -620,8 +620,8 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
       Type[] typeProfile = new Type[size];
       for(int i=0; i<size; i++) {
         Type exprType = typeCheck(exprStar.get(i), env);
-        typeProfile[i] = Compiler.eraseAsProfile(exprType);
         isCompatible(parameters.get(i).getType(), exprType);
+        typeProfile[i] = Compiler.eraseAsProfile(exprType);
       }
       
       LocalVar localVar;
@@ -633,7 +633,11 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
           List<Type> typeProfileList = Arrays.asList(typeProfile);
           Function specializedFunction = function.lookupSignature(typeProfileList);
           if (specializedFunction == null) {
-            specializedFunction = Compiler.traceTypecheckFunction(function, typeProfile, PrimitiveType.ANY/*FIXME try to infer*/); 
+            if (env.isUntakenBranch()) {  // don't try to typecheck an untaken function
+              throw UntakenBranchTypeCheckException.INSTANCE;
+            }
+            
+            specializedFunction = Compiler.traceTypecheckFunction(function, typeProfile); 
           } 
           if (specializedFunction != null) {
             LocalVar functionVar = functionToLocalMap.get(specializedFunction);
@@ -657,7 +661,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
         }
         
       } else {
-        // call will be intrinsified
+        // call will be intrinsicfied
         localVar = LocalVar.createConstantFoldable(function);
       }
       

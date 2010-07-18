@@ -122,7 +122,7 @@ public class Compiler {
     return gen(false, function, bindMap, liveness, typeChecker.getTypeAttributeMap(), typeChecker.getSymbolAttributeMap());
   }
   
-  public static Function traceTypecheckFunction(Function function, Type[] types, Type returnType) {
+  public static Function traceTypecheckFunction(Function function, Type[] types) {
     String name = function.getName();
     LocalScope localScope = new LocalScope(function.getScope());
     localScope.register(new Var(name, true, false, PrimitiveType.ANY, function));
@@ -145,7 +145,7 @@ public class Compiler {
     }
     
     BindMap bindMap = new BindMap();
-    TypeChecker typeChecker = new TypeChecker(false, function.getBlock(), localScope, bindMap, new TypeProfileMap(), RTFlag.COMPILER_OPTIMISTIC);
+    TypeChecker typeChecker = new TypeChecker(false, null, null, bindMap, new TypeProfileMap(), RTFlag.COMPILER_OPTIMISTIC);
     
     Type liveness;
     try {
@@ -154,7 +154,7 @@ public class Compiler {
       return null;
     }
     
-    Function specializedFunction = freshFunction(function, vars, returnType);
+    Function specializedFunction = freshFunction(function, vars, function.getReturnType());
     MethodHandle mh = SpecializedFunctionStub.specializedStub(specializedFunction,
         bindMap,
         liveness,

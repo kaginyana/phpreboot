@@ -1,0 +1,13 @@
+
+function foo(x) {
+  if (x % 2 == 0)
+    return 2
+  return 3.0
+}
+
+i = 0
+while (i < 200) {
+  foo(i);
+  i = i + 1
+}
+

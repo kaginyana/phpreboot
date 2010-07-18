@@ -333,7 +333,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     
     Block block = function.getBlock();
     Type returnType = function.getReturnType();
-    gen(block, new GenEnv(mv, 1/*eval env=0*/, null, new LoopStack<Labels>(), returnType));
+    gen(block, new GenEnv(mv, 1/*eval env=0*/, returnType, null, new LoopStack<Labels>(), returnType));
     
     if (typeAttributeMap.get(block) == LivenessType.ALIVE) {
       defaultReturn(mv, returnType);
@@ -433,11 +433,11 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     MethodVisitor mv = env.getMethodVisitor();
     mv.visitLineNumber(instr_return.getLineNumberAttribute(), new Label());
     Expr expr = instr_return.getExprOptional();
-    Type type = getTypeAttribute(instr_return);
+    Type functionReturnType = env.getFunctionReturnType();
     
     if (expr != null) {
-      gen(expr, env.expectedType(type));
-      insertCast(mv, type, getTypeAttribute(expr));
+      gen(expr, env.expectedType(functionReturnType));
+      insertCast(mv, functionReturnType, getTypeAttribute(expr));
     }
     
     if (trace) {
@@ -447,7 +447,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       return null;
     }
     
-    mv.visitInsn(asASMType(type).getOpcode(IRETURN));
+    mv.visitInsn(asASMType(functionReturnType).getOpcode(IRETURN));
     return null;
   }
   

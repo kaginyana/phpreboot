@@ -83,14 +83,17 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   private final boolean breakOrContinueAsException;
   private final /*@Nullable*/Node rootTraceNode;  // null if not in trace mode
   private final /*@Nullable*/Scope rootScope;     // null if not in trace mode
+  private final boolean inferReturnType;
+  private Type inferedReturnType;
   private final BindMap bindMap;
   private final TypeProfileMap typeProfileMap;
   private final boolean allowOptimisticType;
   
-  TypeChecker(boolean breakOrContinueAsException, /*@Nullable*/Node rootTraceNode, /*@Nullable*/Scope rootScope, BindMap bindMap, TypeProfileMap typeProfileMap, boolean allowOptimisticType) {
+  TypeChecker(boolean breakOrContinueAsException, /*@Nullable*/Node rootTraceNode, /*@Nullable*/Scope rootScope, boolean inferReturnType, BindMap bindMap, TypeProfileMap typeProfileMap, boolean allowOptimisticType) {
     this.breakOrContinueAsException = breakOrContinueAsException;
     this.rootTraceNode = rootTraceNode;
     this.rootScope = rootScope;
+    this.inferReturnType = inferReturnType;
     this.bindMap = bindMap;
     this.typeProfileMap = typeProfileMap;
     this.allowOptimisticType = allowOptimisticType;
@@ -107,6 +110,9 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   }
   public Map<Node, Symbol> getSymbolAttributeMap() {
     return symbolAttributeMap;
+  }
+  public Type getInferedReturnType() {
+    return inferedReturnType;
   }
   
   
@@ -415,9 +421,18 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     Expr expr = instr_return.getExprOptional();
     Type exprType = (expr == null)? PrimitiveType.VOID: typeCheck(expr, env);
     
+    if (inferReturnType) {      // return type inference
+      if (inferedReturnType == null) {
+        inferedReturnType = exprType;
+      } else {
+        inferedReturnType = commonSuperType(exprType, inferedReturnType);
+      }
+      return DEAD;
+    }
+    
     Type functionReturnType = env.getFunctionReturnType();
     isCompatible(functionReturnType, exprType);
-    return functionReturnType;    //HACK: it also means !Liveness.ALIVE 
+    return DEAD;   
   }
   
   @Override
@@ -568,7 +583,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
   
   private Type visitBreakOrContinue(/*@Nullable*/IdToken idToken, TypeCheckEnv env) {
     if (breakOrContinueAsException) {   // mixed mode, if loopstack doesn't contains any labels 
-      return DEAD;   // gen pass will generate an exception to go back in the interpreter
+      return DEAD;   // gen pass will generate an exception to go back into the interpreter
     }
 
     LoopStack<Boolean> loopStack = env.getLoopStack();

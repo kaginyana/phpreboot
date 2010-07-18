@@ -125,7 +125,7 @@ public class EscapeTraceEvaluator extends Visitor<Void, Node, RuntimeException> 
     }
     @Override
     public Class<?> getUnboxedRuntimeClass() {
-      return null;
+      return MethodHandle.class;
     }
     @Override
     public String toString() {

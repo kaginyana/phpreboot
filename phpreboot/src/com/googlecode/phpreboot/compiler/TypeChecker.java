@@ -642,17 +642,15 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
       LocalVar localVar;
       if (function.getIntrinsicInfo() == null) {
         
-        if (allowOptimisticType) {
-          // try to specialize the method
-          
+        if (allowOptimisticType) {   // try to specialize the method
           List<Type> typeProfileList = Arrays.asList(typeProfile);
           Function specializedFunction = function.lookupSignature(typeProfileList);
           if (specializedFunction == null) {
-            if (env.isUntakenBranch()) {  // don't try to typecheck an untaken function
+            if (env.isUntakenBranch()) {  // don't try to typecheck a function that was not called at least once
               throw UntakenBranchTypeCheckException.INSTANCE;
             }
             
-            specializedFunction = Compiler.traceTypecheckFunction(function, typeProfile); 
+            specializedFunction = Compiler.traceTypecheckFunction(function, typeProfileList); 
           } 
           if (specializedFunction != null) {
             LocalVar functionVar = functionToLocalMap.get(specializedFunction);
@@ -684,6 +682,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
       return function.getReturnType();
     }
     
+    //FIXME implements Java bridge
     return super.visit(funcall_call, env);
   }
   

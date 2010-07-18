@@ -122,7 +122,7 @@ public class Compiler {
     return gen(function, bindMap, liveness, typeChecker.getTypeAttributeMap(), typeChecker.getSymbolAttributeMap());
   }
   
-  public static Function traceTypecheckFunction(Function function, Type[] types) {
+  public static Function traceTypecheckFunction(Function function, List<Type> types) {
     String name = function.getName();
     LocalScope localScope = new LocalScope(function.getScope());
     localScope.register(new Var(name, true, false, PrimitiveType.ANY, function));
@@ -134,7 +134,7 @@ public class Compiler {
       Type type = parameter.getType();
       Node node;
       if (type == PrimitiveType.ANY) {
-        type = types[i];
+        type = types.get(i);
         node = parameter.getNode();
       } else {
         node = null;
@@ -144,6 +144,9 @@ public class Compiler {
       localScope.register(localVar);
     }
     
+    Function specializedFunction = createSpecializedFunction(function, vars);
+    function.getSignatureCache().put(types, specializedFunction);   //fix point, avoid infinite recursive typechecking
+    
     BindMap bindMap = new BindMap();
     TypeChecker typeChecker = new TypeChecker(false, null, null, true, bindMap, new TypeProfileMap(), RTFlag.COMPILER_OPTIMISTIC);
     
@@ -151,21 +154,23 @@ public class Compiler {
     try {
       liveness = typecheck(typeChecker, function.getBlock(), function.getReturnType(), localScope);
     } catch(CodeNotCompilableTypeCheckException ignored) {
+      function.getSignatureCache().remove(types);
       return null;
     }
     
-    Function specializedFunction = freshFunction(function, vars, typeChecker.getInferedReturnType());
+    specializedFunction.__setReturnType__(typeChecker.getInferedReturnType());
+    
     MethodHandle mh = SpecializedFunctionStub.specializedStub(specializedFunction,
         bindMap,
         liveness,
         typeChecker.getTypeAttributeMap(),
         typeChecker.getSymbolAttributeMap(),
-        asMethodType(specializedFunction, bindMap));
+        asMethodType(specializedFunction));
     specializedFunction.setMethodHandle(mh);
     return specializedFunction;
   }
   
-  private static Function freshFunction(Function unspecializedFunction, Var[] vars, Type returnType) {
+  private static Function createSpecializedFunction(Function unspecializedFunction, Var[] vars) {
     assert unspecializedFunction.getIntrinsicInfo() == null;
     
     int length = vars.length;
@@ -180,9 +185,9 @@ public class Compiler {
     Map<List<Type>, Function> signatureCache = unspecializedFunction.getSignatureCache();
     Function function = new Function(unspecializedFunction.getName(),
         parameters,
-        returnType,
+        null,           // return type will be set later
         unspecializedFunction.getScope(),
-        unspecializedFunction.getIntrinsicInfo(),  // should be always null
+        null,
         signatureCache,
         unspecializedFunction.getBlock());
     function.registerSignature(function);
@@ -453,8 +458,7 @@ public class Compiler {
   }
 
   static Class<?> asClass(Type type) {
-    Class<?> clazz = type.getUnboxedRuntimeClass();         // use primitive type if possible
-    return (clazz == null)? type.getRuntimeClass(): clazz;
+    return type.getUnboxedRuntimeClass();         // use primitive type if possible
   }
   
   static MethodType asMethodType(Function function) {

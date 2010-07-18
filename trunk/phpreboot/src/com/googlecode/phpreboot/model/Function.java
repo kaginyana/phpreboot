@@ -19,7 +19,7 @@ public class Function {
   private final String name;
   private final List<Parameter> parameters;
   private final List<Type> parameterTypes; //FIXME should be a view of parameters 
-  private final Type returnType;
+  private Type returnType;                 // can't be final because of inference of recursive function return type
   private final /*@Nullable*/Scope scope;
   private final Block block;
   private final /*@Nullable*/IntrinsicInfo intrinsicInfo;
@@ -55,6 +55,9 @@ public class Function {
     return parameterTypes;
   }
   public Type getReturnType() {
+    if (returnType == null) {   // null during inference of recursive function 
+      return PrimitiveType.ANY;
+    }
     return returnType;
   }
   public /*@Nullable*/Scope getScope() {
@@ -67,6 +70,10 @@ public class Function {
     return block;
   }
   
+  //should be called only by Typechecker 
+  public void __setReturnType__(Type returnType) {
+    this.returnType = returnType;
+  }
   public /*@Nullable*/Map<List<Type>, Function> getSignatureCache() {
     return signatureCache;
   }

@@ -32,4 +32,4 @@ else
 fi
 
 LIB=$PHPR_HOME/lib
-java -server -ea -Ddebug=true -verbose:class -XX:+AnonymousClasses -XX:+PrintCompilation -XX:+UnlockExperimentalVMOptions -XX:+EnableInvokeDynamic -Xbootclasspath/p:$LIB/phpreboot.jar:$LIB/tatoo-runtime.jar:$LIB/asm-all-3.2.jar:$LIB/hs19-b01-jsr292-patch.jar:$LIB/grizzly-servlet-webserver-1.9.18-k.jar:$LIB/derby.jar com.googlecode.phpreboot.Main $@
+java -server -ea -Ddebug=true -XX:+AnonymousClasses -XX:+PrintCompilation -XX:+UnlockExperimentalVMOptions -XX:+EnableInvokeDynamic -Xbootclasspath/p:$LIB/phpreboot.jar:$LIB/tatoo-runtime.jar:$LIB/asm-all-3.2.jar:$LIB/jaxen-1.1.2.jar:$LIB/grizzly-servlet-webserver-1.9.18-k.jar:$LIB/derby.jar com.googlecode.phpreboot.Main $@

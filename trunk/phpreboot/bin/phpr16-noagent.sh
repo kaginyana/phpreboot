@@ -32,4 +32,4 @@ else
 fi
 
 LIB=$PHPR_HOME/lib
-java -server -ea -Dcompiler.enable=false -Xbootclasspath/p:$LIB/jsr292-backport.jar:$LIB/phpreboot-backported.jar:$LIB/tatoo-runtime.jar:$LIB/grizzly-servlet-webserver-1.9.18-k.jar:$LIB/derby.jar com.googlecode.phpreboot.Main16 $@
+java -server -ea -Dcompiler.enable=false -Xbootclasspath/p:$LIB/jsr292-backport.jar:$LIB/phpreboot-backported.jar:$LIB/tatoo-runtime.jar:$LIB/jaxen-1.1.2.jar:$LIB/grizzly-servlet-webserver-1.9.18-k.jar:$LIB/derby.jar com.googlecode.phpreboot.Main16 $@

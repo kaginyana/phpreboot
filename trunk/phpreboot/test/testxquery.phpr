@@ -31,9 +31,7 @@ bookstore =
     </book>
   </bookstore>
   
-titles = for x in bookstore/book
-           where x.price to double > 30
-           return x.title
+titles = for x in bookstore/book where x.price to double > 30 return x.title;
 
 <basket>
 {

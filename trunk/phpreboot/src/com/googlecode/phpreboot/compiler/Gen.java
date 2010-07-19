@@ -199,9 +199,10 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
         return ASM_XML_TYPE;
       case URI:
         return ASM_URI_TYPE;
-      default:
-        throw new AssertionError("unknown primitive type "+type);
+      case FUNCTION:
+        return ASM_FUNCTION_TYPE;
       }
+      throw new AssertionError("unknown primitive type "+type);
     } else {
       return org.objectweb.asm.Type.VOID_TYPE;
     }
@@ -213,6 +214,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   private static final org.objectweb.asm.Type ASM_SEQUENCE_TYPE = org.objectweb.asm.Type.getType(Sequence.class);
   private static final org.objectweb.asm.Type ASM_XML_TYPE = org.objectweb.asm.Type.getType(XML.class);
   private static final org.objectweb.asm.Type ASM_URI_TYPE = org.objectweb.asm.Type.getType(URI.class);
+  private static final org.objectweb.asm.Type ASM_FUNCTION_TYPE = org.objectweb.asm.Type.getType(Function.class);
 
   void defaultReturn(MethodVisitor mv, Type returnType) {
     switch((PrimitiveType)returnType) {

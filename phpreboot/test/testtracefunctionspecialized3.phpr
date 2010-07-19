@@ -7,7 +7,7 @@ function fibo(a) {
 
 i = 0
 while (i < 200) {
-  fibo(i % 7);
+  fibo(i % 7)
   i = i + 1
 }
 

@@ -95,7 +95,7 @@ public class Function {
   
   @Override
   public String toString() {
-    return name+parameters;
+    return name+parameters+':'+returnType;
   }
   
   public Object call(EvalEnv env, Object[] arguments) {

@@ -1,0 +1,13 @@
+
+function identity(x) {
+  return x
+}
+
+foo = identity;
+
+i = 0
+while (i < 200) {
+  foo(i)
+  i = i + 1
+}
+

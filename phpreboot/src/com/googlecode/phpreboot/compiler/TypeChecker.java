@@ -255,7 +255,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     Function function = Function.createFunction(name, parametersNode, intrinsicInfo, scope, block);
     
     LocalScope localScope = new LocalScope(function.getScope());
-    localScope.register(new Var(name, true, false, PrimitiveType.ANY, function));
+    localScope.register(new Var(name, true, true, PrimitiveType.ANY, function));
     List<Parameter> parameters = function.getParameters();
     int size = parameters.size();
     for(int i=0; i<size; i++) {
@@ -642,7 +642,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
       LocalVar localVar;
       if (function.getIntrinsicInfo() == null) {
         
-        if (allowOptimisticType) {   // try to specialize the method
+        if (allowOptimisticType && var.isReallyConstant()) {   // try to specialize the method
           List<Type> typeProfileList = Arrays.asList(typeProfile);
           Function specializedFunction = function.lookupSignature(typeProfileList);
           if (specializedFunction == null) {

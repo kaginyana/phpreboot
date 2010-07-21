@@ -615,7 +615,8 @@ public class RT {
   }
   
   public static Sequence toSequence(Object o) {
-    Class<?> clazz = o.getClass(); // nullcheck
+    if (o == null)  // null sequence is allowed  
+      return null;
     
     if (o instanceof Sequence) {
       return (Sequence)o;
@@ -630,6 +631,7 @@ public class RT {
     if (o instanceof Object[]) {
       return objectArrayToSequence((Object[])o);
     }
+    Class<?> clazz = o.getClass();
     if (clazz.isArray()) {
       return primitiveArrayToSequence(o);
     }
@@ -802,6 +804,9 @@ public class RT {
     if ((o instanceof XML)) {
       return builder.append(o);
     }
+    if (o instanceof Protect) {  // doesn't escape XML
+      return builder.append(o);
+    }
     return escapeXML(builder, String.valueOf(o));
   }
   static StringBuilder escapeXML(StringBuilder builder, String text) {
@@ -819,6 +824,38 @@ public class RT {
       }
     }
     return builder;
+  }
+  
+  public static String escapeSQL(Object value) {
+    if (value == null)
+      return "null";
+    if (value instanceof Protect) {  // doesn't escape SQL
+      return value.toString();
+    }
+    String text = value.toString();
+    boolean isString = value instanceof String;
+    StringBuilder builder = new StringBuilder();
+    if (isString)
+      builder.append('\'');
+    for(int i = 0; i < text.length(); i++) {
+      char c = text.charAt(i);
+      switch(c) {
+      case '\0':
+      case '\n':
+      case '\r':
+      case '\\':
+      case '\'':
+      case '"':
+      case '\u001a':
+        builder.append('\\').append(c);
+        break;
+      default:
+        builder.append(c);
+      }
+    }
+    if (isString)
+      builder.append('\'');
+    return builder.toString();
   }
   
   

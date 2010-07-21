@@ -60,9 +60,11 @@ import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.parser.ProductionEnum;
+import com.googlecode.phpreboot.runtime.RT;
 import com.googlecode.phpreboot.runtime.SQLCursor;
 
 public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException> {
+  private static final boolean DOESNT_ALLOW_PREPARED_STATEMENT = true;
   static final SQLTreeVisitor INSTANCE = new SQLTreeVisitor();
   
   public void executeQuery(Sql sql, Connection connection, EvalEnv evalEnv) {
@@ -88,7 +90,6 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException> {
     StringBuilder builder = env.getBuilder();
     builder.setLength(builder.length() - delimiter.length());
   }
-  
   
   // --- generic visit
   
@@ -120,8 +121,9 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException> {
     ResultSet resultSet;
     List<Object> parameters = env.getParameters();
     Connection connection = env.getConnection();
+    
     try {
-      if (parameters.isEmpty()) {
+      if (DOESNT_ALLOW_PREPARED_STATEMENT || parameters.isEmpty()) {
         Statement statement = connection.createStatement();
         try {
           resultSet = statement.executeQuery(sqlQuery);
@@ -143,7 +145,7 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException> {
       }
     
       if (!resultSet.next())  { // starts with first row, free result set if empty
-        resultSet.getStatement().close();
+        resultSet.close();
         resultSet = null;
       }
       
@@ -190,15 +192,24 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException> {
     Connection connection = env.getConnection();
     List<Object> parameters = env.getParameters();
     try {
-      PreparedStatement prepareStatement = connection.prepareStatement(sql);
-      try {
-        int index = 1;
-        for(Object value: parameters) {
-          prepareStatement.setObject(index++, value);
+      if (DOESNT_ALLOW_PREPARED_STATEMENT) {
+        Statement statement = connection.createStatement();
+        try {
+          statement.executeUpdate(sql);
+        } finally {
+          statement.close();
         }
-        prepareStatement.executeUpdate();
-      } finally {
-        prepareStatement.close();
+      } else {
+        PreparedStatement prepareStatement = connection.prepareStatement(sql);
+        try {
+          int index = 1;
+          for(Object value: parameters) {
+            prepareStatement.setObject(index++, value);
+          }
+          prepareStatement.executeUpdate();
+        } finally {
+          prepareStatement.close();
+        }
       }
     } catch (SQLException e) {
       throw (RuntimeException)new RuntimeException(sql).initCause(e);
@@ -218,8 +229,12 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException> {
     StringBuilder builder = env.getBuilder();
     for(Expr expr: insert_statement.getExprPlus()) {
       Object exprValue = Evaluator.INSTANCE.eval(expr, env.getEvalEnv());
-      env.getParameters().add(exprValue);
-      builder.append("?, ");
+      if (DOESNT_ALLOW_PREPARED_STATEMENT) {
+        builder.append(RT.escapeSQL(exprValue)).append(" ,");
+      } else {
+        env.getParameters().add(exprValue);
+        builder.append("?, ");
+      }
     }
     builder.setLength(builder.length() - 2);
     builder.append(')');
@@ -495,8 +510,12 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException> {
   @Override
   public Void visit(ConditionValueLiteral condition_value_literal, SQLEnv env) {
     Object value = Evaluator.INSTANCE.eval(condition_value_literal.getSingleLiteral(), env.getEvalEnv());
-    env.getParameters().add(value);
-    env.append("?");
+    if (DOESNT_ALLOW_PREPARED_STATEMENT) {
+      env.append(RT.escapeSQL(value));
+    } else {
+      env.getParameters().add(value);
+      env.append("?");
+    }
     return null;
   }
   @Override
@@ -513,8 +532,12 @@ public class SQLTreeVisitor extends Visitor<Void, SQLEnv, RuntimeException> {
   @Override
   public Void visit(ConditionValueDollarAccess condition_value_dollar_access,SQLEnv env) {
     Object value = Evaluator.INSTANCE.eval(condition_value_dollar_access.getDollarAccess(), env.getEvalEnv());
-    env.getParameters().add(value);
-    env.append("?");
+    if (DOESNT_ALLOW_PREPARED_STATEMENT) {
+      env.append(RT.escapeSQL(value));
+    } else {
+      env.getParameters().add(value);
+      env.append("?");
+    }
     return null;
   }
 }

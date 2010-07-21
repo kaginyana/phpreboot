@@ -64,6 +64,8 @@ tokens:
   ropt = '\]'
   semi = ';'
   
+  // xml tokens
+  script_tag = 'script'
   lbrack_slash = '<[( \t\r\n]*\/'
   slash_rbrack = '\/[( \t\r\n]*>'
   dollar = '\$'
@@ -132,7 +134,8 @@ tokens:
   value_literal = '([0-9]+(\.([0-9])+)?)|(0[xX][0-9a-fA-F]+)'
   string_literal = '(\u0022([^\u0022])*\u0022)|(\u0027([^\u0027])*\u0027)'
   id = '[A-Za-z_][A-Za-z0-9_]*'
-  xml_text = '[^<${]+'          [xml]
+  xml_text = '[^<${]+'                [xml]
+  xml_script_text = '([^<]|<[^/]|<\/[^s]|<\/s[^c]|<\/sc[^r]|<\/scr[^i]|<\/scri[^p]|<\/scrip[^t])+<\/script'   
   eoln = '(\r)?\n'
   
 blanks:
@@ -151,6 +154,7 @@ types:
   'lcurl': void
   'rcurl': void
   'xml_text': String
+  'xml_script_text': String
   
 attributes:
   lineNumber: int
@@ -321,8 +325,10 @@ productions:
                  | '$' '(' expr ')'        { dollar_access_expr }
                  ;    
        
-   xmls = '<' 'id' attrs '>' content 'lbrack_slash' 'id' '>'     { xmls_start_end_tag }
-        | '<' 'id' attrs 'slash_rbrack'                          { xmls_empty_tag }
+   xmls = '<' 'id' attrs '>' content 'lbrack_slash' 'id' '>'    { xmls_start_end_tag }
+        | '<' 'id' attrs 'slash_rbrack'                         { xmls_empty_tag }
+        | '<' 'script_tag' attrs '>' 'xml_script_text' '>'      { xmls_start_end_script_tag }
+        | '<' 'script_tag' attrs 'slash_rbrack'                 { xmls_empty_script_tag }
         ;
        
    content = content xmls                     { content_xmls }

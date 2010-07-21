@@ -16,15 +16,24 @@ public class SQLCursor implements Sequence, ArrayAccess {
   
   @Override
   public Sequence next() {
+    row++;
     try {
-      row++;
       if (resultSet.next())
         return this;
-      resultSet.getStatement().close();
-      return null;
     } catch (SQLException e) {
+      try {
+        resultSet.close();
+      } catch (SQLException e1) {
+        // ignore
+      }
       throw new RuntimeException(e);
     }
+    try {
+      resultSet.close();
+    } catch (SQLException e) {
+      // ignore
+    }
+    return null;
   }
   
   @Override

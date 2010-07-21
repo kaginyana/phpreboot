@@ -19,6 +19,7 @@ import com.googlecode.phpreboot.ast.RegexAnycharacterToken;
 import com.googlecode.phpreboot.ast.RootDirToken;
 import com.googlecode.phpreboot.ast.StringLiteralToken;
 import com.googlecode.phpreboot.ast.ValueLiteralToken;
+import com.googlecode.phpreboot.ast.XmlScriptTextToken;
 import com.googlecode.phpreboot.ast.XmlTextToken;
 import com.googlecode.phpreboot.tools.TerminalEvaluator;
 
@@ -62,6 +63,10 @@ public class ASTHandler extends ASTGrammarEvaluator implements TerminalEvaluator
   @Override
   public XmlTextToken xml_text(CharSequence data) {
     return computeTokenAnnotation(new XmlTextToken(data.toString()));
+  }
+  @Override
+  public XmlScriptTextToken xml_script_text(CharSequence data) {
+    return computeTokenAnnotation(new XmlScriptTextToken(data.subSequence(0, data.length() - 8).toString()));
   }
   
   @Override

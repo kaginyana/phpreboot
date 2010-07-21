@@ -1,0 +1,39 @@
+<html>
+  <head>
+    <script type="text/javascript" src="/jquery-1.4.2.js"/>
+    <script type="text/javascript">
+$(document).ready(function(){ 
+  $(".comments_button").click(function(){ 
+    $.ajax({ 
+      type: "GET", 
+      url: "comments.phpr, 
+      dataType : "xml", 
+      
+      error:function(msg, string){ 
+        alert( "Error !: " + msg + " " + string ); 
+      }, 
+      success:function(data){ 
+        var comment = data.getElementsByTagName('comment'); 
+        var length = comment[0].childNodes.length; 
+        
+        for (i=0; i<length; i++) { 
+          $("#comments").append("<div class='comment'>"+comment[0].getElementsByTagName("text")[i].firstChild.nodeValue +"<br /> From : "+ comment[0].getElementsByTagName("author")[i].firstChild.nodeValue+"</div>"); 
+        } 
+        $("#comments").slideDown("slow"); 
+      }
+    }); 
+  }); 
+}); 
+    </script>
+  </head>
+  <body>
+    <h1>GuestBook</h1> 
+    <p>
+     Please let a comment on my questbook
+    </p>
+    
+    <a class="comments_button">see comments</a> 
+    
+    <div id="commments"/>
+  </body>
+</html>

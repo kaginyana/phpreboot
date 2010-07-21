@@ -92,7 +92,9 @@ import com.googlecode.phpreboot.ast.PrimaryParens;
 import com.googlecode.phpreboot.ast.PrimaryPrimaryArrayAccess;
 import com.googlecode.phpreboot.ast.PrimaryPrimaryFieldAccess;
 import com.googlecode.phpreboot.ast.Visitor;
+import com.googlecode.phpreboot.ast.XmlsEmptyScriptTag;
 import com.googlecode.phpreboot.ast.XmlsEmptyTag;
+import com.googlecode.phpreboot.ast.XmlsStartEndScriptTag;
 import com.googlecode.phpreboot.ast.XmlsStartEndTag;
 import com.googlecode.phpreboot.compiler.Compiler;
 import com.googlecode.phpreboot.compiler.Compiler.CompileFunctionStub;
@@ -108,6 +110,7 @@ import com.googlecode.phpreboot.model.Var;
 import com.googlecode.phpreboot.parser.ProductionEnum;
 import com.googlecode.phpreboot.regex.RegexEvaluator;
 import com.googlecode.phpreboot.runtime.Array;
+import com.googlecode.phpreboot.runtime.Protect;
 import com.googlecode.phpreboot.runtime.RT;
 import com.googlecode.phpreboot.runtime.RTFlag;
 import com.googlecode.phpreboot.runtime.Sequence;
@@ -486,11 +489,8 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Expr expr = labeled_instr_foreach.getExpr();
     Object expression = eval(expr, env);
     Sequence sequence = RT.toSequence(expression);
-    if (sequence == null)
-      return null;
     
     String name = labeled_instr_foreach.getId().getValue();
-    
     Instr instr = labeled_instr_foreach.getInstr();
     try {
       while(sequence != null) {
@@ -1006,12 +1006,24 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Array elements = (Array)eval(xmls_start_end_tag.getContent(), env);
     return new XML(name, attributes, elements);
   }
-  
   @Override
   public Object visit(XmlsEmptyTag xmls_empty_tag, EvalEnv env) {
     String name = xmls_empty_tag.getId().getValue();
     Array attributes = (Array)eval(xmls_empty_tag.getAttrs(), env);
     return new XML(name, attributes, new Array()); 
+  }
+  
+  @Override
+  public Object visit(XmlsStartEndScriptTag xmls_start_end_script_tag, EvalEnv env) {
+    Array attributes = (Array)eval(xmls_start_end_script_tag.getAttrs(), env);
+    Array elements = new Array();
+    elements.add(new Protect(xmls_start_end_script_tag.getXmlScriptText().getValue()));
+    return new XML("script", attributes, elements); 
+  }
+  @Override
+  public Object visit(XmlsEmptyScriptTag xmls_empty_script_tag, EvalEnv env) {
+    Array attributes = (Array)eval(xmls_empty_script_tag.getAttrs(), env);
+    return new XML("script", attributes, new Array()); 
   }
   
   @Override

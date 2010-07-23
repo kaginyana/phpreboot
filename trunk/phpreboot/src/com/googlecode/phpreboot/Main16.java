@@ -14,6 +14,7 @@ import java.util.Iterator;
 
 import com.googlecode.phpreboot.doc.Doclet;
 import com.googlecode.phpreboot.interpreter.Analyzer;
+import com.googlecode.phpreboot.interpreter.Echoer;
 import com.googlecode.phpreboot.interpreter.RootScope;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Var;
@@ -183,7 +184,7 @@ public class Main16 {
       if (optionMap.containsKey(Option.aot)) {
         Analyzer.compileAheadOfTime(scriptName, reader, rootScope);
       } else {
-        Analyzer.interpret(reader, writer, rootScope);  
+        Analyzer.interpret(reader, Echoer.writerEchoer(writer), rootScope);  
       }
     } catch(Throwable t) {
       if (verbose)

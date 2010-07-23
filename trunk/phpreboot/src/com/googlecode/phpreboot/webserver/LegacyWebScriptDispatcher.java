@@ -12,6 +12,7 @@ import java.io.Reader;
 import java.util.Map;
 
 import com.googlecode.phpreboot.interpreter.Analyzer;
+import com.googlecode.phpreboot.interpreter.Echoer;
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Var;
@@ -156,7 +157,7 @@ public class LegacyWebScriptDispatcher extends GrizzlyAdapter {
     Reader reader = new InputStreamReader(input);
     PrintWriter writer = new PrintWriter(output);
     try {
-      Analyzer.interpret(reader, writer, new Scope(scope));
+      Analyzer.interpret(reader, Echoer.writerEchoer(writer), new Scope(scope));
     } finally {
       sqlConnection.close();
     }

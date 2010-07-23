@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.Map;
 
 import com.googlecode.phpreboot.interpreter.Analyzer;
+import com.googlecode.phpreboot.interpreter.Echoer;
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Var;
@@ -55,7 +56,7 @@ public class WebScriptDispatcher extends GrizzlyAdapter {
         try {
 
           if (name.endsWith(".phpr")) {
-            handleScript(input, output, request);
+            handleScript(input, output, request, response);
           } else {
             copy(input, output);
           }
@@ -146,17 +147,18 @@ public class WebScriptDispatcher extends GrizzlyAdapter {
     scope.register(new Var("_POST", true, true, PrimitiveType.ARRAY, post));
   }
   
-  private void handleScript(InputStream input, OutputStream output, GrizzlyRequest request) {
+  private void handleScript(InputStream input, OutputStream output, GrizzlyRequest request, GrizzlyResponse<?> response) {
     Scope scope = new Scope(rootScope);
     fillRequestInfos(request, scope);
     
     GenericSQLConnection sqlConnection = new GenericSQLConnection(jdbcURL);
-    scope.register(new Var("SQL_CONNECTION", true, true, PrimitiveType.ANY, sqlConnection));
+    scope.register(new Var("__PHPR__SQL_CONNECTION", true, true, PrimitiveType.ANY, sqlConnection));
+    //FIXME//scope.register(new Var("__PHPR__SQL_CONNECTION", true, true, PrimitiveType.ANY, new ));
     
     Reader reader = new InputStreamReader(input);
     PrintWriter writer = new PrintWriter(output);
     try {
-      Analyzer.interpret(reader, writer, new Scope(scope));
+      Analyzer.interpret(reader, Echoer.writerEchoer(writer), new Scope(scope));
     } finally {
       sqlConnection.close();
     }

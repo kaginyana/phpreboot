@@ -2,7 +2,6 @@ package com.googlecode.phpreboot.interpreter;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.io.Reader;
 import java.util.IdentityHashMap;
 
@@ -71,9 +70,9 @@ public class Analyzer {
     }
   }
   
-  public static void interpret(Reader reader, PrintWriter writer, Scope rootScope) {
+  public static void interpret(Reader reader, Echoer echoer, Scope rootScope) {
     LocationTracker locationTracker = new LocationTracker();
-    Interpreter interpreter = new Interpreter(locationTracker, writer, rootScope);
+    Interpreter interpreter = new Interpreter(locationTracker, echoer, rootScope);
     ReaderWrapper buffer = new ReaderWrapper(reader, locationTracker);
     
     createAnalyzer(buffer, interpreter).run();

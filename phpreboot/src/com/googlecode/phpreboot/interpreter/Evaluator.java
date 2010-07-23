@@ -636,7 +636,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     
     Object key = eval(assignment_array.getExpr(), env);
     Object value = eval(assignment_array.getExpr2(), env);  
-    RT.interpreterArraySet(assignment_array, var.getValue(), key, value, false);
+    RT.MemberAccess.interpreterArraySet(assignment_array, var.getValue(), key, value, false);
     return null;
   }
   
@@ -646,7 +646,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Object key = eval(assignment_primary_array.getExpr(), env);
     Object value = eval(assignment_primary_array.getExpr2(), env);
     
-    RT.interpreterArraySet(assignment_primary_array, array, key, value, false);
+    RT.MemberAccess.interpreterArraySet(assignment_primary_array, array, key, value, false);
     return null;
   }
   
@@ -660,7 +660,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     } 
     
     Object value = eval(assignment_field.getExpr(), env);  
-    RT.interpreterArraySet(assignment_field, var.getValue(), assignment_field.getId2().getValue(), value, true);
+    RT.MemberAccess.interpreterArraySet(assignment_field, var.getValue(), assignment_field.getId2().getValue(), value, true);
     return null;
   }
   
@@ -669,14 +669,14 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     Object array = eval(assignment_primary_field.getPrimary(), env);
     Object value = eval(assignment_primary_field.getExpr(), env);
     
-    RT.interpreterArraySet(assignment_primary_field, array, assignment_primary_field.getId().getValue(), value, true);
+    RT.MemberAccess.interpreterArraySet(assignment_primary_field, array, assignment_primary_field.getId().getValue(), value, true);
     return null;
   }
   
   @Override
   public Object visit(InstrSql instr_sql, EvalEnv env) {
     Scope scope = env.getScope();
-    SQLConnection sqlConnection = (SQLConnection)lookupVarValue("SQL_CONNECTION", scope);
+    SQLConnection sqlConnection = (SQLConnection)lookupVarValue("__PHPR__SQL_CONNECTION", scope);
     sqlConnection.executeStatement(instr_sql.getSql(), env);
     return null;
   }
@@ -717,7 +717,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       values[i] = eval(expr, env);
     }
     
-    return RT.interpreterMethodCall(funcall_call, name, values);
+    return RT.JavaMethodCall.interpreterMethodCall(funcall_call, name, values);
   }
   
   @Override
@@ -764,25 +764,25 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   public Object visit(PrimaryArrayAccess primary_array_access, EvalEnv env) {
     Object array = lookupVarValue(primary_array_access.getId().getValue(), env.getScope());
     Object key = eval(primary_array_access.getExpr(), env);
-    return RT.interpreterArrayGet(primary_array_access, array, key, false);
+    return RT.MemberAccess.interpreterArrayGet(primary_array_access, array, key, false);
   }
   @Override
   public Object visit(PrimaryPrimaryArrayAccess primary_primary_array_access, EvalEnv env) {
     Object array = eval(primary_primary_array_access.getPrimary(), env);
     Object key = eval(primary_primary_array_access.getExpr(), env);
-    return RT.interpreterArrayGet(primary_primary_array_access, array, key, false);
+    return RT.MemberAccess.interpreterArrayGet(primary_primary_array_access, array, key, false);
   }
   @Override
   public Object visit(PrimaryFieldAccess primary_field_access, EvalEnv env) {
     Object array = lookupVarValue(primary_field_access.getId().getValue(), env.getScope());
     String key = primary_field_access.getId2().getValue();
-    return RT.interpreterArrayGet(primary_field_access, array, key, true);
+    return RT.MemberAccess.interpreterArrayGet(primary_field_access, array, key, true);
   }
   @Override
   public Object visit(PrimaryPrimaryFieldAccess primary_primary_field_access, EvalEnv env) {
     Object array = eval(primary_primary_field_access.getPrimary(), env);
     String key = primary_primary_field_access.getId().getValue();
-    return RT.interpreterArrayGet(primary_primary_field_access, array, key, true);
+    return RT.MemberAccess.interpreterArrayGet(primary_primary_field_access, array, key, true);
   }
   
   // --- expressions

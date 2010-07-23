@@ -43,7 +43,7 @@ class MethodResolver {
     if (list.size() == 1) {
       return list.get(0);
     }
-    return null; // zaro method or too much methods
+    return null; // zero method or too much methods
   }
 
   private static ArrayList<Method> gatherMethods(Class<?> declaringClass, String name, int parameterCount) {

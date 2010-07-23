@@ -1,6 +1,5 @@
 package com.googlecode.phpreboot.interpreter;
 
-import java.io.PrintWriter;
 import java.util.List;
 
 import com.googlecode.phpreboot.ast.Action;
@@ -38,9 +37,9 @@ public class Interpreter extends ASTHandler {
   private int interpreter = 0;
   
   
-  public Interpreter(LocationTracker locationTracker, PrintWriter writer, Scope scope) {
+  public Interpreter(LocationTracker locationTracker, Echoer echoer, Scope scope) {
     super(locationTracker);
-    this.echoer = Echoer.writerEchoer(writer);
+    this.echoer = echoer;
     this.currentScope = scope;
   }
   

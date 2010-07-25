@@ -13,7 +13,7 @@ public class BindMap {
   private final ArrayList<LocalVar> bindReferences =
     new ArrayList<LocalVar>(16);
   
-  public LocalVar bind(String name, boolean isReadOnly, Object value, Type type, boolean allowOptimiticType, TypeProfileMap typeProfileMap, Node declaringNode) {
+  public LocalVar bind(String name, boolean isReadOnly, boolean isConstant, Object value, Type type, boolean allowOptimiticType, TypeProfileMap typeProfileMap, Node declaringNode) {
     boolean optimistic;
     if (allowOptimiticType && type == PrimitiveType.ANY) {
       type = Compiler.inferType(value);
@@ -29,7 +29,7 @@ public class BindMap {
     
     int slot = slotCount;
     slotCount = slot + ((type == PrimitiveType.DOUBLE)?2 :1);
-    LocalVar constant = LocalVar.createConstantBound(name, isReadOnly, type, (optimistic)? declaringNode: null, value, slot);
+    LocalVar constant = LocalVar.createConstantBound(name, isReadOnly, isConstant, type, (optimistic)? declaringNode: null, value, slot);
     bindReferences.add(constant);
     
     if (!isReadOnly)

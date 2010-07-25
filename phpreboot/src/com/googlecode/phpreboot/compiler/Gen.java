@@ -920,23 +920,27 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     LocalVar localVar = (LocalVar)getSymbolAttribute(funcall_call);
     Function function = (Function)localVar.getValue();
     
+    StringBuilder desc = new StringBuilder().append('(');
+    
     MethodVisitor mv = env.getMethodVisitor();
     IntrinsicInfo intrinsicInfo = function.getIntrinsicInfo();
     if (intrinsicInfo == null) {
-      mv.visitVarInsn(ALOAD, localVar.getSlot(0));
-      mv.visitMethodInsn(INVOKEVIRTUAL, FUNCTION_INTERNAL_NAME, "getMethodHandle", "()Ljava/dyn/MethodHandle;");
+      //mv.visitVarInsn(ALOAD, localVar.getSlot(0));
+      if (localVar.isReallyConstant()) {
+        //desc.append('L'+FUNCTION_INTERNAL_NAME+';');
+      } else { // it's a lambda
+        mv.visitVarInsn(ALOAD, localVar.getSlot(0));
+        mv.visitMethodInsn(INVOKEVIRTUAL, FUNCTION_INTERNAL_NAME, "getMethodHandle", "()Ljava/dyn/MethodHandle;");
+      }
       mv.visitVarInsn(ALOAD, 0); // environment
     } else {
-      if (intrinsicInfo.getDeclaringClass() == null) { //self unit call
+      if (intrinsicInfo.getDeclaringClass() == null) { //call to the same unit (not a module call)
         mv.visitVarInsn(ALOAD, 0); // environment
       }
     }
     
-    StringBuilder desc = new StringBuilder();
     if (intrinsicInfo == null || intrinsicInfo.getDeclaringClass() == null) {
-      desc.append("(L" + EVAL_ENV_INTERNAL_NAME + ';');
-    } else {
-      desc.append('(');
+      desc.append("L" + EVAL_ENV_INTERNAL_NAME + ';');
     }
     
     List<Expr> exprStar = funcall_call.getExprStar();
@@ -955,9 +959,14 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       returnType = env.getExpectedType();
     }*/
     desc.append(asASMType(returnType).getDescriptor());
+    String signature = desc.toString();
     
     if (intrinsicInfo == null) {
-      mv.visitMethodInsn(INVOKEVIRTUAL, "java/dyn/MethodHandle", /*"invokeExact"*/ "invoke", desc.toString());
+      if (localVar.isReallyConstant()) {  // function call
+        mv.visitMethodInsn(INVOKEDYNAMIC, INVOKEDYNAMIC_OWNER, "call_"+localVar.getName(), signature);
+      } else {  // lambda call
+        mv.visitMethodInsn(INVOKEVIRTUAL, "java/dyn/MethodHandle", /*"invokeExact"*/ "invoke", signature);
+      }
     } else {
       
       int opcode = intrinsicInfo.getOpcode();
@@ -968,7 +977,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       
       Class<?> declaringClass = intrinsicInfo.getDeclaringClass();
       String owner = (declaringClass == null)? internalClassName: getInternalName(declaringClass);
-      mv.visitMethodInsn(INVOKESTATIC, owner, intrinsicInfo.getName(), desc.toString());
+      mv.visitMethodInsn(INVOKESTATIC, owner, intrinsicInfo.getName(), signature);
     }
     return returnType;
   }

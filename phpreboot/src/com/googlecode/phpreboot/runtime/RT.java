@@ -3,15 +3,23 @@ package com.googlecode.phpreboot.runtime;
 import java.dyn.CallSite;
 import java.dyn.MethodHandle;
 import java.dyn.MethodHandles;
-import java.dyn.MethodHandles.Lookup;
 import java.dyn.MethodType;
+import java.dyn.MethodHandles.Lookup;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
 import com.googlecode.phpreboot.ast.Node;
+import com.googlecode.phpreboot.interpreter.EvalEnv;
+import com.googlecode.phpreboot.interpreter.Evaluator;
 import com.googlecode.phpreboot.interpreter.Profile;
+import com.googlecode.phpreboot.model.Function;
+import com.googlecode.phpreboot.model.PrimitiveType;
+import com.googlecode.phpreboot.model.Type;
+import com.googlecode.phpreboot.model.Var;
+import com.googlecode.phpreboot.model.Function.FunctionCallSite;
 import com.googlecode.phpreboot.runtime.Array.Entry;
 
 public class RT {
@@ -1174,7 +1182,11 @@ public class RT {
   
   
   public static CallSite bootstrap(@SuppressWarnings("unused") Class<?> declaringClass, String name, MethodType methodType) {
-    OpBehavior opBehavior = OpBehavior.valueOf(name);
+    if (name.startsWith("call_")) {  // function call
+      return FunctionCall.bootstrap(name.substring(5), methodType);
+    }
+    
+    OpBehavior opBehavior = OpBehavior.valueOf(name);   // operators
     CallSite callSite = new CallSite();
     
     MethodHandle target = MethodHandles.insertArguments(OpBehavior.slowPath, 0, opBehavior, callSite);
@@ -1182,8 +1194,42 @@ public class RT {
     return callSite;
   }
   
-  public static boolean isInstance(Class<?> leftType, Class<?> rightType, Object left, Object right) {
-    return leftType.isInstance(left) && rightType.isInstance(right);
+  public static class FunctionCall {
+    private static Type asType(Class<?> clazz) {
+      if (clazz == Object.class)
+        return PrimitiveType.ANY;
+      if (clazz == boolean.class)
+        return PrimitiveType.BOOLEAN;
+      if (clazz == int.class)
+        return PrimitiveType.INT;
+      if (clazz == double.class)
+        return PrimitiveType.DOUBLE;
+      if (clazz == String.class)
+        return PrimitiveType.STRING;
+      throw new AssertionError("unsupported reuntime type");
+    }
+    
+    static CallSite bootstrap(String functionName, MethodType methodType) {
+      assert methodType.parameterType(0) == EvalEnv.class;
+      
+      FunctionCallSite callSite = new FunctionCallSite();
+      Var var = Evaluator.INSTANCE.getRootScope().lookup(functionName);
+      Function function = (Function)var.getValue();
+      
+      // create signature (Type) from method type (Class)
+      ArrayList<Type> signature = new ArrayList<Type>();   
+      int parameterCount = methodType.parameterCount();
+      for(int i=1; i<parameterCount; i++) {
+        signature.add(asType(methodType.parameterType(i)));
+      }
+      
+      Function specializedFunction = function.getSignatureCache().get(signature);
+      if (!specializedFunction.isOptimized()) {
+        specializedFunction.linkCallSite(callSite);
+      }
+      callSite.setTarget(specializedFunction.getMethodHandle());
+      return callSite;
+    }
   }
   
   public static class OpBehavior {
@@ -1226,6 +1272,10 @@ public class RT {
         }
       }
       return null;
+    }
+    
+    public static boolean isInstance(Class<?> leftType, Class<?> rightType, Object left, Object right) {
+      return leftType.isInstance(left) && rightType.isInstance(right);
     }
     
     static class Plus extends OpBehavior {
@@ -1368,7 +1418,7 @@ public class RT {
       Lookup lookup = MethodHandles.publicLookup();
       isInstance = lookup.findVirtual(Class.class, "isInstance",
           MethodType.methodType(boolean.class, Object.class));
-      isInstanceLeftRight = lookup.findStatic(RT.class, "isInstance",
+      isInstanceLeftRight = lookup.findStatic(OpBehavior.class, "isInstance",
           MethodType.methodType(boolean.class, Class.class, Class.class, Object.class, Object.class));
     }
     

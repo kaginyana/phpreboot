@@ -23,6 +23,13 @@ public class Scope {
     return parent;
   }
   
+  @Override
+  public String toString() {
+    if (parent == null)
+      return varMap.toString();
+    return varMap.toString() + " -> " + parent;
+  }
+  
   public Var lookup(String name) {
     //FIXME remove recursive tailcall
     Var symbol = varMap.get(name);

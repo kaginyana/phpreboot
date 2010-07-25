@@ -7,6 +7,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 
+import com.googlecode.phpreboot.interpreter.EvalEnv;
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.model.Function;
 import com.googlecode.phpreboot.model.IntrinsicInfo;
@@ -15,7 +16,6 @@ import com.googlecode.phpreboot.model.PrimitiveType;
 import com.googlecode.phpreboot.model.Type;
 import com.googlecode.phpreboot.model.Var;
 
-//FIXME module must be loaded lazily
 public abstract class Module {
   private static final Lookup PUBLIC_LOOKUP = MethodHandles.publicLookup();
   
@@ -30,11 +30,13 @@ public abstract class Module {
         throw new AssertionError("method in module must be static "+method);
       }
       
-      // add a unused parameter for the environment
-      mh = MethodHandles.dropArguments(mh, 0, Object.class/*EvalEnv.class*/);
+      // add a unused parameter for the environment if needed
+      if (!method.isAnnotationPresent(RequireEnv.class)) {
+        mh = MethodHandles.dropArguments(mh, 0, EvalEnv.class);
+      }
       
       Function function = createFunction(method);
-      function.setMethodHandle(mh);
+      function.setMethodHandle(mh, true);
       
       Var var = new Var(method.getName(), true, true, PrimitiveType.ANY, function);
       scope.register(var);

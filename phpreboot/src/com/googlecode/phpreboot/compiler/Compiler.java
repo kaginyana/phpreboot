@@ -166,7 +166,7 @@ public class Compiler {
         typeChecker.getTypeAttributeMap(),
         typeChecker.getSymbolAttributeMap(),
         asMethodType(specializedFunction));
-    specializedFunction.setMethodHandle(mh);
+    specializedFunction.setMethodHandle(mh, false);
     return specializedFunction;
   }
   
@@ -210,11 +210,11 @@ public class Compiler {
       if (counter > RTFlag.COMPILER_FUNCTION_THRESHOLD) {
         MethodHandle compileMH = Compiler.compileFunction(function);
         if (compileMH != null) {
-          function.setMethodHandle(compileMH);
+          function.setMethodHandle(compileMH, true);
           mh = compileMH;
         } else {
           mh = interpreter;
-          function.setMethodHandle(interpreter);
+          function.setMethodHandle(interpreter, true);
         }
       } else {
         mh = interpreter;
@@ -251,10 +251,7 @@ public class Compiler {
         Object[] args) throws Throwable {
 
        MethodHandle mh = Compiler.gen(specializedFunction, bindMap, liveness, typeAttributeMap, symbolAttributeMap);
-       
-       // install the compiled method handle
-       specializedFunction.setMethodHandle(mh);
-       
+       specializedFunction.setMethodHandle(mh, true);
        return mh.invokeVarargs(args);
     }
     

@@ -655,7 +655,6 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
           if (specializedFunction != null) {
             LocalVar functionVar = functionToLocalMap.get(specializedFunction);
             if (functionVar == null) {
-              //functionVar = bindMap.bind(name, true, true, specializedFunction, PrimitiveType.FUNCTION, false, typeProfileMap, funcall_call);
               functionVar = LocalVar.createConstantFoldable(name, specializedFunction);
               functionToLocalMap.put(specializedFunction, functionVar);
             }
@@ -669,7 +668,11 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
         } else {
           localVar = functionToLocalMap.get(function);
           if (localVar == null) {
-            localVar = bindMap.bind(name, var.isReadOnly(), true, function, PrimitiveType.FUNCTION, false, typeProfileMap, funcall_call);
+            if (var.isReallyConstant()) {
+              localVar = LocalVar.createConstantFoldable(name, function);
+            } else {
+              localVar = bindMap.bind(name, var.isReadOnly(), false, function, PrimitiveType.FUNCTION, false, typeProfileMap, funcall_call);
+            }
             functionToLocalMap.put(function, localVar);
           }
         }

@@ -925,10 +925,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     MethodVisitor mv = env.getMethodVisitor();
     IntrinsicInfo intrinsicInfo = function.getIntrinsicInfo();
     if (intrinsicInfo == null) {
-      //mv.visitVarInsn(ALOAD, localVar.getSlot(0));
-      if (localVar.isReallyConstant()) {
-        //desc.append('L'+FUNCTION_INTERNAL_NAME+';');
-      } else { // it's a lambda
+       if (!localVar.isReallyConstant()) {  // it's a lambda
         mv.visitVarInsn(ALOAD, localVar.getSlot(0));
         mv.visitMethodInsn(INVOKEVIRTUAL, FUNCTION_INTERNAL_NAME, "getMethodHandle", "()Ljava/dyn/MethodHandle;");
       }

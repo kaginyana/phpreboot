@@ -129,6 +129,17 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     // enforce singleton
   }
   
+  
+  // needed by invokedynamic on constant foldable functions
+  private Scope rootScope;
+  void setRootScope(Scope scope) {
+    rootScope = scope;
+  }
+  public Scope getRootScope() {
+    return rootScope;
+  }
+  
+  
   public Object eval(Node node, EvalEnv env) {
     return node.accept(this, env);
   }
@@ -203,7 +214,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       mh = CompileFunctionStub.compileStub(function, mh);
     }
     
-    function.setMethodHandle(mh);
+    function.setMethodHandle(mh, true);
     return function;
   }
   

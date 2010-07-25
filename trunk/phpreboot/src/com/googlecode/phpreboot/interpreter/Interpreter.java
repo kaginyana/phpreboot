@@ -41,6 +41,9 @@ public class Interpreter extends ASTHandler {
     super(locationTracker);
     this.echoer = echoer;
     this.currentScope = scope;
+    
+    //FIXME ugly
+    Evaluator.INSTANCE.setRootScope(scope);
   }
   
   // --- helper methods

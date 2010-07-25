@@ -53,12 +53,12 @@ public class LocalVar extends Var implements Symbol {
     return shift + slot;
   }
   
-  public static LocalVar createConstantFoldable(Object value) {
-    return new LocalVar(null, true, true, null, /*not optimistic*/null, value, true, -1);
+  public static LocalVar createConstantFoldable(/*@Nullable*/String name, Object value) {
+    return new LocalVar(name, true, true, null, /*not optimistic*/null, value, true, -1);
   }
   
-  public static LocalVar createConstantBound(String name, boolean readOnly, Type type, Node declaringNode, Object value, int slot) {
-    return new LocalVar(name, readOnly, false, type, declaringNode, value, true, slot);
+  public static LocalVar createConstantBound(String name, boolean readOnly, boolean isConstant, Type type, Node declaringNode, Object value, int slot) {
+    return new LocalVar(name, readOnly, isConstant, type, declaringNode, value, true, slot);
   }
   
   public static LocalVar createLocalVar(String name, boolean readOnly, Type type, Node declaringNode, int slot) {

@@ -1,5 +1,6 @@
 package com.googlecode.phpreboot.model;
 
+import java.dyn.CallSite;
 import java.dyn.MethodHandle;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -23,8 +24,12 @@ public class Function {
   private final /*@Nullable*/Scope scope;
   private final Block block;
   private final /*@Nullable*/IntrinsicInfo intrinsicInfo;
-  private /*volatile*/ MethodHandle methodHandle;
+  
+  private MethodHandle methodHandle;
+  private boolean optimized;
+  private FunctionCallSite callSites;
   private final Map<List<Type>, Function> signatureCache;
+  
   
   public Function(String name, List<Parameter> parameters, Type returnType, /*@Nullable*/Scope scope, /*@Nullable*/IntrinsicInfo intrinsicInfo, Map<List<Type>, /*@Nullable*/Function> signatureCache, Block block) {
     this.name = name;
@@ -86,11 +91,34 @@ public class Function {
     signatureCache.put(function.parameterTypes, function);
   }
   
+  
+  public static class FunctionCallSite extends CallSite {
+    FunctionCallSite next;
+
+    public FunctionCallSite() {
+        super();
+    }
+  }
+  
+  public boolean isOptimized() {
+    return optimized;
+  }
   public MethodHandle getMethodHandle() {
     return methodHandle;
   }
-  public void setMethodHandle(MethodHandle methodHandle) {
+  public void setMethodHandle(MethodHandle methodHandle, boolean optimized) {
     this.methodHandle = methodHandle;
+    if (optimized && callSites != null) {
+      for(FunctionCallSite callSite = callSites; callSite != null; callSite = callSite.next) {
+        callSite.setTarget(methodHandle); 
+      }
+      callSites = null;
+      this.optimized = true;
+    }
+  }
+  public void linkCallSite(FunctionCallSite functionCallSite) {
+    functionCallSite.next = callSites;
+    callSites = functionCallSite;
   }
   
   @Override

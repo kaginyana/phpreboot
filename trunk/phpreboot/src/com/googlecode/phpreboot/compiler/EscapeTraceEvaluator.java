@@ -28,7 +28,7 @@ public class EscapeTraceEvaluator extends Visitor<Void, Node, RuntimeException> 
     MethodHandle mh = MethodHandles.insertArguments(EscapeTraceEvaluator.ESCAPE_TRACE_MH, 0, node, traceNode, scope, vars);
     mh = MethodHandles.collectArguments(mh, asMethodType(varMapAssoc));
     
-    LocalVar localVar = bindMap.bind("<escape>", true, mh, EscapeTraceEvaluator.METHOD_HANDLE_TYPE, false, typeProfileMap, null);
+    LocalVar localVar = bindMap.bind("<escape>", true, true, mh, EscapeTraceEvaluator.METHOD_HANDLE_TYPE, false, typeProfileMap, null);
     return localVar;
   }
   

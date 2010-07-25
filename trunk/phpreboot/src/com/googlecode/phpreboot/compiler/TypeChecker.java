@@ -270,7 +270,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     Var var = new Var(name, true, true, PrimitiveType.ANY, function);
     scope.register(var);
     
-    symbolAttributeMap.put(node, LocalVar.createConstantFoldable(function));
+    symbolAttributeMap.put(node, LocalVar.createConstantFoldable(name, function));
   }
   
   @Override
@@ -537,7 +537,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
           localVar.setType(PrimitiveType.ANY);
         }
       } else {
-        localVar = bindMap.bind(name, var.isReadOnly(), var.getValue(), var.getType(), allowOptimisticType, typeProfileMap, assignment_id);
+        localVar = bindMap.bind(name, var.isReadOnly(), false, var.getValue(), var.getType(), allowOptimisticType, typeProfileMap, assignment_id);
         scope.register(localVar);
       }
     }
@@ -655,7 +655,8 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
           if (specializedFunction != null) {
             LocalVar functionVar = functionToLocalMap.get(specializedFunction);
             if (functionVar == null) {
-              functionVar = bindMap.bind(name, var.isReadOnly(), specializedFunction, PrimitiveType.FUNCTION, false, typeProfileMap, funcall_call);
+              //functionVar = bindMap.bind(name, true, true, specializedFunction, PrimitiveType.FUNCTION, false, typeProfileMap, funcall_call);
+              functionVar = LocalVar.createConstantFoldable(name, specializedFunction);
               functionToLocalMap.put(specializedFunction, functionVar);
             }
             var = functionVar;
@@ -668,14 +669,14 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
         } else {
           localVar = functionToLocalMap.get(function);
           if (localVar == null) {
-            localVar = bindMap.bind(name, var.isReadOnly(), function, PrimitiveType.FUNCTION, false, typeProfileMap, funcall_call);
+            localVar = bindMap.bind(name, var.isReadOnly(), true, function, PrimitiveType.FUNCTION, false, typeProfileMap, funcall_call);
             functionToLocalMap.put(function, localVar);
           }
         }
         
       } else {
-        // call will be intrinsicfied
-        localVar = LocalVar.createConstantFoldable(function);
+        // call will be intrinsicfied during gen
+        localVar = LocalVar.createConstantFoldable(name, function);
       }
       
       symbolAttributeMap.put(funcall_call, localVar);
@@ -719,25 +720,25 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
     
     if (var.isReallyConstant()) {  // constant foldable
       if (value instanceof Boolean) {
-        symbolAttributeMap.put(expr_id, LocalVar.createConstantFoldable(value));
+        symbolAttributeMap.put(expr_id, LocalVar.createConstantFoldable(null, value));
         return PrimitiveType.BOOLEAN;
       }
       if (value instanceof Integer) {
-        symbolAttributeMap.put(expr_id, LocalVar.createConstantFoldable(value));
+        symbolAttributeMap.put(expr_id, LocalVar.createConstantFoldable(null, value));
         return PrimitiveType.INT;
       }
       if (value instanceof Double) {
-        symbolAttributeMap.put(expr_id, LocalVar.createConstantFoldable(value));
+        symbolAttributeMap.put(expr_id, LocalVar.createConstantFoldable(null, value));
         return PrimitiveType.DOUBLE;
       }
       if (value instanceof String) {
-        symbolAttributeMap.put(expr_id, LocalVar.createConstantFoldable(value));
+        symbolAttributeMap.put(expr_id, LocalVar.createConstantFoldable(null, value));
         return PrimitiveType.STRING;
       }
     }
     
     // bound constant
-    LocalVar bindVar = bindMap.bind(name, var.isReadOnly(), value, type, allowOptimisticType, typeProfileMap, expr_id);
+    LocalVar bindVar = bindMap.bind(name, var.isReadOnly(), false, value, type, allowOptimisticType, typeProfileMap, expr_id);
     env.getScope().register(bindVar);
     symbolAttributeMap.put(expr_id, bindVar);
     return bindVar.getType();

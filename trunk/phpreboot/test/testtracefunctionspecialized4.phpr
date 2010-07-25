@@ -6,7 +6,7 @@ function identity(x) {
 foo = identity;
 
 i = 0
-while (i < 200) {
+while (i < 500) {
   foo(i)
   i = i + 1
 }

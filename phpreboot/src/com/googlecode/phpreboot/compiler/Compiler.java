@@ -145,20 +145,28 @@ public class Compiler {
     }
     
     Function specializedFunction = createSpecializedFunction(function, vars);
+    Type functionReturnType = function.getReturnType();
+    boolean inferReturnType = functionReturnType == PrimitiveType.ANY;
+    if (!inferReturnType) {
+      specializedFunction.__setReturnType__(functionReturnType);
+    }
+    
     function.getSignatureCache().put(types, specializedFunction);   //fix point, avoid infinite recursive typechecking
     
     BindMap bindMap = new BindMap();
-    TypeChecker typeChecker = new TypeChecker(false, null, null, true, bindMap, new TypeProfileMap(), RTFlag.COMPILER_OPTIMISTIC);
+    TypeChecker typeChecker = new TypeChecker(false, null, null, inferReturnType, bindMap, new TypeProfileMap(), RTFlag.COMPILER_OPTIMISTIC);
     
     Type liveness;
     try {
-      liveness = typecheck(typeChecker, function.getBlock(), function.getReturnType(), localScope);
+      liveness = typecheck(typeChecker, function.getBlock(), functionReturnType, localScope);
     } catch(CodeNotCompilableTypeCheckException ignored) {
       function.getSignatureCache().remove(types);
       return null;
     }
     
-    specializedFunction.__setReturnType__(typeChecker.getInferedReturnType());
+    if (inferReturnType) {
+      specializedFunction.__setReturnType__(typeChecker.getInferedReturnType());
+    }
     
     MethodHandle mh = SpecializedFunctionStub.specializedStub(specializedFunction,
         bindMap,

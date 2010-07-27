@@ -60,8 +60,8 @@ public class Function {
     return parameterTypes;
   }
   public Type getReturnType() {
-    if (returnType == null) {   // null during inference of recursive function 
-      return PrimitiveType.ANY;
+    if (returnType == null) {    // null during inference of recursive function 
+      return PrimitiveType.ANY;  // in that case return type is any
     }
     return returnType;
   }

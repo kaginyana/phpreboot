@@ -29,6 +29,7 @@ public interface Profile {
     boolean callTrace(EvalEnv env) {
       // check if bindMap is compatible with current environment
       // and create the trace parameter array
+      Scope scope = env.getScope();
       BindMap bindMap = this.bindMap;
       List<LocalVar> references = bindMap.getReferences();
       int size = references.size();
@@ -38,7 +39,12 @@ public interface Profile {
       int outputVarIndex = size + 1;
       for(int i=0; i<size; i++) {
         LocalVar localVar = references.get(i);
-        Var var = env.getScope().lookup(localVar.getName());
+        Var var = scope.lookup(localVar.getName());
+        if (var == null) {  // escape method handle
+          args[i + 1] = localVar.getValue();
+          continue;
+        }
+        
         Object value = var.getValue();
         args[i + 1] = value;
         if (!var.isReadOnly()) {

@@ -3,6 +3,7 @@ package com.googlecode.phpreboot.compiler;
 import java.dyn.MethodHandle;
 import java.dyn.MethodHandles;
 import java.dyn.MethodType;
+import java.dyn.NoAccessException;
 import java.io.PrintWriter;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -234,8 +235,12 @@ public class Compiler {
     
     static final MethodHandle STUB;
     static {
-      STUB = MethodHandles.publicLookup().findStatic(CompileFunctionStub.class, "stub",
-          MethodType.methodType(Object.class, Function.class, MethodHandle.class, CompileFunctionStub.class, Object[].class));
+      try {
+        STUB = MethodHandles.publicLookup().findStatic(CompileFunctionStub.class, "stub",
+            MethodType.methodType(Object.class, Function.class, MethodHandle.class, CompileFunctionStub.class, Object[].class));
+      } catch (NoAccessException e) {
+        throw (AssertionError)new AssertionError().initCause(e);
+      }
     }
   }
   
@@ -265,8 +270,12 @@ public class Compiler {
     
     static final MethodHandle STUB;
     static {
-      STUB = MethodHandles.publicLookup().findStatic(SpecializedFunctionStub.class, "stub",
-          MethodType.methodType(Object.class, Function.class, BindMap.class, Type.class, Map.class, Map.class, Object[].class));
+      try {
+        STUB = MethodHandles.publicLookup().findStatic(SpecializedFunctionStub.class, "stub",
+            MethodType.methodType(Object.class, Function.class, BindMap.class, Type.class, Map.class, Map.class, Object[].class));
+      } catch (NoAccessException e) {
+        throw (AssertionError)new AssertionError().initCause(e);
+      }
     }
   }
   
@@ -551,7 +560,11 @@ public class Compiler {
     } else {
       declaredClass = StandardLoader.define(className.replace('.', '/'), bytecodes);
     }
-    return MethodHandles.lookup().findStatic(declaredClass, name, methodType);
+    try {
+      return MethodHandles.lookup().findStatic(declaredClass, name, methodType);
+    } catch (NoAccessException e) {
+      throw (AssertionError)new AssertionError().initCause(e);
+    }
   }
   
   static final MethodHandle ANONYMOUS_CLASS_DEFINE;
@@ -577,6 +590,9 @@ public class Compiler {
         define = MethodHandles.publicLookup().findVirtual(anonymousClassLoaderClass, "loadClass",
             MethodType.methodType(Class.class, byte[].class));
       } catch(ClassNotFoundException e) {
+        define = null;
+      } catch (NoAccessException e) {
+        System.err.println(e.getMessage());
         define = null;
       }
     }

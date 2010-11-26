@@ -3,6 +3,7 @@ package com.googlecode.phpreboot.module;
 import java.dyn.MethodHandle;
 import java.dyn.MethodHandles;
 import java.dyn.MethodHandles.Lookup;
+import java.dyn.NoAccessException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -24,7 +25,12 @@ public abstract class Module {
       if (!method.isAnnotationPresent(Export.class))
         continue;
       
-      MethodHandle mh = PUBLIC_LOOKUP.unreflect(method);
+      MethodHandle mh;
+      try {
+        mh = PUBLIC_LOOKUP.unreflect(method);
+      } catch (NoAccessException e) {
+        throw (AssertionError)new AssertionError().initCause(e);
+      }
       
       if (!Modifier.isStatic(method.getModifiers())) {
         throw new AssertionError("method in module must be static "+method);

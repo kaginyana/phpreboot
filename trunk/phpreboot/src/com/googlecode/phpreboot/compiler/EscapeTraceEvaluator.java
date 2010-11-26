@@ -6,6 +6,7 @@ package com.googlecode.phpreboot.compiler;
 import java.dyn.MethodHandle;
 import java.dyn.MethodHandles;
 import java.dyn.MethodType;
+import java.dyn.NoAccessException;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 
@@ -133,7 +134,11 @@ public class EscapeTraceEvaluator extends Visitor<Void, Node, RuntimeException> 
     }
   };
   static {
-    ESCAPE_TRACE_MH = MethodHandles.publicLookup().findStatic(EscapeTraceEvaluator.class, "escapeTrace",
-        MethodType.methodType(void.class, Node.class, Node.class, Scope.class, Var[].class, EvalEnv.class, Object[].class));
+    try {
+      ESCAPE_TRACE_MH = MethodHandles.publicLookup().findStatic(EscapeTraceEvaluator.class, "escapeTrace",
+          MethodType.methodType(void.class, Node.class, Node.class, Scope.class, Var[].class, EvalEnv.class, Object[].class));
+    } catch (NoAccessException e) {
+      throw (AssertionError)new AssertionError().initCause(e);
+    }
   }
 }

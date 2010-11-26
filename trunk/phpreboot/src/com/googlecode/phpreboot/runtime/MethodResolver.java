@@ -3,6 +3,7 @@ package com.googlecode.phpreboot.runtime;
 import java.dyn.MethodHandle;
 import java.dyn.MethodHandles;
 import java.dyn.MethodHandles.Lookup;
+import java.dyn.NoAccessException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 
@@ -35,7 +36,11 @@ class MethodResolver {
       return null;
     }
     
-    return PUBLIC_LOOKUP.unreflect(method);
+    try {
+      return PUBLIC_LOOKUP.unreflect(method);
+    } catch (NoAccessException e) {
+      throw (AssertionError)new AssertionError().initCause(e);
+    }
   }
   
   private static Method findMethod(Class<?> declaringClass, String name, int parameterCount) {

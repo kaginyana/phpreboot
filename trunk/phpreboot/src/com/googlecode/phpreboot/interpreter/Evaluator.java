@@ -3,6 +3,7 @@ package com.googlecode.phpreboot.interpreter;
 import java.dyn.MethodHandle;
 import java.dyn.MethodHandles;
 import java.dyn.MethodType;
+import java.dyn.NoAccessException;
 import java.util.List;
 
 import com.googlecode.phpreboot.ast.ArrayEntry;
@@ -199,8 +200,13 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       signature[i + 1] = parameterTypes.get(i).getUnboxedRuntimeClass();
     }
     
-    MethodHandle mh = MethodHandles.lookup().findVirtual(Function.class, "call",
-        MethodType.methodType(Object.class, EvalEnv.class, Object[].class));
+    MethodHandle mh;
+    try {
+      mh = MethodHandles.lookup().findVirtual(Function.class, "call",
+          MethodType.methodType(Object.class, EvalEnv.class, Object[].class));
+    } catch (NoAccessException e) {
+      throw (AssertionError)new AssertionError().initCause(e);
+    }
     mh = MethodHandles.insertArguments(mh, 0, function);
     mh = MethodHandles.collectArguments(mh, MethodType.genericMethodType(1 + size));
     

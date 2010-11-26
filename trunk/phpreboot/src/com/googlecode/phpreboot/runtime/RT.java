@@ -5,6 +5,7 @@ import java.dyn.MethodHandle;
 import java.dyn.MethodHandles;
 import java.dyn.MethodType;
 import java.dyn.MethodHandles.Lookup;
+import java.dyn.NoAccessException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -878,8 +879,12 @@ public class RT {
   static final MethodHandle test_receiver_class;
   static {
     Lookup lookup = MethodHandles.publicLookup();
-    test_receiver_class = lookup.findVirtual(Class.class, "isInstance",
-        MethodType.methodType(boolean.class, Object.class));
+    try {
+      test_receiver_class = lookup.findVirtual(Class.class, "isInstance",
+          MethodType.methodType(boolean.class, Object.class));
+    } catch (NoAccessException e) {
+      throw (AssertionError)new AssertionError().initCause(e);
+    }
   }
   
   
@@ -895,25 +900,29 @@ public class RT {
 
     static {
       Lookup lookup = MethodHandles.publicLookup();
-      array_set = MethodHandles.convertArguments(
-          lookup.findVirtual(Array.class, "set",
-              MethodType.methodType(void.class, Object.class, Object.class)),
-              MethodType.methodType(void.class, Object.class, Object.class, Object.class));
-      array_access = MethodHandles.convertArguments(
-          lookup.findStatic(MemberAccess.class, "array_access",
-              MethodType.methodType(Object.class, boolean.class, ArrayAccess.class, Object.class)),
-              MethodType.methodType(Object.class, boolean.class, Object.class, Object.class));
+      try {
+        array_set = MethodHandles.convertArguments(
+            lookup.findVirtual(Array.class, "set",
+                MethodType.methodType(void.class, Object.class, Object.class)),
+                MethodType.methodType(void.class, Object.class, Object.class, Object.class));
+        array_access = MethodHandles.convertArguments(
+            lookup.findStatic(MemberAccess.class, "array_access",
+                MethodType.methodType(Object.class, boolean.class, ArrayAccess.class, Object.class)),
+                MethodType.methodType(Object.class, boolean.class, Object.class, Object.class));
 
-      test_receiver_asArray = lookup.findStatic(MemberAccess.class, "test_receiver_asArray",
-          MethodType.methodType(boolean.class, Object.class));
-      test_receiver_and_key = lookup.findStatic(MemberAccess.class, "test_receiver_and_key",
-          MethodType.methodType(boolean.class, Class.class, Object.class, Object.class));
+        test_receiver_asArray = lookup.findStatic(MemberAccess.class, "test_receiver_asArray",
+            MethodType.methodType(boolean.class, Object.class));
+        test_receiver_and_key = lookup.findStatic(MemberAccess.class, "test_receiver_and_key",
+            MethodType.methodType(boolean.class, Class.class, Object.class, Object.class));
 
 
-      slowPathArraySet = lookup.findStatic(MemberAccess.class, "slowPathArraySet",
-          MethodType.methodType(void.class, CallSite.class, boolean.class, Object.class, Object.class, Object.class));
-      slowPathArrayGet = lookup.findStatic(MemberAccess.class, "slowPathArrayGet",
-          MethodType.methodType(Object.class, CallSite.class, boolean.class, Object.class, Object.class));
+        slowPathArraySet = lookup.findStatic(MemberAccess.class, "slowPathArraySet",
+            MethodType.methodType(void.class, CallSite.class, boolean.class, Object.class, Object.class, Object.class));
+        slowPathArrayGet = lookup.findStatic(MemberAccess.class, "slowPathArrayGet",
+            MethodType.methodType(Object.class, CallSite.class, boolean.class, Object.class, Object.class));
+      } catch(NoAccessException e) {
+        throw (AssertionError)new AssertionError().initCause(e);
+      }
     }
 
     public static boolean test_receiver_asArray(Object refValue) {
@@ -1096,8 +1105,12 @@ public class RT {
     private static final MethodHandle slowPathMethodCall;
     static {
       Lookup lookup = MethodHandles.publicLookup();
-      slowPathMethodCall = lookup.findStatic(JavaMethodCall.class, "slowPathMethodCall",
-          MethodType.methodType(Object.class, CallSite.class, String.class, Object[].class));
+      try {
+        slowPathMethodCall = lookup.findStatic(JavaMethodCall.class, "slowPathMethodCall",
+            MethodType.methodType(Object.class, CallSite.class, String.class, Object[].class));
+      } catch (NoAccessException e) {
+        throw (AssertionError)new AssertionError().initCause(e);
+      }
     }
 
     public static Object interpreterMethodCall(Node node, String name, Object[] values) {
@@ -1247,11 +1260,19 @@ public class RT {
     // constructor for binary op 
     OpBehavior(String operator, Lookup lookup, String name) {
       this(operator,
-          lookup.findStatic(RT.class, name,
-              MethodType.methodType(int.class, int.class, int.class)),
-          lookup.findStatic(RT.class, name,
-              MethodType.methodType(double.class, double.class, double.class))
-            );
+            findStatic(lookup, name,
+                MethodType.methodType(int.class, int.class, int.class)),
+                findStatic(lookup, name,
+                    MethodType.methodType(double.class, double.class, double.class))
+        );
+    }
+    
+    static MethodHandle findStatic(Lookup lookup, String name, MethodType methodType) {
+      try {
+        return lookup.findStatic(RT.class, name, methodType);
+      } catch (NoAccessException e) {
+        throw (AssertionError)new AssertionError().initCause(e);
+      }
     }
     
     /*@Nullabble*/MethodHandle getMethodHandle(Class<?> leftType, Class<?> rightType) {
@@ -1288,17 +1309,17 @@ public class RT {
       
       Plus(Lookup lookup) {
         super("+", lookup, "plus");
-        plus_string_any = lookup.findStatic(RT.class, "plus",
+        plus_string_any = findStatic(lookup, "plus",
             MethodType.methodType(String.class, String.class, Object.class));
-        plus_string_int = lookup.findStatic(RT.class, "plus",
+        plus_string_int = findStatic(lookup, "plus",
             MethodType.methodType(String.class, String.class, int.class));
-        plus_string_double = lookup.findStatic(RT.class, "plus",
+        plus_string_double = findStatic(lookup, "plus",
             MethodType.methodType(String.class, String.class, double.class));
-        plus_any_string = lookup.findStatic(RT.class, "plus",
+        plus_any_string = findStatic(lookup, "plus",
             MethodType.methodType(String.class, Object.class, String.class));
-        plus_int_string = lookup.findStatic(RT.class, "plus",
+        plus_int_string = findStatic(lookup, "plus",
             MethodType.methodType(String.class, int.class, String.class));
-        plus_double_string = lookup.findStatic(RT.class, "plus",
+        plus_double_string = findStatic(lookup, "plus",
             MethodType.methodType(String.class, double.class, String.class));
       }
       
@@ -1327,12 +1348,12 @@ public class RT {
       
       Cmp(String operator, Lookup lookup, String name) {
         super(operator,
-            lookup.findStatic(RT.class, name,
+            findStatic(lookup, name,
                 MethodType.methodType(boolean.class, int.class, int.class)),
-            lookup.findStatic(RT.class, name,
+            findStatic(lookup, name,
                 MethodType.methodType(boolean.class, double.class, double.class))
               );
-        op_cmp_any = lookup.findStatic(RT.class, name,
+        op_cmp_any = findStatic(lookup, name,
             MethodType.methodType(boolean.class, Comparable.class, Object.class));
       }
       
@@ -1414,19 +1435,19 @@ public class RT {
     
     private final static MethodHandle isInstance; 
     private final static MethodHandle isInstanceLeftRight; 
-    static {
-      Lookup lookup = MethodHandles.publicLookup();
-      isInstance = lookup.findVirtual(Class.class, "isInstance",
-          MethodType.methodType(boolean.class, Object.class));
-      isInstanceLeftRight = lookup.findStatic(OpBehavior.class, "isInstance",
-          MethodType.methodType(boolean.class, Class.class, Class.class, Object.class, Object.class));
-    }
-    
     final static MethodHandle slowPath;
     static {
-      Lookup publicLookup = MethodHandles.lookup();
-      slowPath = publicLookup.findVirtual(OpBehavior.class, "slowPath",
-          MethodType.methodType(Object.class, CallSite.class, Object.class, Object.class));
+      Lookup lookup = MethodHandles.publicLookup();
+      try {
+        isInstance = lookup.findVirtual(Class.class, "isInstance",
+            MethodType.methodType(boolean.class, Object.class));
+        isInstanceLeftRight = lookup.findStatic(OpBehavior.class, "isInstance",
+            MethodType.methodType(boolean.class, Class.class, Class.class, Object.class, Object.class));
+        slowPath = lookup.findVirtual(OpBehavior.class, "slowPath",
+            MethodType.methodType(Object.class, CallSite.class, Object.class, Object.class));
+      } catch(NoAccessException e) {
+        throw (AssertionError)new AssertionError().initCause(e);
+      }
     }
   }
 }

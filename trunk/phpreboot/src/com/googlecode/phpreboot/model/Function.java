@@ -1,7 +1,8 @@
 package com.googlecode.phpreboot.model;
 
-import java.dyn.CallSite;
 import java.dyn.MethodHandle;
+import java.dyn.MethodType;
+import java.dyn.MutableCallSite;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -92,11 +93,11 @@ public class Function {
   }
   
   
-  public static class FunctionCallSite extends CallSite {
+  public static class FunctionCallSite extends MutableCallSite {
     FunctionCallSite next;
 
-    public FunctionCallSite() {
-        super();
+    public FunctionCallSite(MethodType methodType) {
+        super(methodType);
     }
   }
   

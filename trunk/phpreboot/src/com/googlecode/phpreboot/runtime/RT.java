@@ -5,6 +5,7 @@ import java.dyn.MethodHandle;
 import java.dyn.MethodHandles;
 import java.dyn.MethodType;
 import java.dyn.MethodHandles.Lookup;
+import java.dyn.MutableCallSite;
 import java.dyn.NoAccessException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -868,12 +869,11 @@ public class RT {
   }
   
   
-  static class CallSiteProfile extends CallSite implements Profile {
-    public CallSiteProfile() {
-      super();
+  static class CallSiteProfile extends MutableCallSite implements Profile {
+    public CallSiteProfile(MethodType type) {
+      super(type);
     }
   }
-  
   
   // this method handle is shared by member access and Java method call logic
   static final MethodHandle test_receiver_class;
@@ -958,7 +958,7 @@ public class RT {
             //FIXME should be invokeExact
             //XXX workaround bug in jdk7b94
             //mh.invokeGeneric(refValue, value);
-            mh.invokeVarargs(refValue, value);
+            mh.invokeWithArguments(refValue, value);
           } catch(Error e) {
             throw e;
           } catch (Throwable e) {
@@ -995,8 +995,8 @@ public class RT {
 
         // cache for next call
 
-        //MethodType methodType = MethodType.methodType(void.class, Object.class, Object.class, Object.class);
-        callSite = new CallSiteProfile();
+        MethodType methodType = MethodType.methodType(void.class, Object.class, Object.class, Object.class);
+        callSite = new CallSiteProfile(methodType);
         target = MethodHandles.insertArguments(slowPathArraySet, 0, callSite, keyMustExist);
         callSite.setTarget(target);
 
@@ -1011,7 +1011,7 @@ public class RT {
           //FIXME should be invokeExact
           //XXX workaround bug in jdk7b94
           //target.invokeGeneric(refValue, key, value);
-          target.invokeVarargs(refValue, key, value);
+          target.invokeWithArguments(refValue, key, value);
         } catch(Error e) {
           throw e;
         } catch (Throwable e) {
@@ -1038,7 +1038,7 @@ public class RT {
             //FIXME should be invokeExact
             //XXX workaround bug in jdk7b94
             //result = mh.invokeGeneric(refValue);
-            result = mh.invokeVarargs(refValue);
+            result = mh.invokeWithArguments(refValue);
           } catch(Error e) {
             throw e;
           } catch (Throwable e) {
@@ -1072,8 +1072,8 @@ public class RT {
 
         // cache for next call
 
-        //MethodType methodType = MethodType.methodType(Object.class, Object.class, Object.class);
-        callSite = new CallSiteProfile();
+        MethodType methodType = MethodType.methodType(Object.class, Object.class, Object.class);
+        callSite = new CallSiteProfile(methodType);
         target = MethodHandles.insertArguments(slowPathArrayGet, 0, callSite, keyMustExist);
         callSite.setTarget(target);
 
@@ -1081,20 +1081,19 @@ public class RT {
         node.setProfileAttribute(callSite);
         return result;
 
-      } else {
-        target = callSite.getTarget();
+      } 
+      target = callSite.getTarget();
 
-        try {
-          //FIXME should be invokeExact
-          //XXX workaround bug in jdk7b94
-          //return target.invokeGeneric(refValue, key);
-          return target.invokeVarargs(refValue, key);
-        } catch(Error e) {
-          throw e;
-        } catch (Throwable e) {
-          throw RT.error((Node)null, e);
-        } 
-      }
+      try {
+        //FIXME should be invokeExact
+        //XXX workaround bug in jdk7b94
+        //return target.invokeGeneric(refValue, key);
+        return target.invokeWithArguments(refValue, key);
+      } catch(Error e) {
+        throw e;
+      } catch (Throwable e) {
+        throw RT.error((Node)null, e);
+      } 
     }
   }
   
@@ -1117,7 +1116,7 @@ public class RT {
       CallSiteProfile callSite = (CallSiteProfile)node.getProfileAttribute();
       if (callSite == null) {
         MethodType type = MethodType.genericMethodType(values.length);
-        callSite = new CallSiteProfile();
+        callSite = new CallSiteProfile(type);
         node.setProfileAttribute(callSite);
         MethodHandle mh = MethodHandles.insertArguments(slowPathMethodCall, 0, callSite, name);
         mh = MethodHandles.collectArguments(mh, type);
@@ -1128,7 +1127,7 @@ public class RT {
 
       MethodHandle target = callSite.getTarget();
       try {
-        return target.invokeVarargs(values);
+        return target.invokeWithArguments(values);
       } catch(Error e) {
         throw e;
       } catch (Throwable e) {
@@ -1149,7 +1148,7 @@ public class RT {
       callSite.setTarget(guard);
 
       try {
-        return target.invokeVarargs(values);
+        return target.invokeWithArguments(values);
       } catch(Error e) {
         throw e;
       } catch (Throwable e) {
@@ -1200,7 +1199,7 @@ public class RT {
     }
     
     OpBehavior opBehavior = OpBehavior.valueOf(name);   // operators
-    CallSite callSite = new CallSite();
+    MutableCallSite callSite = new MutableCallSite(methodType);
     
     MethodHandle target = MethodHandles.insertArguments(OpBehavior.slowPath, 0, opBehavior, callSite);
     callSite.setTarget(MethodHandles.convertArguments(target, methodType));
@@ -1225,7 +1224,7 @@ public class RT {
     static CallSite bootstrap(String functionName, MethodType methodType) {
       assert methodType.parameterType(0) == EvalEnv.class;
       
-      FunctionCallSite callSite = new FunctionCallSite();
+      FunctionCallSite callSite = new FunctionCallSite(methodType);
       Var var = Evaluator.INSTANCE.getRootScope().lookup(functionName);
       Function function = (Function)var.getValue();
       
@@ -1422,7 +1421,7 @@ public class RT {
       
       //XXX use invokeVarargs instead of invokeGeneric to workaround bug of jdk7b94
       //Object result =  mh.invokeGeneric(left, right);
-      Object result = mh.invokeVarargs(left, right);
+      Object result = mh.invokeWithArguments(left, right);
       
       mh = MethodHandles.convertArguments(mh, methodType);
       callSite.setTarget(MethodHandles.guardWithTest(test, mh, callSite.getTarget()));

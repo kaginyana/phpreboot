@@ -64,7 +64,7 @@ public interface Profile {
       }
       
       try {
-        return (Boolean)trace.invokeVarargs(args);
+        return (Boolean)trace.invokeWithArguments(args);
       } catch(Error e) {
         throw e;
       } catch (Throwable e) {

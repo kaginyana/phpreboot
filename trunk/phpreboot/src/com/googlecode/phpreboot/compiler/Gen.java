@@ -203,9 +203,8 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
         return ASM_FUNCTION_TYPE;
       }
       throw new AssertionError("unknown primitive type "+type);
-    } else {
-      return org.objectweb.asm.Type.VOID_TYPE;
-    }
+    } 
+    return org.objectweb.asm.Type.VOID_TYPE;
   }
   
   private static final org.objectweb.asm.Type ASM_ANY_TYPE = org.objectweb.asm.Type.getType(Object.class);
@@ -1056,10 +1055,10 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       Type expectedType = env.getExpectedType();
       indy(mv, opName, expectedType, exprType);
       return expectedType;
-    } else {
-      mv.visitInsn(asASMType(exprType).getOpcode(opcode));
-      return exprType;
-    }
+    } 
+    
+    mv.visitInsn(asASMType(exprType).getOpcode(opcode));
+    return exprType;
   }
   
   private Type visitBinaryOp(String opName, int opcode, Node leftNode, Node rightNode, Type type, GenEnv env) {

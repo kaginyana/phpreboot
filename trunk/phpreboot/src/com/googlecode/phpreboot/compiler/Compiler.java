@@ -230,7 +230,7 @@ public class Compiler {
         stub.counter = counter + 1;
       }
       
-      return mh.invokeVarargs(args);
+      return mh.invokeWithArguments(args);
     }
     
     static final MethodHandle STUB;
@@ -265,7 +265,7 @@ public class Compiler {
 
        MethodHandle mh = Compiler.gen(specializedFunction, bindMap, liveness, typeAttributeMap, symbolAttributeMap);
        specializedFunction.setMethodHandle(mh, true);
-       return mh.invokeVarargs(args);
+       return mh.invokeWithArguments(args);
     }
     
     static final MethodHandle STUB;
@@ -450,7 +450,7 @@ public class Compiler {
     //System.err.println("calls "+java.util.Arrays.toString(args));
     
     try {
-      return (Boolean)mh.invokeVarargs(args);
+      return (Boolean)mh.invokeWithArguments(args);
     } catch(Error e) {
       throw e;
     } catch (Throwable e) {
@@ -623,7 +623,7 @@ public class Compiler {
     static Class<?> define(byte[] bytecodes) {
       try {
         //XXX workaround bug in jdk7b94, should use invokeGeneric instead
-        return (Class<?>)ANONYMOUS_CLASS_DEFINE.invokeVarargs(ANONYMOUS_CLASS_LOADER, bytecodes);
+        return (Class<?>)ANONYMOUS_CLASS_DEFINE.invokeWithArguments(ANONYMOUS_CLASS_LOADER, bytecodes);
       } catch(Throwable t) {
         t.printStackTrace();
         throw new AssertionError(t);

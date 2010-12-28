@@ -153,7 +153,6 @@ public class WebScriptDispatcher extends GrizzlyAdapter {
     
     GenericSQLConnection sqlConnection = new GenericSQLConnection(jdbcURL);
     scope.register(new Var("__PHPR__SQL_CONNECTION", true, true, PrimitiveType.ANY, sqlConnection));
-    //FIXME//scope.register(new Var("__PHPR__SQL_CONNECTION", true, true, PrimitiveType.ANY, new ));
     
     Reader reader = new InputStreamReader(input);
     PrintWriter writer = new PrintWriter(output);

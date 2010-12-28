@@ -391,13 +391,12 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
         Boolean result = Compiler.traceCompileAndExec(labeled_instr_while, profile, true, env);
         if (result == Boolean.TRUE) {
           break;       // trace ok
+        } 
+        if (result == null) {
+          counter = Integer.MIN_VALUE;  // disable trace compilation  
         } else {
-          if (result == null) {
-            counter = Integer.MIN_VALUE;  // disable trace compilation  
-          } else {
-            counter = 0; // trace escape 
-          } 
-        }
+          counter = 0; // trace escape 
+        } 
       }
 
       if (!checkBoolean(expr, env))
@@ -756,7 +755,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     }
     
     try {
-      return ((Function)value).getMethodHandle().invokeVarargs(values);
+      return ((Function)value).getMethodHandle().invokeWithArguments(values);
     } catch(Error e) {
       throw e;
     } catch (Throwable e) {

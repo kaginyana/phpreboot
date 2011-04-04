@@ -1,9 +1,8 @@
 package com.googlecode.phpreboot.interpreter;
 
-import java.dyn.MethodHandle;
-import java.dyn.MethodHandles;
-import java.dyn.MethodType;
-import java.dyn.NoAccessException;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.util.List;
 
 import com.googlecode.phpreboot.ast.ArrayEntry;
@@ -204,11 +203,14 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     try {
       mh = MethodHandles.lookup().findVirtual(Function.class, "call",
           MethodType.methodType(Object.class, EvalEnv.class, Object[].class));
-    } catch (NoAccessException e) {
+    } catch (IllegalAccessException e) {
+      throw (AssertionError)new AssertionError().initCause(e);
+    } catch(NoSuchMethodException e) {
       throw (AssertionError)new AssertionError().initCause(e);
     }
     mh = MethodHandles.insertArguments(mh, 0, function);
-    mh = MethodHandles.collectArguments(mh, MethodType.genericMethodType(1 + size));
+    mh = mh.asCollector(Object[].class, size);
+    //FIXME convert EvalEnv to Object ?
     
     MethodType functionType = MethodType.methodType(function.getReturnType().getUnboxedRuntimeClass(), signature);
     mh = MethodHandles.convertArguments(mh, functionType);

@@ -1,6 +1,6 @@
 package com.googlecode.phpreboot.interpreter;
 
-import java.dyn.MethodHandle;
+import java.lang.invoke.MethodHandle;
 import java.util.List;
 
 import com.googlecode.phpreboot.ast.Node;

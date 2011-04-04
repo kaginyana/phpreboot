@@ -1,8 +1,8 @@
 package com.googlecode.phpreboot.model;
 
-import java.dyn.MethodHandle;
-import java.dyn.MethodType;
-import java.dyn.MutableCallSite;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodType;
+import java.lang.invoke.MutableCallSite;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

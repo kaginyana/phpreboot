@@ -1,9 +1,8 @@
 package com.googlecode.phpreboot.compiler;
 
-import java.dyn.MethodHandle;
-import java.dyn.MethodHandles;
-import java.dyn.MethodType;
-import java.dyn.NoAccessException;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.io.PrintWriter;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -85,7 +84,7 @@ public class Compiler {
     mv.visitMaxs(0, 0);
     mv.visitEnd();
     
-    generateStaticInit(cv);
+    //generateStaticInit(cv);
     
     cv.visitEnd();
     
@@ -209,7 +208,8 @@ public class Compiler {
     public static MethodHandle compileStub(Function function, MethodHandle interpreter) {
       CompileFunctionStub compileFunctionStub = new CompileFunctionStub();
       MethodHandle stub = MethodHandles.insertArguments(STUB, 0, function, interpreter, compileFunctionStub);
-      return MethodHandles.collectArguments(stub, interpreter.type());
+      MethodType interpreterType = interpreter.type();
+      return stub.asCollector(Object[].class, interpreterType.parameterCount()).asType(interpreterType);
     }
     
     public static Object stub(Function function, MethodHandle interpreter, CompileFunctionStub stub, Object[] args) throws Throwable {
@@ -238,7 +238,9 @@ public class Compiler {
       try {
         STUB = MethodHandles.publicLookup().findStatic(CompileFunctionStub.class, "stub",
             MethodType.methodType(Object.class, Function.class, MethodHandle.class, CompileFunctionStub.class, Object[].class));
-      } catch (NoAccessException e) {
+      } catch (IllegalAccessException e) {
+        throw (AssertionError)new AssertionError().initCause(e);
+      } catch (NoSuchMethodException e) {
         throw (AssertionError)new AssertionError().initCause(e);
       }
     }
@@ -253,7 +255,7 @@ public class Compiler {
         MethodType methodType) {
       
       MethodHandle stub = MethodHandles.insertArguments(STUB, 0, specializedFunction, bindMap, liveness, typeAttributeMap, symbolAttributeMap);
-      return MethodHandles.collectArguments(stub, methodType);
+      return stub.asCollector(Object[].class, methodType.parameterCount()).asType(methodType);
     }
     
     public static Object stub(Function specializedFunction,
@@ -273,7 +275,9 @@ public class Compiler {
       try {
         STUB = MethodHandles.publicLookup().findStatic(SpecializedFunctionStub.class, "stub",
             MethodType.methodType(Object.class, Function.class, BindMap.class, Type.class, Map.class, Map.class, Object[].class));
-      } catch (NoAccessException e) {
+      } catch (IllegalAccessException e) {
+        throw (AssertionError)new AssertionError().initCause(e);
+      } catch (NoSuchMethodException e) {
         throw (AssertionError)new AssertionError().initCause(e);
       }
     }
@@ -306,7 +310,7 @@ public class Compiler {
     mv.visitMaxs(0, 0);
     mv.visitEnd();
     
-    generateStaticInit(cv);
+    //generateStaticInit(cv);
     
     cv.visitEnd();
     
@@ -429,7 +433,7 @@ public class Compiler {
     mv.visitMaxs(0, 0);
     mv.visitEnd();
     
-    generateStaticInit(cv);
+    //generateStaticInit(cv);
     
     cv.visitEnd();
     
@@ -456,19 +460,6 @@ public class Compiler {
     } catch (Throwable e) {
       throw RT.error((Node)null, e);
     }
-  }
-  
-  private static void generateStaticInit(ClassVisitor cv) {
-    MethodVisitor mv = cv.visitMethod(Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
-    mv.visitCode();
-    
-    mv.visitLdcInsn(org.objectweb.asm.Type.getType(RT.class));
-    mv.visitLdcInsn("bootstrap");
-    mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/dyn/Linkage", "registerBootstrapMethod", "(Ljava/lang/Class;Ljava/lang/String;)V");
-    mv.visitInsn(Opcodes.RETURN);
-    
-    mv.visitMaxs(0, 0);
-    mv.visitEnd();
   }
 
   static Class<?> asClass(Type type) {
@@ -562,7 +553,9 @@ public class Compiler {
     }
     try {
       return MethodHandles.lookup().findStatic(declaredClass, name, methodType);
-    } catch (NoAccessException e) {
+    } catch (IllegalAccessException e) {
+      throw (AssertionError)new AssertionError().initCause(e);
+    } catch (NoSuchMethodException e) {
       throw (AssertionError)new AssertionError().initCause(e);
     }
   }
@@ -586,12 +579,15 @@ public class Compiler {
     } catch(ClassNotFoundException e2) {
       legacyMode = false;
       try {
-        Class<?> anonymousClassLoaderClass = Class.forName("sun.dyn.anon.AnonymousClassLoader");
+        Class<?> anonymousClassLoaderClass = Class.forName("sun.invoke.anon.AnonymousClassLoader");
         define = MethodHandles.publicLookup().findVirtual(anonymousClassLoaderClass, "loadClass",
             MethodType.methodType(Class.class, byte[].class));
       } catch(ClassNotFoundException e) {
         define = null;
-      } catch (NoAccessException e) {
+      } catch (IllegalAccessException e) {
+        System.err.println(e.getMessage());
+        define = null;
+      } catch (NoSuchMethodException e) {
         System.err.println(e.getMessage());
         define = null;
       }
@@ -604,7 +600,7 @@ public class Compiler {
     private static final Object ANONYMOUS_CLASS_LOADER;
     static {
       try {
-        Class<?> anonymousClassLoaderClass = Class.forName("sun.dyn.anon.AnonymousClassLoader");
+        Class<?> anonymousClassLoaderClass = Class.forName("sun.invoke.anon.AnonymousClassLoader");
         Constructor<?> constructor = anonymousClassLoaderClass.getConstructor(Class.class);
         ANONYMOUS_CLASS_LOADER = constructor.newInstance((Object)null);
       } catch (InvocationTargetException e) {

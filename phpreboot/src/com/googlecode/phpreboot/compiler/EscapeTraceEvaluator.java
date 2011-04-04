@@ -3,10 +3,9 @@
  */
 package com.googlecode.phpreboot.compiler;
 
-import java.dyn.MethodHandle;
-import java.dyn.MethodHandles;
-import java.dyn.MethodType;
-import java.dyn.NoAccessException;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 
@@ -27,7 +26,8 @@ public class EscapeTraceEvaluator extends Visitor<Void, Node, RuntimeException> 
   static LocalVar createEscapeTraceLocalVar(BindMap bindMap, TypeProfileMap typeProfileMap, Node node, Node traceNode, Scope scope, LinkedHashMap<LocalVar,Var> varMapAssoc) {
     Var[] vars = varMapAssoc.values().toArray(new Var[varMapAssoc.size()]);
     MethodHandle mh = MethodHandles.insertArguments(EscapeTraceEvaluator.ESCAPE_TRACE_MH, 0, node, traceNode, scope, vars);
-    mh = MethodHandles.collectArguments(mh, asMethodType(varMapAssoc));
+    MethodType methodType = asMethodType(varMapAssoc);
+    mh = mh.asCollector(Object[].class, vars.length).asType(methodType);
     
     LocalVar localVar = bindMap.bind("<escape>", true, true, mh, EscapeTraceEvaluator.METHOD_HANDLE_TYPE, false, typeProfileMap, null);
     return localVar;
@@ -137,7 +137,9 @@ public class EscapeTraceEvaluator extends Visitor<Void, Node, RuntimeException> 
     try {
       ESCAPE_TRACE_MH = MethodHandles.publicLookup().findStatic(EscapeTraceEvaluator.class, "escapeTrace",
           MethodType.methodType(void.class, Node.class, Node.class, Scope.class, Var[].class, EvalEnv.class, Object[].class));
-    } catch (NoAccessException e) {
+    } catch (IllegalAccessException e) {
+      throw (AssertionError)new AssertionError().initCause(e);
+    } catch (NoSuchMethodException e) {
       throw (AssertionError)new AssertionError().initCause(e);
     }
   }

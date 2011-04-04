@@ -7,6 +7,7 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.Reader;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
@@ -47,10 +48,10 @@ public class WebScriptDispatcher extends GrizzlyAdapter {
       uri = "/index.phpr";
     }
     Path path = rootPath.resolve(uri.substring(1));
-    String name = path.getName().toString();
+    String name = path.getFileName().toString();
     
     try {
-      InputStream input = path.newInputStream();
+      InputStream input = Files.newInputStream(path);
       try {
         OutputStream output = response.getOutputStream();
         try {

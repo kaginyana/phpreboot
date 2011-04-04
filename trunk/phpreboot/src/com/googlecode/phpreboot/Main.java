@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -100,7 +101,7 @@ public class Main {
   }
   
   private static String trimExtension(Path path) {
-    String name = path.getName().toString();
+    String name = path.getFileName().toString();
     int index = name.lastIndexOf('.');
     if (index<1)
       return name;
@@ -170,7 +171,7 @@ public class Main {
     } else {
       Path path = filePaths.get(0);
       scriptName = trimExtension(path);
-      input = path.newInputStream();
+      input = Files.newInputStream(path);
     }
 
     InputStreamReader reader = new InputStreamReader(input);

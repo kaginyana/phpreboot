@@ -1,9 +1,8 @@
 package com.googlecode.phpreboot.module;
 
-import java.dyn.MethodHandle;
-import java.dyn.MethodHandles;
-import java.dyn.MethodHandles.Lookup;
-import java.dyn.NoAccessException;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -28,7 +27,7 @@ public abstract class Module {
       MethodHandle mh;
       try {
         mh = PUBLIC_LOOKUP.unreflect(method);
-      } catch (NoAccessException e) {
+      } catch (IllegalAccessException e) {
         throw (AssertionError)new AssertionError().initCause(e);
       }
       

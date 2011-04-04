@@ -26,8 +26,6 @@ import static org.objectweb.asm.Opcodes.IF_ICMPNE;
 import static org.objectweb.asm.Opcodes.ILOAD;
 import static org.objectweb.asm.Opcodes.IMUL;
 import static org.objectweb.asm.Opcodes.INEG;
-import static org.objectweb.asm.Opcodes.INVOKEDYNAMIC;
-import static org.objectweb.asm.Opcodes.INVOKEDYNAMIC_OWNER;
 import static org.objectweb.asm.Opcodes.INVOKESPECIAL;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 import static org.objectweb.asm.Opcodes.INVOKEVIRTUAL;
@@ -38,14 +36,17 @@ import static org.objectweb.asm.Opcodes.ISUB;
 import static org.objectweb.asm.Opcodes.NEW;
 import static org.objectweb.asm.Opcodes.POP;
 import static org.objectweb.asm.Opcodes.POP2;
-import static org.objectweb.asm.Opcodes.SIPUSH;
+import static org.objectweb.asm.Opcodes.*;
 
-import java.dyn.MethodType;
+import java.lang.invoke.CallSite;
+import java.lang.invoke.MethodType;
+import java.lang.invoke.MethodHandles.Lookup;
 import java.util.List;
 import java.util.Map;
 
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodHandle;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
@@ -162,16 +163,22 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   
   // --- helpers
   
-  private void indy(MethodVisitor mv, String name, Type returnType, Type type) {
-    mv.visitMethodInsn(INVOKEDYNAMIC, INVOKEDYNAMIC_OWNER, name,
+  private static final MethodHandle BOOTSTRAP_METHOD =
+    new MethodHandle(MH_INVOKESTATIC, RT_INTERNAL_NAME, "bootstrap",
+        MethodType.methodType(CallSite.class, Lookup.class, String.class, MethodType.class).toMethodDescriptorString());
+  
+  private static void indy(MethodVisitor mv, String name, Type returnType, Type type) {
+    mv.visitInvokeDynamicInsn(name,
         org.objectweb.asm.Type.getMethodDescriptor(asASMType(returnType),
-            new org.objectweb.asm.Type[]{asASMType(type)}));
+            new org.objectweb.asm.Type[]{asASMType(type)}),
+        BOOTSTRAP_METHOD);
   }
   
-  private void indy(MethodVisitor mv, String name, Type returnType, Type type1, Type type2) {
-    mv.visitMethodInsn(INVOKEDYNAMIC, INVOKEDYNAMIC_OWNER, name,
+  private static void indy(MethodVisitor mv, String name, Type returnType, Type type1, Type type2) {
+    mv.visitInvokeDynamicInsn(name,
         org.objectweb.asm.Type.getMethodDescriptor(asASMType(returnType),
-            new org.objectweb.asm.Type[]{asASMType(type1), asASMType(type2)}));
+            new org.objectweb.asm.Type[]{asASMType(type1), asASMType(type2)}),
+            BOOTSTRAP_METHOD);
   }
   
   // --- ASM helper
@@ -260,8 +267,9 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     }
     
     // unboxing
-    mv.visitMethodInsn(INVOKEDYNAMIC, INVOKEDYNAMIC_OWNER, "checkcast",
-          '('+asASMType(exprType).getDescriptor()+')'+asASMType(type).getDescriptor());
+    mv.visitInvokeDynamicInsn("checkcast",
+          '('+asASMType(exprType).getDescriptor()+')'+asASMType(type).getDescriptor(),
+          BOOTSTRAP_METHOD);
   }
   
   private static String getInternalName(Class<?> runtimeClass) {
@@ -541,7 +549,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
           desc.append(asmType.getDescriptor());
         }
         desc.append(")V");
-        mv.visitMethodInsn(INVOKEVIRTUAL, "java/dyn/MethodHandle", /*"invokeExact"*/ "invoke", desc.toString());
+        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/invoke/MethodHandle", "invokeExact" /*"invoke"*/, desc.toString());
         
         mv.visitInsn(ICONST_0);
         mv.visitInsn(IRETURN);   // return false, trace escape
@@ -926,7 +934,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     if (intrinsicInfo == null) {
        if (!localVar.isReallyConstant()) {  // it's a lambda
         mv.visitVarInsn(ALOAD, localVar.getSlot(0));
-        mv.visitMethodInsn(INVOKEVIRTUAL, FUNCTION_INTERNAL_NAME, "getMethodHandle", "()Ljava/dyn/MethodHandle;");
+        mv.visitMethodInsn(INVOKEVIRTUAL, FUNCTION_INTERNAL_NAME, "getMethodHandle", "()Ljava/lang/invoke/MethodHandle;");
       }
       mv.visitVarInsn(ALOAD, 0); // environment
     } else {
@@ -959,9 +967,9 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     
     if (intrinsicInfo == null) {
       if (localVar.isReallyConstant()) {  // function call
-        mv.visitMethodInsn(INVOKEDYNAMIC, INVOKEDYNAMIC_OWNER, "call_"+localVar.getName(), signature);
+        mv.visitInvokeDynamicInsn("call_"+localVar.getName(), signature, BOOTSTRAP_METHOD);
       } else {  // lambda call
-        mv.visitMethodInsn(INVOKEVIRTUAL, "java/dyn/MethodHandle", /*"invokeExact"*/ "invoke", signature);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/invoke/MethodHandle", "invokeExact" /*"invoke"*/, signature);
       }
     } else {
       

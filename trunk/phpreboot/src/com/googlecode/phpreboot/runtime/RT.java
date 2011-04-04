@@ -1,12 +1,11 @@
 package com.googlecode.phpreboot.runtime;
 
-import java.dyn.CallSite;
-import java.dyn.MethodHandle;
-import java.dyn.MethodHandles;
-import java.dyn.MethodType;
-import java.dyn.MethodHandles.Lookup;
-import java.dyn.MutableCallSite;
-import java.dyn.NoAccessException;
+import java.lang.invoke.CallSite;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.lang.invoke.MethodHandles.Lookup;
+import java.lang.invoke.MutableCallSite;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -882,7 +881,9 @@ public class RT {
     try {
       test_receiver_class = lookup.findVirtual(Class.class, "isInstance",
           MethodType.methodType(boolean.class, Object.class));
-    } catch (NoAccessException e) {
+    } catch (IllegalAccessException e) {
+      throw (AssertionError)new AssertionError().initCause(e);
+    } catch (NoSuchMethodException e) {
       throw (AssertionError)new AssertionError().initCause(e);
     }
   }
@@ -920,7 +921,9 @@ public class RT {
             MethodType.methodType(void.class, CallSite.class, boolean.class, Object.class, Object.class, Object.class));
         slowPathArrayGet = lookup.findStatic(MemberAccess.class, "slowPathArrayGet",
             MethodType.methodType(Object.class, CallSite.class, boolean.class, Object.class, Object.class));
-      } catch(NoAccessException e) {
+      } catch(IllegalAccessException e) {
+        throw (AssertionError)new AssertionError().initCause(e);
+      } catch (NoSuchMethodException e) {
         throw (AssertionError)new AssertionError().initCause(e);
       }
     }
@@ -1107,7 +1110,9 @@ public class RT {
       try {
         slowPathMethodCall = lookup.findStatic(JavaMethodCall.class, "slowPathMethodCall",
             MethodType.methodType(Object.class, CallSite.class, String.class, Object[].class));
-      } catch (NoAccessException e) {
+      } catch (IllegalAccessException e) {
+        throw (AssertionError)new AssertionError().initCause(e);
+      } catch (NoSuchMethodException e) {
         throw (AssertionError)new AssertionError().initCause(e);
       }
     }
@@ -1119,7 +1124,7 @@ public class RT {
         callSite = new CallSiteProfile(type);
         node.setProfileAttribute(callSite);
         MethodHandle mh = MethodHandles.insertArguments(slowPathMethodCall, 0, callSite, name);
-        mh = MethodHandles.collectArguments(mh, type);
+        mh = mh.asCollector(Object[].class, type.parameterCount()).asType(type);
         callSite.setTarget(mh);
 
         return slowPathMethodCall(callSite, name, values);
@@ -1157,45 +1162,10 @@ public class RT {
     }
   }
   
-  
-  // --- operators
-  /* raw version
-  enum Operation {
-    plus(Object.class),
-    minus(Object.class),
-    mult(Object.class),
-    div(Object.class),
-    mod(Object.class),
-    
-    eq(boolean.class),
-    ne(boolean.class),
-    
-    lt(boolean.class),
-    le(boolean.class),
-    gt(boolean.class),
-    ge(boolean.class);
-    
-    final MethodHandle generic;
-    
-    private Operation(Class<?> returnType) {
-      generic = MethodHandles.lookup().findStatic(RT.class, name(),
-          MethodType.methodType(returnType, Object.class, Object.class));
-    }
-  }
-  
-  public static CallSite bootstrap(Class<?> declaringClass, String name, MethodType methodType) {
-    Operation operation = Operation.valueOf(name);
-    CallSite callSite = new CallSite(declaringClass, name, methodType);
-    //MethodHandle target = RTConvertWorkaround.convertArguments(operation.generic, methodType);
-    MethodHandle target = MethodHandles.convertArguments(operation.generic, methodType);
-    callSite.setTarget(target);
-    return callSite;
-  }*/
-  
-  
-  public static CallSite bootstrap(@SuppressWarnings("unused") Class<?> declaringClass, String name, MethodType methodType) {
+  // main bootstrap method, FIXME remove !!!
+  public static CallSite bootstrap(Lookup lookup, String name, MethodType methodType) {
     if (name.startsWith("call_")) {  // function call
-      return FunctionCall.bootstrap(name.substring(5), methodType);
+      return FunctionCall.bootstrap(lookup, name.substring(5), methodType);
     }
     
     OpBehavior opBehavior = OpBehavior.valueOf(name);   // operators
@@ -1221,7 +1191,7 @@ public class RT {
       throw new AssertionError("unsupported reuntime type");
     }
     
-    static CallSite bootstrap(String functionName, MethodType methodType) {
+    public static CallSite bootstrap(@SuppressWarnings("unused") Lookup lookup, String functionName, MethodType methodType) {
       assert methodType.parameterType(0) == EvalEnv.class;
       
       FunctionCallSite callSite = new FunctionCallSite(methodType);
@@ -1269,7 +1239,9 @@ public class RT {
     static MethodHandle findStatic(Lookup lookup, String name, MethodType methodType) {
       try {
         return lookup.findStatic(RT.class, name, methodType);
-      } catch (NoAccessException e) {
+      } catch (IllegalAccessException e) {
+        throw (AssertionError)new AssertionError().initCause(e);
+      } catch (NoSuchMethodException e) {
         throw (AssertionError)new AssertionError().initCause(e);
       }
     }
@@ -1444,7 +1416,9 @@ public class RT {
             MethodType.methodType(boolean.class, Class.class, Class.class, Object.class, Object.class));
         slowPath = lookup.findVirtual(OpBehavior.class, "slowPath",
             MethodType.methodType(Object.class, CallSite.class, Object.class, Object.class));
-      } catch(NoAccessException e) {
+      } catch(IllegalAccessException e) {
+        throw (AssertionError)new AssertionError().initCause(e);
+      } catch (NoSuchMethodException e) {
         throw (AssertionError)new AssertionError().initCause(e);
       }
     }

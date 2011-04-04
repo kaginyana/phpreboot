@@ -2,10 +2,10 @@
 <classpath>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="src" path="gen-src"/>
+	<classpathentry kind="lib" path="lib/asm-all-4.0.jar"/>
 	<classpathentry kind="lib" path="lib/jsr292-backport.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="lib" path="lib/tatoo-runtime.jar" sourcepath="lib/src.zip"/>
-	<classpathentry kind="lib" path="lib/asm-all-3.2.jar" sourcepath="lib/src.zip"/>
 	<classpathentry kind="lib" path="lib/grizzly-servlet-webserver-1.9.18-k.jar" sourcepath="lib/grizzly-webserver-1.9.18-k-sources.jar"/>
 	<classpathentry kind="lib" path="lib/derby.jar"/>
 	<classpathentry kind="lib" path="lib/doclet.jar"/>

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -90,7 +91,7 @@ public class URI {
   public String getName() {
     if (uri != null)
       return getLastPart(uri.getPath());
-    return path.getName().toString();
+    return path.getFileName().toString();
   }
   
   private static String getLastPart(String path) {
@@ -211,6 +212,6 @@ public class URI {
         throw RT.error((Node)null, e);
       }
     }
-    return path.newInputStream();
+    return Files.newInputStream(path);
   }
 }

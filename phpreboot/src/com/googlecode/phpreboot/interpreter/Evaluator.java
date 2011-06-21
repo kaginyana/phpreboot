@@ -213,7 +213,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     //FIXME convert EvalEnv to Object ?
     
     MethodType functionType = MethodType.methodType(function.getReturnType().getUnboxedRuntimeClass(), signature);
-    mh = MethodHandles.convertArguments(mh, functionType);
+    mh = mh.asType(functionType);
     
     //System.err.println("create function handle "+name+" "+functionType);
     

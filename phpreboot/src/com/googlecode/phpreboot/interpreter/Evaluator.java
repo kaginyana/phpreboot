@@ -1,9 +1,16 @@
 package com.googlecode.phpreboot.interpreter;
 
+import static org.objectweb.asm.Opcodes.ACONST_NULL;
+import static org.objectweb.asm.Opcodes.DCONST_0;
+import static org.objectweb.asm.Opcodes.ICONST_0;
+import static org.objectweb.asm.Opcodes.IRETURN;
+
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.List;
+
+import org.objectweb.asm.MethodVisitor;
 
 import com.googlecode.phpreboot.ast.ArrayEntry;
 import com.googlecode.phpreboot.ast.ArrayValue;
@@ -163,7 +170,22 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     } catch(ReturnError e) {
       return function.getReturnType().getRuntimeClass().cast(e.value);
     }
-    return null;
+    
+    // no return, returns the default value
+    return defaultReturn(function.getReturnType());
+  }
+  
+  private static Object defaultReturn(Type returnType) {
+    switch((PrimitiveType)returnType) {
+    case BOOLEAN:
+      return false;
+    case INT:
+      return 0;
+    case DOUBLE:
+      return 0.0;
+    default:
+      return null;
+    }
   }
   
   // --- helper methods

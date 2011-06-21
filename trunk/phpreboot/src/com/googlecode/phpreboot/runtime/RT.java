@@ -902,13 +902,12 @@ public class RT {
     static {
       Lookup lookup = MethodHandles.publicLookup();
       try {
-        array_set = MethodHandles.convertArguments(
-            lookup.findVirtual(Array.class, "set",
-                MethodType.methodType(void.class, Object.class, Object.class)),
+        array_set = lookup.findVirtual(Array.class, "set",
+                MethodType.methodType(void.class, Object.class, Object.class)).asType(
                 MethodType.methodType(void.class, Object.class, Object.class, Object.class));
-        array_access = MethodHandles.convertArguments(
+        array_access = 
             lookup.findStatic(MemberAccess.class, "array_access",
-                MethodType.methodType(Object.class, boolean.class, ArrayAccess.class, Object.class)),
+                MethodType.methodType(Object.class, boolean.class, ArrayAccess.class, Object.class)).asType(
                 MethodType.methodType(Object.class, boolean.class, Object.class, Object.class));
 
         test_receiver_asArray = lookup.findStatic(MemberAccess.class, "test_receiver_asArray",
@@ -955,8 +954,7 @@ public class RT {
       if (key instanceof String && ((name = (String)key).length() != 0)) {
         MethodHandle mh = MethodResolver.findSetter(refClass, name);
         if (mh != null) {
-          mh = MethodHandles.convertArguments(mh,  
-              MethodType.methodType(void.class, Object.class, Object.class));
+          mh = mh.asType(MethodType.methodType(void.class, Object.class, Object.class));
           try {
             //FIXME should be invokeExact
             //XXX workaround bug in jdk7b94
@@ -1034,8 +1032,7 @@ public class RT {
           mh = MethodResolver.findMethodHandle(refClass, name, 0);
         }
         if (mh != null) {
-          mh = MethodHandles.convertArguments(mh,  
-              MethodType.methodType(Object.class, Object.class));
+          mh = mh.asType(MethodType.methodType(Object.class, Object.class));
           Object result;
           try {
             //FIXME should be invokeExact
@@ -1147,7 +1144,7 @@ public class RT {
         throw RT.error("no function %s with values %s", name, Arrays.toString(values));
       }
 
-      target = MethodHandles.convertArguments(target, callSite.getTarget().type());
+      target = target.asType(callSite.getTarget().type());
       MethodHandle test = MethodHandles.insertArguments(test_receiver_class, 0, receiverClass);
       MethodHandle guard = MethodHandles.guardWithTest(test, target, callSite.getTarget());
       callSite.setTarget(guard);
@@ -1172,7 +1169,7 @@ public class RT {
     MutableCallSite callSite = new MutableCallSite(methodType);
     
     MethodHandle target = MethodHandles.insertArguments(OpBehavior.slowPath, 0, opBehavior, callSite);
-    callSite.setTarget(MethodHandles.convertArguments(target, methodType));
+    callSite.setTarget(target.asType(methodType));
     return callSite;
   }
   
@@ -1252,12 +1249,12 @@ public class RT {
           return op_int_int;
         } 
         if (rightType == double.class || rightType == Double.class) {
-          return MethodHandles.convertArguments(op_double_double, op_double_double.type());
+          return op_double_double.asType(op_double_double.type());
         }
       }
       if (leftType == double.class || leftType == Double.class) {
         if (rightType == int.class || rightType == Integer.class) {
-          return MethodHandles.convertArguments(op_double_double, op_double_double.type());
+          return op_double_double.asType(op_double_double.type());
         } 
         if (rightType == double.class || rightType == Double.class) {
           return op_double_double;
@@ -1395,7 +1392,7 @@ public class RT {
       //Object result =  mh.invokeGeneric(left, right);
       Object result = mh.invokeWithArguments(left, right);
       
-      mh = MethodHandles.convertArguments(mh, methodType);
+      mh = mh.asType(methodType);
       callSite.setTarget(MethodHandles.guardWithTest(test, mh, callSite.getTarget()));
       return result; 
     }

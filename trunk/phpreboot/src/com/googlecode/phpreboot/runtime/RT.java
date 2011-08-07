@@ -1196,7 +1196,7 @@ public class RT {
       Function function = (Function)var.getValue();
       
       // create signature (Type) from method type (Class)
-      ArrayList<Type> signature = new ArrayList<Type>();   
+      ArrayList<Type> signature = new ArrayList<>();   
       int parameterCount = methodType.parameterCount();
       for(int i=1; i<parameterCount; i++) {
         signature.add(asType(methodType.parameterType(i)));
@@ -1347,7 +1347,7 @@ public class RT {
     private static final HashMap<String, OpBehavior> BEHAVIOR_MAP;
     static {
       Lookup lookup = MethodHandles.publicLookup();
-      HashMap<String, OpBehavior> map = new HashMap<String, RT.OpBehavior>();
+      HashMap<String, OpBehavior> map = new HashMap<>();
       map.put("plus", new Plus(lookup));
       
       map.put("minus", new OpBehavior("-", lookup, "minus"));

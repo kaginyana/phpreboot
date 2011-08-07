@@ -1,16 +1,9 @@
 package com.googlecode.phpreboot.interpreter;
 
-import static org.objectweb.asm.Opcodes.ACONST_NULL;
-import static org.objectweb.asm.Opcodes.DCONST_0;
-import static org.objectweb.asm.Opcodes.ICONST_0;
-import static org.objectweb.asm.Opcodes.IRETURN;
-
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.List;
-
-import org.objectweb.asm.MethodVisitor;
 
 import com.googlecode.phpreboot.ast.ArrayEntry;
 import com.googlecode.phpreboot.ast.ArrayValue;
@@ -190,7 +183,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   // --- helper methods
   
-  private Object lookupVarValue(String name, Scope scope) {
+  private static Object lookupVarValue(String name, Scope scope) {
     Var var = scope.lookup(name);
     if (var == null) {
       throw RT.error("variable %s not defined", name);
@@ -208,7 +201,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   // --- function definition
   
-  private Function createFunction(String name, Parameters parametersNode, Block block, EvalEnv env) {
+  private static Function createFunction(String name, Parameters parametersNode, Block block, EvalEnv env) {
     Function function = Function.createFunction(name, parametersNode, null, env.getScope(), block);
     
     //FIXME, this code is similar to Compiler.asMethodType()
@@ -248,7 +241,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     return function;
   }
   
-  private void visitFun(String name, Parameters parameters, Block block, EvalEnv env) {
+  private static void visitFun(String name, Parameters parameters, Block block, EvalEnv env) {
     Scope scope = env.getScope();
     checkVar(name, scope);
     
@@ -382,7 +375,7 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
   
   // --- labeled instructions
   
-  private /*@Nullable*/String getLoopLabel(InstrLabeled instr_labeled) {
+  private static /*@Nullable*/String getLoopLabel(InstrLabeled instr_labeled) {
     Label label = instr_labeled.getLabel();
     if (label instanceof LabelId) {
       return ((LabelId)label).getId().getValue();

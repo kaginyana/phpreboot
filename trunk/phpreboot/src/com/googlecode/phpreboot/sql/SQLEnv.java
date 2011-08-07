@@ -9,8 +9,7 @@ import com.googlecode.phpreboot.interpreter.EvalEnv;
 public class SQLEnv {
   private final EvalEnv evalEnv;
   private final Connection connection;
-  private final ArrayList<Object> parameters =
-    new ArrayList<Object>();
+  private final ArrayList<Object> parameters = new ArrayList<>();
   private final StringBuilder builder =
     new StringBuilder();
   

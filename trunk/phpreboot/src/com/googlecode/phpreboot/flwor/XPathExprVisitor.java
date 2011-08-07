@@ -95,7 +95,7 @@ public class XPathExprVisitor extends Visitor<Object, XPathExprEnv, JaxenExcepti
     EvalEnv newEnv = new EvalEnv(new Scope(evalEnv.getScope()), evalEnv.getEchoer());
     
     Iterator<ForOrLet> it = flwor.getForOrLetPlus().iterator();
-    ArrayList<Object> arrayList = new ArrayList<Object>();
+    ArrayList<Object> arrayList = new ArrayList<>();
     forOrLets(it, flwor.getXwhereOptional(), flwor.getExpr(), arrayList, newEnv);
     
     Xorderby xorderby = flwor.getXorderbyOptional();
@@ -170,7 +170,7 @@ public class XPathExprVisitor extends Visitor<Object, XPathExprEnv, JaxenExcepti
     }
   }
   
-  private boolean filter(Xwhere xwhere, EvalEnv env) {
+  private static boolean filter(Xwhere xwhere, EvalEnv env) {
     Object condition = Evaluator.INSTANCE.eval(xwhere.getExpr(), env);
     if (!(condition instanceof Boolean)) {
       throw RT.error("where condition must be a boolean: %s", condition);
@@ -210,7 +210,7 @@ public class XPathExprVisitor extends Visitor<Object, XPathExprEnv, JaxenExcepti
     Collections.sort(list, comparator);
   }
   
-  private Array toArray(List<?> list) {
+  private static Array toArray(List<?> list) {
     Array array = new Array();
     for(Object o: list) {
       array.add(o);
@@ -265,7 +265,7 @@ public class XPathExprVisitor extends Visitor<Object, XPathExprEnv, JaxenExcepti
   
   @Override
   public Object visit(RelativeLocationPathStep relative_location_path_step, XPathExprEnv env) throws JaxenException {
-    ArrayList<Step> steps = new ArrayList<Step>();
+    ArrayList<Step> steps = new ArrayList<>();
     steps.add((Step)xpath(relative_location_path_step.getStep(), env));
     return steps;
   }
@@ -366,7 +366,7 @@ public class XPathExprVisitor extends Visitor<Object, XPathExprEnv, JaxenExcepti
     return env.getFactory().createPredicate((Expr)xpath(predicate.getXpathExpr(), env));
   }
   
-  private Object xpathEscape(Node node, XPathExprEnv env) throws JaxenException {
+  private static Object xpathEscape(Node node, XPathExprEnv env) throws JaxenException {
     Object o = Evaluator.INSTANCE.eval(node, env.getEvalEnv());
     if (o instanceof String) {
       return env.getFactory().createLiteralExpr((String)o);

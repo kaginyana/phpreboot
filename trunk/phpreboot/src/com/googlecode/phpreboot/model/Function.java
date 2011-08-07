@@ -44,7 +44,7 @@ public class Function {
   }
   
   private static List<Type> gatherParameterTypes(List<Parameter> parameters) {
-    ArrayList<Type> parameterTypes = new ArrayList<Type>(parameters.size());
+    ArrayList<Type> parameterTypes = new ArrayList<>(parameters.size());
     for(Parameter parameter: parameters) {
       parameterTypes.add(parameter.getType());
     }
@@ -134,7 +134,7 @@ public class Function {
   public static Function createFunction(String name, Parameters parametersNode, IntrinsicInfo intrinsicInfo, Scope scope, Block block) {
     List<com.googlecode.phpreboot.ast.Parameter> parameterStar = parametersNode.getParameterStar();
     int size = parameterStar.size();
-    ArrayList<Parameter> parameters = new ArrayList<Parameter>(size);
+    ArrayList<Parameter> parameters = new ArrayList<>(size);
     
     for(int i=0; i<size; i++) {
       String parameterName;

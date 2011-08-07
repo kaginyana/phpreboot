@@ -82,7 +82,7 @@ public class Scope {
   }
   
   public static Scope filterReadOnlyVars(Scope scope) {
-    HashMap<String,Var> map = new HashMap<String, Var>();
+    HashMap<String,Var> map = new HashMap<>();
     filterReadOnlyVars(map, scope);
     
     Scope newScope = new Scope(null);
@@ -102,7 +102,7 @@ public class Scope {
       return this;
     }
     
-    HashMap<String,Var> map = new HashMap<String, Var>();
+    HashMap<String,Var> map = new HashMap<>();
     for(Var var: varMap.values()) {
       Var newVar = new Var(var.getName(), var.isReadOnly(), var.isReallyConstant(), var.getType(), null);
       varMap.put((LocalVar)var, newVar);

@@ -16,10 +16,8 @@ class LoopStack<E> {
     }
   }
   
-  private final ArrayDeque<Entry<E>> stack =
-    new ArrayDeque<Entry<E>>(8);
-  private final HashMap<String,E> labelMap =
-    new HashMap<String, E>(16);
+  private final ArrayDeque<Entry<E>> stack = new ArrayDeque<>(8);
+  private final HashMap<String,E> labelMap = new HashMap<>(16);
   
   private static class Entry<E> {
     final /*@Nullable*/String label;
@@ -32,7 +30,7 @@ class LoopStack<E> {
   }
   
   public void push(/*@Nullable*/String label, E element) {
-    stack.push(new Entry<E>(label, element));
+    stack.push(new Entry<>(label, element));
     if (label != null) {
       labelMap.put(label, element);
     }

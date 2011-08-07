@@ -32,7 +32,7 @@ public class Main {
     doc(": start doc") {
       @Override
       boolean parse(EnumMap<Option, Object> optionMap, Iterator<String> it) {
-        ArrayList<String> arguments = new ArrayList<String>();
+        ArrayList<String> arguments = new ArrayList<>();
         while(it.hasNext())
           arguments.add(it.next());
         optionMap.put(this, arguments.toArray(new String[arguments.size()]));
@@ -109,9 +109,9 @@ public class Main {
   }
 
   public static void main(String[] args) throws IOException {
-    EnumMap<Option,Object> optionMap = new EnumMap<Option,Object>(Option.class);
+    EnumMap<Option,Object> optionMap = new EnumMap<>(Option.class);
 
-    ArrayList<Path> filePaths = new ArrayList<Path>(); 
+    ArrayList<Path> filePaths = new ArrayList<>(); 
     if (args.length != 0) {
       Iterator<String> it = Arrays.asList(args).iterator();
       while(it.hasNext()) {
@@ -156,7 +156,7 @@ public class Main {
     }
     
     if (optionMap.containsKey(Option.doc)) {
-      ArrayList<String> arguments = new ArrayList<String>();
+      ArrayList<String> arguments = new ArrayList<>();
       Collections.addAll(arguments, "-doclet", Doclet.class.getName());
       Collections.addAll(arguments, (String[])optionMap.get(Option.doc));
       com.sun.tools.javadoc.Main.main(arguments.toArray(new String[arguments.size()]));

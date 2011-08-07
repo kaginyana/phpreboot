@@ -36,12 +36,11 @@ function reverse(list) {
   return {"element": list.element, "next": tail}
 }
 
-
-list = cons(2, cons(3, nil()));
-
-display(list)
-echo size(list)
-echo contains(list, "foo")
-echo contains(list, 2)
-echo reverse(list)
-
+// create a bigger list
+big = nil()
+i = 0;
+while (i<1000) {
+  big = cons(i, big)
+  i = i + 1
+}
+echo big

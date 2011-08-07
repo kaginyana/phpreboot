@@ -240,7 +240,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     mv.visitInsn(asASMType(returnType).getOpcode(IRETURN));
   }
   
-  private void insertCast(MethodVisitor mv, Type type, Type exprType) {
+  private static void insertCast(MethodVisitor mv, Type type, Type exprType) {
     if (type == exprType)
       return;
 
@@ -448,6 +448,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
       gen(expr, env.expectedType(functionReturnType));
       insertCast(mv, functionReturnType, getTypeAttribute(expr));
     }
+    //else FIXME: should put null or default value on stack
     
     if (trace) {
       // we are in trace mode, must generate an exception to go back into the interpreter
@@ -530,7 +531,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     };
   }
   
-  private Generator generatorEscapeToInterpreter(final BranchSymbol branchSymbol) {
+  private static Generator generatorEscapeToInterpreter(final BranchSymbol branchSymbol) {
     return new Generator() {
       @Override
       void gen(GenEnv env) {
@@ -585,7 +586,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     throw new AssertionError("unknown opName");
   }
   
-  private void genInstrOrExprBranches(IfParts ifParts, Label trueLabel, Label endLabel, boolean lastInstrIsAMethodCall, GenEnv env) {
+  private static void genInstrOrExprBranches(IfParts ifParts, Label trueLabel, Label endLabel, boolean lastInstrIsAMethodCall, GenEnv env) {
     MethodVisitor mv = env.getMethodVisitor();
     if (!lastInstrIsAMethodCall || ifParts.inCondition) {
       if (lastInstrIsAMethodCall) {
@@ -612,7 +613,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
     } 
   }
   
-  private void genOnlyOneBranch(IfParts ifParts, int opcode, GenEnv env) {
+  private static void genOnlyOneBranch(IfParts ifParts, int opcode, GenEnv env) {
     if (opcode == IF_ICMPEQ) {
       ifParts.falsePart.gen(env);
     } else {

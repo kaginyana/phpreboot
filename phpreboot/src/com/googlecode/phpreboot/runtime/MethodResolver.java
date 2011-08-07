@@ -51,7 +51,7 @@ class MethodResolver {
   }
 
   private static ArrayList<Method> gatherMethods(Class<?> declaringClass, String name, int parameterCount) {
-    ArrayList<Method> list = new ArrayList<Method>();
+    ArrayList<Method> list = new ArrayList<>();
     for(Method method: declaringClass.getMethods()) {
       String methodName = method.getName();
       Class<?>[] parameterTypes = method.getParameterTypes();

@@ -10,8 +10,7 @@ import com.googlecode.phpreboot.model.Type;
 public class BindMap {
   private int slotCount = 1;    // 0 == EvalEnv
   private int outputVarCount = 0;
-  private final ArrayList<LocalVar> bindReferences =
-    new ArrayList<LocalVar>(16);
+  private final ArrayList<LocalVar> bindReferences = new ArrayList<>(16);
   
   public LocalVar bind(String name, boolean isReadOnly, boolean isConstant, Object value, Type type, boolean allowOptimiticType, TypeProfileMap typeProfileMap, Node declaringNode) {
     boolean optimistic;

@@ -74,12 +74,9 @@ import com.googlecode.phpreboot.parser.ProductionEnum;
 import com.googlecode.phpreboot.runtime.RT;
 
 class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
-  private final HashMap<Node, Type> typeAttributeMap =
-    new HashMap<Node, Type>();
-  private final HashMap<Node, Symbol> symbolAttributeMap =
-    new HashMap<Node, Symbol>();
-  private final HashMap<Function,LocalVar> functionToLocalMap =
-    new HashMap<Function, LocalVar>();
+  private final HashMap<Node, Type> typeAttributeMap = new HashMap<>();
+  private final HashMap<Node, Symbol> symbolAttributeMap = new HashMap<>();
+  private final HashMap<Function,LocalVar> functionToLocalMap = new HashMap<>();
   private final boolean breakOrContinueAsException;
   private final /*@Nullable*/Node rootTraceNode;  // null if not in trace mode
   private final /*@Nullable*/Scope rootScope;     // null if not in trace mode
@@ -264,7 +261,7 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
       localScope.register(LocalVar.createLocalVar(parameter.getName(), true, type, null, localScope.nextSlot(type)));
     }
     
-    LoopStack<Boolean> loopStack = new LoopStack<Boolean>();
+    LoopStack<Boolean> loopStack = new LoopStack<>();
     typeCheck(block, new TypeCheckEnv(localScope, loopStack, false, function.getReturnType()));
     
     Var var = new Var(name, true, true, PrimitiveType.ANY, function);
@@ -350,12 +347,12 @@ class TypeChecker extends Visitor<Type, TypeCheckEnv, RuntimeException> {
       
       if (!ifProfile.isLeftPartTaken()) {  
         leftPartEnv = new TypeCheckEnv(env.getScope(), env.getLoopStack(), true, env.getFunctionReturnType());
-        varMapAssoc = new LinkedHashMap<LocalVar, Var>();
+        varMapAssoc = new LinkedHashMap<>();
         reconstructedScope = env.getScope().reconstructScope(varMapAssoc);
       } else
         if (!ifProfile.isRightPartTaken()) {
           rightPartEnv = new TypeCheckEnv(env.getScope(), env.getLoopStack(), true, env.getFunctionReturnType());
-          varMapAssoc = new LinkedHashMap<LocalVar, Var>();
+          varMapAssoc = new LinkedHashMap<>();
           reconstructedScope = env.getScope().reconstructScope(varMapAssoc);
         }
     }

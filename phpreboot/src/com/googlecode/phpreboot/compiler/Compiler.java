@@ -182,7 +182,7 @@ public class Compiler {
     assert unspecializedFunction.getIntrinsicInfo() == null;
     
     int length = vars.length;
-    ArrayList<Parameter> parameters = new ArrayList<Parameter>(length);
+    ArrayList<Parameter> parameters = new ArrayList<>(length);
     List<Parameter> unspecializedParameters = unspecializedFunction.getParameters();
     for(int i=0; i<length; i++) {
       Parameter unspecializedParameter = unspecializedParameters.get(i);
@@ -341,7 +341,7 @@ public class Compiler {
   
   // returns the liveness of the block 
   private static Type typecheck(TypeChecker typeChecker, Node node, Type returnType, LocalScope localScope) throws CodeNotCompilableTypeCheckException {
-    LoopStack<Boolean> loopStack = new LoopStack<Boolean>();
+    LoopStack<Boolean> loopStack = new LoopStack<>();
     TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, false, returnType);
     return typeChecker.typeCheck(node, typeCheckEnv);
   }
@@ -354,7 +354,7 @@ public class Compiler {
     TypeProfileMap typeProfileMap = new TypeProfileMap();
     BindMap bindMap = new BindMap();
     TypeChecker typeChecker = new TypeChecker(true, labeledInstrWhile, rootScope, false, bindMap, typeProfileMap, RTFlag.COMPILER_OPTIMISTIC && optimisticTrace);
-    LoopStack<Boolean> loopStack = new LoopStack<Boolean>();
+    LoopStack<Boolean> loopStack = new LoopStack<>();
     TypeCheckEnv typeCheckEnv = new TypeCheckEnv(localScope, loopStack, false, PrimitiveType.ANY);
     
     try {

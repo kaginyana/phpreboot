@@ -6,8 +6,7 @@ import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.model.Type;
 
 class TypeProfileMap {
-  private final HashMap<Node, Type> typeMap =
-    new HashMap<Node, Type>(32);
+  private final HashMap<Node, Type> typeMap = new HashMap<>(32);
   private boolean valid = true;
   
   public void registerType(Node node, Type type) {

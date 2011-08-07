@@ -49,7 +49,7 @@ public abstract class Module {
   }
   
   private static Function createFunction(Method method) {
-    ArrayList<Parameter> parameters = new ArrayList<Parameter>();
+    ArrayList<Parameter> parameters = new ArrayList<>();
     Class<?>[] parameterTypes = method.getParameterTypes();
     for(int i=0; i< parameterTypes.length; i++) {
       Parameter parameter = new Parameter("arg"+i, asType(parameterTypes[i]), null);

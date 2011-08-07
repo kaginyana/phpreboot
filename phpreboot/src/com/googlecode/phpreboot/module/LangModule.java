@@ -32,7 +32,7 @@ public class LangModule extends Module {
     try {
       XMLEventReader eventReader = factory.createXMLEventReader(input);
       
-      ArrayDeque<XML> stack = new ArrayDeque<XML>();
+      ArrayDeque<XML> stack = new ArrayDeque<>();
       while(eventReader.hasNext()) {
         XMLEvent event = eventReader.nextEvent();
         switch (event.getEventType()) {

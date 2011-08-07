@@ -56,20 +56,19 @@ public enum PrimitiveType implements Type {
   }
   
   public static PrimitiveType lookup(String name) {
-    PrimitiveType token = PrimitiveType.tokenMap.get(name);
+    PrimitiveType token = TOKEN_MAP.get(name);
     if (token == null) {
       throw RT.error("Unknown type %s", name);
     }
     return token;
   }
   
-  static final HashMap<String, PrimitiveType> tokenMap;
+  static private final HashMap<String, PrimitiveType> TOKEN_MAP;
   static {
-    HashMap<String, PrimitiveType> map =
-      new HashMap<String, PrimitiveType>(32);
+    HashMap<String, PrimitiveType> map = new HashMap<>(32);
     for(PrimitiveType token: PrimitiveType.values()) {
       map.put(token.type, token);
     }
-    tokenMap = map;
+    TOKEN_MAP = map;
   }
 }

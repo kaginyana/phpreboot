@@ -120,7 +120,7 @@ public class WebScriptDispatcher extends GrizzlyAdapter {
     scope.register(new Var("_SERVER", true, true, PrimitiveType.ARRAY, server));
   }
   
-  private void fillGetOrPost(GrizzlyRequest request, Scope scope) {
+  private static void fillGetOrPost(GrizzlyRequest request, Scope scope) {
     Array parameters = new Array();
     for(Map.Entry<?,?> entry: ((Map<?,?>)request.getParameterMap()).entrySet()) {
       Object value = entry.getValue();

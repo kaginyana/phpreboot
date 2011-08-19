@@ -13,8 +13,6 @@ import com.googlecode.phpreboot.ast.ParameterAny;
 import com.googlecode.phpreboot.ast.ParameterTyped;
 import com.googlecode.phpreboot.ast.Parameters;
 import com.googlecode.phpreboot.ast.ReturnType;
-import com.googlecode.phpreboot.interpreter.EvalEnv;
-import com.googlecode.phpreboot.interpreter.Evaluator;
 import com.googlecode.phpreboot.interpreter.Scope;
 
 public class Function {
@@ -76,7 +74,7 @@ public class Function {
     return block;
   }
   
-  //should be called only by Typechecker 
+  //should be called only by the Typechecker 
   public void __setReturnType__(Type returnType) {
     this.returnType = returnType;
   }
@@ -85,10 +83,12 @@ public class Function {
   }
   // A call to this method is only valid if intrinsicInfo is null
   public Function lookupSignature(List<Type> signature) {
+    assert intrinsicInfo == null;
     return signatureCache.get(signature);
   }
   // A call to this method is only valid if intrinsicInfo is null
   public void registerSignature(Function function) {
+    assert intrinsicInfo == null;
     signatureCache.put(function.parameterTypes, function);
   }
   
@@ -125,10 +125,6 @@ public class Function {
   @Override
   public String toString() {
     return name+parameters+':'+returnType;
-  }
-  
-  public Object call(EvalEnv env, Object[] arguments) {
-    return Evaluator.INSTANCE.evalFunction(this, arguments, env);
   }
   
   public static Function createFunction(String name, Parameters parametersNode, IntrinsicInfo intrinsicInfo, Scope scope, Block block) {

@@ -25,6 +25,7 @@ import com.googlecode.phpreboot.ast.Node;
 import com.googlecode.phpreboot.ast.Script;
 import com.googlecode.phpreboot.compiler.LoopStack.Labels;
 import com.googlecode.phpreboot.interpreter.EvalEnv;
+import com.googlecode.phpreboot.interpreter.Evaluator;
 import com.googlecode.phpreboot.interpreter.Scope;
 import com.googlecode.phpreboot.interpreter.Profile.LoopProfile;
 import com.googlecode.phpreboot.model.Function;
@@ -205,39 +206,34 @@ public class Compiler {
   public static class CompileFunctionStub {
     private int counter;
     
-    public static MethodHandle compileStub(Function function, MethodHandle interpreter) {
+    public static MethodHandle compileStub() {
       CompileFunctionStub compileFunctionStub = new CompileFunctionStub();
-      MethodHandle stub = MethodHandles.insertArguments(STUB, 0, function, interpreter, compileFunctionStub);
-      MethodType interpreterType = interpreter.type();
-      return stub.asCollector(Object[].class, interpreterType.parameterCount()).asType(interpreterType);
+      return STUB.bindTo(compileFunctionStub);
     }
     
-    public static Object stub(Function function, MethodHandle interpreter, CompileFunctionStub stub, Object[] args) throws Throwable {
-      MethodHandle mh;
-      
+    public static Object stub(CompileFunctionStub stub, Function function, EvalEnv env, Object[] args) throws Throwable {
       int counter = stub.counter;
-      if (counter > RTFlag.COMPILER_FUNCTION_THRESHOLD) {
+      if (counter >= RTFlag.COMPILER_FUNCTION_THRESHOLD) {
         MethodHandle compileMH = Compiler.compileFunction(function);
         if (compileMH != null) {
           function.setMethodHandle(compileMH, true);
-          mh = compileMH;
-        } else {
-          mh = interpreter;
-          function.setMethodHandle(interpreter, true);
+        } else { // fallback, always use the evaluator
+          MethodType functionType = function.getMethodHandle().type();
+          MethodHandle evaluator = MethodHandles.insertArguments(Evaluator.EVAL_FUNCTION, 0, function);
+          evaluator = evaluator.asCollector(Object[].class, functionType.parameterCount() - 1);
+          evaluator = evaluator.asType(functionType);
+          function.setMethodHandle(evaluator, true);
         }
-      } else {
-        mh = interpreter;
-        stub.counter = counter + 1;
-      }
-      
-      return mh.invokeWithArguments(args);
+      } 
+      stub.counter = counter + 1;
+      return Evaluator.INSTANCE.evalFunction(function, env, args);
     }
     
     static final MethodHandle STUB;
     static {
       try {
         STUB = MethodHandles.publicLookup().findStatic(CompileFunctionStub.class, "stub",
-            MethodType.methodType(Object.class, Function.class, MethodHandle.class, CompileFunctionStub.class, Object[].class));
+            MethodType.methodType(Object.class, CompileFunctionStub.class, Function.class, EvalEnv.class, Object[].class));
       } catch (IllegalAccessException e) {
         throw (AssertionError)new AssertionError().initCause(e);
       } catch (NoSuchMethodException e) {

@@ -144,7 +144,8 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     return node.accept(this, env);
   }
   
-  public Object evalFunction(Function function, Object[] arguments, EvalEnv env) {
+  // is method is called through a MethodHandle, see #createFunction()
+  public Object evalFunction(Function function, EvalEnv env, Object[] arguments) {
     Scope scope = new Scope(function.getScope());
     scope.register(new Var(function.getName(), true, false, PrimitiveType.ANY, function));
     
@@ -214,14 +215,12 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
       signature[i + 1] = parameterTypes.get(i).getUnboxedRuntimeClass();
     }
     
+    // install a compiler stub or a call to the evaluator
     MethodHandle mh;
-    try {
-      mh = MethodHandles.lookup().findVirtual(Function.class, "call",
-          MethodType.methodType(Object.class, EvalEnv.class, Object[].class));
-    } catch (IllegalAccessException e) {
-      throw (AssertionError)new AssertionError().initCause(e);
-    } catch(NoSuchMethodException e) {
-      throw (AssertionError)new AssertionError().initCause(e);
+    if (RTFlag.COMPILER_ENABLE) {
+      mh = CompileFunctionStub.compileStub();
+    } else {
+      mh = EVAL_FUNCTION;
     }
     mh = MethodHandles.insertArguments(mh, 0, function);
     mh = mh.asCollector(Object[].class, size);
@@ -232,13 +231,22 @@ public class Evaluator extends Visitor<Object, EvalEnv, RuntimeException> {
     
     //System.err.println("create function handle "+name+" "+functionType);
     
-    // install compiler stub
-    if (RTFlag.COMPILER_ENABLE) {
-      mh = CompileFunctionStub.compileStub(function, mh);
-    }
-    
     function.setMethodHandle(mh, true);
     return function;
+  }
+  
+  public static final MethodHandle EVAL_FUNCTION;
+  static {
+    MethodHandle mh;
+    try {
+      mh = MethodHandles.lookup().bind(INSTANCE, "evalFunction",
+          MethodType.methodType(Object.class, Function.class, EvalEnv.class, Object[].class));
+    } catch (IllegalAccessException e) {
+      throw (AssertionError)new AssertionError().initCause(e);
+    } catch(NoSuchMethodException e) {
+      throw (AssertionError)new AssertionError().initCause(e);
+    }
+    EVAL_FUNCTION = mh;
   }
   
   private static void visitFun(String name, Parameters parameters, Block block, EvalEnv env) {

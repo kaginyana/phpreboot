@@ -79,7 +79,7 @@ public class Compiler {
     Gen gen = new Gen(false, scriptName, cv, typeChecker.getTypeAttributeMap(), typeChecker.getSymbolAttributeMap());
     gen.gen(script, new GenEnv(mv, 2 /*ARGS + env*/, PrimitiveType.VOID, null, new LoopStack<Labels>(), null));
     if (liveness == LivenessType.ALIVE) {
-      gen.defaultReturn(mv, PrimitiveType.VOID);
+      Gen.defaultReturn(mv, PrimitiveType.VOID);
     }
     
     mv.visitMaxs(0, 0);
@@ -300,7 +300,7 @@ public class Compiler {
     Gen gen = new Gen(false, className, cv, typeAttributeMap, symbolAttributeMap);
     gen.gen(function.getBlock(), new GenEnv(mv, bindMap.getSlotCount(), returnType, null, new LoopStack<Labels>(), null));
     if (liveness == LivenessType.ALIVE) {
-      gen.defaultReturn(mv, returnType);
+      Gen.defaultReturn(mv, returnType);
     }
     
     mv.visitMaxs(0, 0);
@@ -393,13 +393,6 @@ public class Compiler {
     
     MethodType methodType = asTraceMethodType(bindMap);
     
-    //XXX ricochet not yet implemented in jdk7
-    if (!LEGACY_MODE && methodType.parameterCount() > 10) {
-      System.err.println("trace:"+methodType);
-      System.err.println("ricochet not yet implemented, go back in interpreter mode");
-      return null;
-    }
-    
     String desc = methodType.toMethodDescriptorString();
     MethodVisitor mv = cv.visitMethod(Opcodes.ACC_PUBLIC|Opcodes.ACC_STATIC, "trace", desc, null, null);
     mv.visitCode();
@@ -420,7 +413,7 @@ public class Compiler {
     Object[] args = new Object[size + outputVarCount + 1];
     args[0] = env;
     if (size != 0) {
-      gen.restoreEnv(mv, references, bindMap.getSlotCount() -1 /*XXX substract env slot */, rootScope, args);
+      Gen.restoreEnv(mv, references, bindMap.getSlotCount() -1 /*XXX substract env slot */, rootScope, args);
     }
     
     mv.visitInsn(Opcodes.ICONST_1);

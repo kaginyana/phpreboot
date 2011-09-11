@@ -46,7 +46,7 @@ import java.util.Map;
 
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Label;
-import org.objectweb.asm.MethodHandle;
+import org.objectweb.asm.Handle;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
@@ -163,8 +163,8 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   
   // --- helpers
   
-  private static final MethodHandle BOOTSTRAP_METHOD =
-    new MethodHandle(MH_INVOKESTATIC, RT_INTERNAL_NAME, "bootstrap",
+  private static final Handle BOOTSTRAP_METHOD =
+    new Handle(H_INVOKESTATIC, RT_INTERNAL_NAME, "bootstrap",
         MethodType.methodType(CallSite.class, Lookup.class, String.class, MethodType.class).toMethodDescriptorString());
   
   private static void indy(MethodVisitor mv, String name, Type returnType, Type type) {
@@ -222,7 +222,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   private static final org.objectweb.asm.Type ASM_URI_TYPE = org.objectweb.asm.Type.getType(URI.class);
   private static final org.objectweb.asm.Type ASM_FUNCTION_TYPE = org.objectweb.asm.Type.getType(Function.class);
 
-  void defaultReturn(MethodVisitor mv, Type returnType) {
+  static void defaultReturn(MethodVisitor mv, Type returnType) {
     switch((PrimitiveType)returnType) {
     case VOID:
       break;
@@ -279,7 +279,7 @@ class Gen extends Visitor<Type, GenEnv, RuntimeException> {
   
   // restore environment at the end of a trace and
   // prepare arguments for the first call
-  void restoreEnv(MethodVisitor mv, List<LocalVar> references, int slotCount, Scope scope, Object[] args) {
+  static void restoreEnv(MethodVisitor mv, List<LocalVar> references, int slotCount, Scope scope, Object[] args) {
     int size = references.size();
     int outputVarIndex = size + 1;
     int outputSlotIndex = slotCount + 1;
